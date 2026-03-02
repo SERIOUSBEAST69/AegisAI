@@ -54,12 +54,19 @@ const go = (path) => router.push(path);
 const logout = () => { localStorage.removeItem('token'); router.push('/login'); };
 
 const theme = ref('dark');
-const themeLabel = computed(() => theme.value === 'dark' ? '护眼模式' : '科技蓝');
+const themeLabel = computed(() => theme.value === 'dark' ? '夜间护眼' : '日间高对比');
 const toggleTheme = () => {
   theme.value = theme.value === 'dark' ? 'light' : 'dark';
-  document.body.style.background = theme.value === 'dark'
-    ? 'radial-gradient(circle at 20% 20%, rgba(22,93,255,0.15), rgba(0,0,0,0)), radial-gradient(circle at 80% 0%, rgba(0,180,42,0.12), rgba(0,0,0,0)), #0b1221'
-    : '#f5f7fb';
+  if (theme.value === 'dark') {
+    document.body.style.background =
+      'radial-gradient(circle at 18% 20%, rgba(15,95,255,0.22), rgba(0,0,0,0)), ' +
+      'radial-gradient(circle at 82% 12%, rgba(0,150,60,0.18), rgba(0,0,0,0)), ' +
+      'linear-gradient(135deg, #050914 0%, #070c19 40%, #050914 100%)';
+    document.body.style.color = '#e6ecf7';
+  } else {
+    document.body.style.background = '#e9eef7';
+    document.body.style.color = '#1b2333';
+  }
 };
 </script>
 

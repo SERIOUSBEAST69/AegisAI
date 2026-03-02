@@ -18,6 +18,8 @@ import SubjectRequest from '../views/SubjectRequest.vue';
 import DesensePreview from '../views/DesensePreview.vue';
 import GlobalSearch from '../views/GlobalSearch.vue';
 import Login from '../views/Login.vue';
+import ModelList from '../views/ai/ModelList.vue';
+import ModelMonitor from '../views/ai/ModelMonitor.vue';
 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { public: true } },
@@ -37,7 +39,9 @@ const routes = [
   { path: '/data-share', name: 'DataShare', component: DataShare },
   { path: '/subject-request', name: 'SubjectRequest', component: SubjectRequest },
   { path: '/desense-preview', name: 'DesensePreview', component: DesensePreview },
-  { path: '/global-search', name: 'GlobalSearch', component: GlobalSearch }
+  { path: '/global-search', name: 'GlobalSearch', component: GlobalSearch },
+  { path: '/ai/models', name: 'ModelList', component: ModelList },
+  { path: '/ai/monitor', name: 'ModelMonitor', component: ModelMonitor }
 ];
 
 const router = createRouter({

@@ -9,6 +9,7 @@ C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\entity\SubjectR
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\service\impl\AlertRecordServiceImpl.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\controller\RoleController.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\controller\UserController.java
+C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\service\AiGatewayService.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\controller\DashboardController.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\controller\DataShareController.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\service\AlertRecordService.java
@@ -59,6 +60,7 @@ C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\mapper\Desensit
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\service\impl\UserServiceImpl.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\service\impl\DataAssetServiceImpl.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\mapper\DataShareRequestMapper.java
+C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\controller\AiGatewayController.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\config\SecurityConfig.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\service\impl\DesensitizeRuleServiceImpl.java
 C:\Users\serio\Desktop\AegisAI\backend\src\main\java\com\trustai\mapper\AuditLogMapper.java

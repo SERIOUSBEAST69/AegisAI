@@ -1,10 +1,13 @@
 :root {
-  --color-primary: #165dff;
-  --color-success: #00b42a;
-  --color-warning: #ff7d00;
-  --color-bg: #0b1221;
-  --color-card: #111a2c;
-  --color-text: #e8edf7;
+  --color-primary: #0b3fae;
+  --color-success: #00a23a;
+  --color-warning: #ff8a1f;
+  --color-bg: #050914;
+  --color-bg-alt: #070c19;
+  --color-card: #0d1525;
+  --color-card-strong: #0f1a2f;
+  --color-text: #e6ecf7;
+  --color-text-muted: #9fb2ce;
   --radius-lg: 14px;
   --radius-md: 10px;
   --gap-sm: 8px;
@@ -13,19 +16,21 @@
 }
 
 body {
-  background: radial-gradient(circle at 20% 20%, rgba(22,93,255,0.15), rgba(0,0,0,0)),
-              radial-gradient(circle at 80% 0%, rgba(0,180,42,0.12), rgba(0,0,0,0)),
-              #0b1221;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(15,95,255,0.22), rgba(0,0,0,0)),
+    radial-gradient(circle at 82% 12%, rgba(0,150,60,0.18), rgba(0,0,0,0)),
+    linear-gradient(135deg, #050914 0%, #070c19 40%, #050914 100%);
   color: var(--color-text);
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 .card-glass {
-  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-  backdrop-filter: blur(8px);
+  background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 16px 50px rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px) saturate(120%);
   border-radius: var(--radius-lg);
+  color: var(--color-text);
 }
 
 .floating-btn {
@@ -34,11 +39,21 @@ body {
   transition: transform .2s ease, box-shadow .2s ease;
 }
 .floating-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(22,93,255,0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(11,63,174,0.35);
 }
 
 .fade-slide-enter-active, .fade-slide-leave-active { transition: all .25s ease; }
 .fade-slide-enter-from, .fade-slide-leave-to { opacity: 0; transform: translateY(4px); }
 
-.skeleton-card { padding: var(--gap-md); border-radius: var(--radius-lg); background: rgba(255,255,255,0.04); }
+.skeleton-card { padding: var(--gap-md); border-radius: var(--radius-lg); background: rgba(255,255,255,0.05); }
+
+/* 强调标题与卡片分割线 */
+.card-header { color: var(--color-text); border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px; margin-bottom: 12px; }
+
+/* 输入、表格更高对比度 */
+.el-input__wrapper, .el-select .el-input__wrapper { background: var(--color-card-strong); border-color: rgba(255,255,255,0.12); }
+.el-table { color: var(--color-text); background: var(--color-card); }
+.el-table th, .el-table td { background-color: transparent; }
+.el-table__header-wrapper { background: var(--color-card-strong); }
+.el-button--primary { background: var(--color-primary); border-color: var(--color-primary); }

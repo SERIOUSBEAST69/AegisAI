@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.entity.*;
 import com.trustai.service.*;
 import com.trustai.utils.R;
+import com.trustai.utils.AesEncryptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +20,7 @@ public class SearchController {
     @Autowired private AiModelService aiModelService;
     @Autowired private AuditLogService auditLogService;
     @Autowired private ApprovalRequestService approvalRequestService;
+    @Autowired private AesEncryptor aesEncryptor;
 
     @GetMapping("/global")
     public R<Map<String, Object>> search(@RequestParam String keyword) {
@@ -26,13 +28,15 @@ public class SearchController {
         QueryWrapper<DataAsset> qwAsset = new QueryWrapper<>();
         qwAsset.like("name", keyword).or().like("description", keyword);
         QueryWrapper<AiModel> qwModel = new QueryWrapper<>();
-        qwModel.like("name", keyword).or().like("description", keyword);
+        qwModel.like("model_name", keyword).or().like("description", keyword);
         QueryWrapper<AuditLog> qwLog = new QueryWrapper<>();
         qwLog.like("operation", keyword).or().like("input_overview", keyword).last("limit 50");
         QueryWrapper<ApprovalRequest> qwApproval = new QueryWrapper<>();
         qwApproval.like("reason", keyword).or().like("status", keyword);
         res.put("assets", dataAssetService.list(qwAsset));
-        res.put("models", aiModelService.list(qwModel));
+        List<AiModel> models = aiModelService.list(qwModel);
+        models.forEach(m -> m.setApiKey(aesEncryptor.mask(m.getApiKey())));
+        res.put("models", models);
         res.put("auditLogs", auditLogService.list(qwLog));
         res.put("approvals", approvalRequestService.list(qwApproval));
         return R.ok(res);
