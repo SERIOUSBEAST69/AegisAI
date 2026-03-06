@@ -4,14 +4,17 @@ import com.trustai.entity.DesensitizeRule;
 import com.trustai.utils.R;
 import com.trustai.service.DesensitizeRuleService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import jakarta.validation.constraints.NotNull;
 
 @RestController
 @RequestMapping("/api/desense")
+@Validated
 public class DesenseController {
 
     @Autowired
@@ -26,6 +29,12 @@ public class DesenseController {
     public R<?> save(@RequestBody DesensitizeRule rule) {
         if (rule.getId() == null) ruleService.save(rule); else ruleService.updateById(rule);
         return R.ok(rule);
+    }
+
+    @PostMapping("/delete")
+    public R<?> delete(@RequestBody @Validated IdReq req) {
+        ruleService.removeById(req.getId());
+        return R.okMsg("删除成功");
     }
 
     @PostMapping("/preview")
@@ -54,5 +63,11 @@ public class DesenseController {
         private String sample; private String mask;
         public String getSample(){return sample;} public void setSample(String s){this.sample=s;}
         public String getMask(){return mask;} public void setMask(String m){this.mask=m;}
+    }
+
+    public static class IdReq {
+        @NotNull private Long id;
+        public Long getId(){return id;}
+        public void setId(Long id){this.id=id;}
     }
 }

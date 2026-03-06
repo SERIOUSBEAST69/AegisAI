@@ -2,7 +2,7 @@
   <div class="page-grid">
     <el-card class="card-glass">
       <div class="card-header">告警闭环管理</div>
-      <el-button type="primary" @click="refresh">刷新</el-button>
+      <el-button type="primary" :loading="loading" @click="refresh">刷新</el-button>
       <el-table :data="list" style="margin-top:12px" v-loading="loading">
         <el-table-column prop="title" label="标题" />
         <el-table-column prop="level" label="等级" />
@@ -17,6 +17,7 @@
               <el-option label="resolved" value="resolved" />
               <el-option label="archived" value="archived" />
             </el-select>
+            <el-button size="small" type="danger" @click="remove(scope.row.id)" style="margin-left:8px">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -26,6 +27,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import request from '../api/request';
 
 const list = ref([]);
@@ -33,13 +35,34 @@ const loading = ref(false);
 
 async function refresh() {
   loading.value = true;
-  list.value = await request.get('/alert/list');
-  loading.value = false;
+  try {
+    list.value = await request.get('/alert/list');
+  } catch (err) {
+    ElMessage.error(err?.message || '加载失败');
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function update(row) {
-  await request.post('/alert/update', row);
-  refresh();
+  try {
+    await request.post('/alert/update', row);
+    ElMessage.success('更新成功');
+    refresh();
+  } catch (err) {
+    ElMessage.error(err?.message || '更新失败');
+  }
+}
+
+async function remove(id) {
+  try {
+    await ElMessageBox.confirm('确认删除该告警吗？', '提示', { type: 'warning' });
+    await request.post('/alert/delete', { id });
+    ElMessage.success('删除成功');
+    refresh();
+  } catch (err) {
+    if (err !== 'cancel') ElMessage.error(err?.message || '删除失败');
+  }
 }
 
 refresh();

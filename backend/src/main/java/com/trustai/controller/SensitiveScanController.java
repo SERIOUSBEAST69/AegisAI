@@ -52,6 +52,12 @@ public class SensitiveScanController {
         return R.ok(task);
     }
 
+    @PostMapping("/delete")
+    public R<?> delete(@RequestBody @Validated IdReq req) {
+        taskService.removeById(req.getId());
+        return R.okMsg("删除成功");
+    }
+
     public static class IdReq { @NotNull private Long id; public Long getId(){return id;} public void setId(Long id){this.id=id;} }
     public static class CreateReq { @NotBlank private String sourceType; @NotBlank private String sourcePath; public String getSourceType(){return sourceType;} public void setSourceType(String v){sourceType=v;} public String getSourcePath(){return sourcePath;} public void setSourcePath(String v){sourcePath=v;} }
 }

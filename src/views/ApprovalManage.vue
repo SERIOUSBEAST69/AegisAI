@@ -9,8 +9,8 @@
         <el-input v-model="query.assetId" placeholder="资产ID" />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="fetchApprovals">查询</el-button>
-        <el-button @click="showAdd = true">新建申请</el-button>
+        <el-button type="primary" :loading="loading" @click="fetchApprovals">查询</el-button>
+        <el-button @click="openAdd">新建申请</el-button>
       </el-form-item>
     </el-form>
     <el-table :data="approvals" style="width: 100%" v-loading="loading">
@@ -22,46 +22,92 @@
       <el-table-column prop="approverId" label="审批人ID" />
       <el-table-column label="操作">
         <template #default="scope">
-          <el-button size="mini" @click="approve(scope.row, '通过')">通过</el-button>
-          <el-button size="mini" type="danger" @click="approve(scope.row, '拒绝')">拒绝</el-button>
+          <el-button size="small" @click="approve(scope.row, '通过')">通过</el-button>
+          <el-button size="small" type="danger" @click="approve(scope.row, '拒绝')">拒绝</el-button>
+          <el-button size="small" type="warning" @click="remove(scope.row.id)" style="margin-left:6px">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
     <el-dialog v-model="showAdd" title="新建审批申请">
-      <el-form :model="addForm">
-        <el-form-item label="申请人ID"><el-input v-model="addForm.applicantId" /></el-form-item>
-        <el-form-item label="资产ID"><el-input v-model="addForm.assetId" /></el-form-item>
-        <el-form-item label="理由"><el-input v-model="addForm.reason" /></el-form-item>
+      <el-form :model="addForm" :rules="rules" ref="addFormRef">
+        <el-form-item label="申请人ID" prop="applicantId"><el-input v-model="addForm.applicantId" /></el-form-item>
+        <el-form-item label="资产ID" prop="assetId"><el-input v-model="addForm.assetId" /></el-form-item>
+        <el-form-item label="理由" prop="reason"><el-input v-model="addForm.reason" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAdd = false">取消</el-button>
-        <el-button type="primary" @click="addApproval">提交</el-button>
+        <el-button type="primary" :loading="saving" @click="addApproval">提交</el-button>
       </template>
     </el-dialog>
   </el-card>
 </template>
 <script setup>
 import { ref } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import request from '../api/request';
 const approvals = ref([]);
 const loading = ref(false);
 const showAdd = ref(false);
+const saving = ref(false);
 const addForm = ref({ applicantId: '', assetId: '', reason: '' });
 const query = ref({ applicantId: '', assetId: '' });
+const addFormRef = ref();
+const rules = {
+  applicantId: [{ required: true, message: '申请人ID不能为空', trigger: 'blur' }],
+  assetId: [{ required: true, message: '资产ID不能为空', trigger: 'blur' }],
+  reason: [{ required: true, message: '理由不能为空', trigger: 'blur' }]
+};
 async function fetchApprovals() {
   loading.value = true;
-  const res = await request.get('/approval/list', { params: query.value });
-  approvals.value = res || [];
-  loading.value = false;
+  try {
+    const res = await request.get('/approval/list', { params: query.value });
+    approvals.value = res || [];
+  } catch (err) {
+    ElMessage.error(err?.message || '加载失败');
+  } finally {
+    loading.value = false;
+  }
+}
+function openAdd() {
+  addForm.value = { applicantId: '', assetId: '', reason: '' };
+  showAdd.value = true;
 }
 async function addApproval() {
-  await request.post('/approval/apply', addForm.value);
-  showAdd.value = false;
-  fetchApprovals();
+  if (!addFormRef.value) return;
+  addFormRef.value.validate(async valid => {
+    if (!valid) return;
+    saving.value = true;
+    try {
+      await request.post('/approval/apply', addForm.value);
+      ElMessage.success('提交成功');
+      showAdd.value = false;
+      fetchApprovals();
+    } catch (err) {
+      ElMessage.error(err?.message || '提交失败');
+    } finally {
+      saving.value = false;
+    }
+  });
 }
 async function approve(row, status) {
-  await request.post('/approval/approve', { requestId: row.id, approverId: 1, status });
-  fetchApprovals();
+  try {
+    await request.post('/approval/approve', { requestId: row.id, approverId: 1, status });
+    ElMessage.success('处理成功');
+    fetchApprovals();
+  } catch (err) {
+    ElMessage.error(err?.message || '处理失败');
+  }
+}
+
+async function remove(id) {
+  try {
+    await ElMessageBox.confirm('确认删除该申请吗？', '提示', { type: 'warning' });
+    await request.post('/approval/delete', { id });
+    ElMessage.success('删除成功');
+    fetchApprovals();
+  } catch (err) {
+    if (err !== 'cancel') ElMessage.error(err?.message || '删除失败');
+  }
 }
 fetchApprovals();
 </script>

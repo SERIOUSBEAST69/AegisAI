@@ -2,17 +2,17 @@
   <div class="page-grid">
     <el-card class="card-glass">
       <div class="card-header">数据主体权利工单</div>
-      <el-form :inline="true" @submit.prevent>
-        <el-form-item label="用户ID"><el-input v-model="form.userId" /></el-form-item>
-        <el-form-item label="类型">
+      <el-form :inline="true" @submit.prevent ref="formRef" :model="form" :rules="rules">
+        <el-form-item label="用户ID" prop="userId"><el-input v-model="form.userId" /></el-form-item>
+        <el-form-item label="类型" prop="type">
           <el-select v-model="form.type" style="width:140px">
             <el-option label="查询" value="access" />
             <el-option label="导出" value="export" />
             <el-option label="删除" value="delete" />
           </el-select>
         </el-form-item>
-        <el-form-item label="备注"><el-input v-model="form.comment" style="width:220px" /></el-form-item>
-        <el-button type="primary" @click="create">提交申请</el-button>
+        <el-form-item label="备注" prop="comment"><el-input v-model="form.comment" style="width:220px" /></el-form-item>
+        <el-button type="primary" :loading="saving" @click="create">提交申请</el-button>
       </el-form>
       <el-table :data="list" style="margin-top:12px" v-loading="loading">
         <el-table-column prop="id" label="ID" width="70" />
@@ -29,6 +29,7 @@
               <el-option label="done" value="done" />
               <el-option label="rejected" value="rejected" />
             </el-select>
+            <el-button size="small" type="danger" @click="remove(scope.row.id)" style="margin-left:8px">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -38,26 +39,67 @@
 
 <script setup>
 import { ref } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import request from '../api/request';
 
 const form = ref({ userId: '', type: 'access', comment: '' });
 const list = ref([]);
 const loading = ref(false);
+const saving = ref(false);
+const formRef = ref();
+const rules = {
+  userId: [{ required: true, message: '用户ID不能为空', trigger: 'blur' }],
+  type: [{ required: true, message: '类型不能为空', trigger: 'change' }],
+  comment: [{ required: true, message: '备注不能为空', trigger: 'blur' }]
+};
 
 async function load() {
   loading.value = true;
-  list.value = await request.get('/subject-request/list');
-  loading.value = false;
+  try {
+    list.value = await request.get('/subject-request/list');
+  } catch (err) {
+    ElMessage.error(err?.message || '加载失败');
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function create() {
-  await request.post('/subject-request/create', form.value);
-  load();
+  if (!formRef.value) return;
+  formRef.value.validate(async valid => {
+    if (!valid) return;
+    saving.value = true;
+    try {
+      await request.post('/subject-request/create', form.value);
+      ElMessage.success('提交成功');
+      load();
+    } catch (err) {
+      ElMessage.error(err?.message || '提交失败');
+    } finally {
+      saving.value = false;
+    }
+  });
 }
 
 async function update(row) {
-  await request.post('/subject-request/process', row);
-  load();
+  try {
+    await request.post('/subject-request/process', row);
+    ElMessage.success('更新成功');
+    load();
+  } catch (err) {
+    ElMessage.error(err?.message || '更新失败');
+  }
+}
+
+async function remove(id) {
+  try {
+    await ElMessageBox.confirm('确认删除该工单吗？', '提示', { type: 'warning' });
+    await request.post('/subject-request/delete', { id });
+    ElMessage.success('删除成功');
+    load();
+  } catch (err) {
+    if (err !== 'cancel') ElMessage.error(err?.message || '删除失败');
+  }
 }
 
 load();

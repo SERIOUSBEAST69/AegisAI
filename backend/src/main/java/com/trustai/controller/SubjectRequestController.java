@@ -10,8 +10,11 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/subject-request")
@@ -20,6 +23,9 @@ public class SubjectRequestController {
 
     @Autowired
     private SubjectRequestService subjectRequestService;
+
+    private static final Set<String> ALLOWED_STATUS = new HashSet<>(Arrays.asList("pending", "processing", "done", "rejected"));
+    private static final Set<String> FINAL_STATUS = new HashSet<>(Arrays.asList("done", "rejected"));
 
     @GetMapping("/list")
     public R<List<SubjectRequest>> list(@RequestParam(required = false) String status) {
@@ -44,12 +50,22 @@ public class SubjectRequestController {
     public R<?> process(@RequestBody @Validated ProcessReq req) {
         SubjectRequest sr = subjectRequestService.getById(req.getId());
         if (sr == null) return R.error(40000, "申请不存在");
+        if (!ALLOWED_STATUS.contains(req.getStatus())) return R.error(40000, "不支持的状态");
+        if (FINAL_STATUS.contains(sr.getStatus())) return R.error(40000, "已完结的工单不可再次处理");
         sr.setStatus(req.getStatus());
-        sr.setHandlerId(req.getHandlerId());
+        if (req.getHandlerId() != null) {
+            sr.setHandlerId(req.getHandlerId());
+        }
         sr.setResult(req.getResult());
         sr.setUpdateTime(new Date());
         subjectRequestService.updateById(sr);
         return R.okMsg("处理完成");
+    }
+
+    @PostMapping("/delete")
+    public R<?> delete(@RequestBody @Validated IdReq req) {
+        subjectRequestService.removeById(req.getId());
+        return R.okMsg("删除成功");
     }
 
     public static class ApplyReq {
@@ -66,7 +82,6 @@ public class SubjectRequestController {
 
     public static class ProcessReq {
         @NotNull private Long id;
-        @NotNull private Long handlerId;
         @NotBlank private String status;
         private String result;
         public Long getId(){return id;}
@@ -77,5 +92,11 @@ public class SubjectRequestController {
         public void setStatus(String v){status=v;}
         public String getResult(){return result;}
         public void setResult(String v){result=v;}
+    }
+
+    public static class IdReq {
+        @NotNull private Long id;
+        public Long getId(){return id;}
+        public void setId(Long v){id=v;}
     }
 }

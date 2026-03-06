@@ -19,6 +19,11 @@
       <el-table-column prop="operation" label="操作类型" />
       <el-table-column prop="operationTime" label="操作时间" />
       <el-table-column prop="result" label="结果" />
+      <el-table-column label="操作" width="120">
+        <template #default="scope">
+          <el-button size="small" type="danger" @click="remove(scope.row.id)">删除</el-button>
+        </template>
+      </el-table-column>
     </el-table>
   </el-card>
 </template>
@@ -33,6 +38,10 @@ async function fetchLogs() {
   const res = await request.post('/audit-log/search', query.value);
   logs.value = res || [];
   loading.value = false;
+}
+async function remove(id) {
+  await request.post('/audit-log/delete', { id });
+  fetchLogs();
 }
 fetchLogs();
 </script>

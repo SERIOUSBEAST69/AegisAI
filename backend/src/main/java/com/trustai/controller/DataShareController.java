@@ -10,8 +10,11 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/data-share")
@@ -20,6 +23,8 @@ public class DataShareController {
 
     @Autowired
     private DataShareRequestService dataShareRequestService;
+
+    private static final Set<String> APPROVE_STATUS = new HashSet<>(Arrays.asList("approved", "rejected"));
 
     @GetMapping("/list")
     public R<List<DataShareRequest>> list(@RequestParam(required = false) String status) {
@@ -45,6 +50,8 @@ public class DataShareController {
     public R<?> approve(@RequestBody @Validated ApproveReq req) {
         DataShareRequest ds = dataShareRequestService.getById(req.getId());
         if (ds == null) return R.error(40000, "申请不存在");
+        if (!APPROVE_STATUS.contains(req.getStatus())) return R.error(40000, "不支持的状态");
+        if (!"pending".equalsIgnoreCase(ds.getStatus())) return R.error(40000, "该申请已处理");
         ds.setStatus(req.getStatus());
         ds.setApproverId(req.getApproverId());
         ds.setUpdateTime(new Date());
@@ -52,11 +59,21 @@ public class DataShareController {
         return R.okMsg("处理完成");
     }
 
+    @PostMapping("/delete")
+    public R<?> delete(@RequestBody @Validated IdReq req) {
+        dataShareRequestService.removeById(req.getId());
+        return R.okMsg("删除成功");
+    }
+
     public static class ApproveReq {
         @NotNull private Long id; @NotNull private Long approverId; @NotBlank private String status;
         public Long getId(){return id;} public void setId(Long id){this.id=id;}
         public Long getApproverId(){return approverId;} public void setApproverId(Long a){this.approverId=a;}
         public String getStatus(){return status;} public void setStatus(String s){this.status=s;}
+    }
+    public static class IdReq {
+        @NotNull private Long id;
+        public Long getId(){return id;} public void setId(Long id){this.id=id;}
     }
     public static class ApplyReq {
         @NotNull private Long assetId; @NotNull private Long applicantId; @NotBlank private String reason;
