@@ -9,15 +9,7 @@ import com.trustai.utils.AesEncryptor;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
@@ -74,14 +66,20 @@ public class AiService {
     }
 
     private String callOpenAiLike(AiModel model, AiCallRequest request, String apiKey) {
-        OpenAiApi api = OpenAiApi.builder()
-                .baseUrl(model.getApiUrl())
-                .apiKey(apiKey)
-                .build();
-        OpenAiChatModel chatModel = new OpenAiChatModel(api);
-        ChatClient client = ChatClient.builder(chatModel).build();
-        List<Message> messages = convertMessages(request.getMessages(), request.getPrompt());
-        return client.prompt().messages(messages).call().content();
+        WebClient client = webClientBuilder.baseUrl(model.getApiUrl()).build();
+        List<SimpleMsg> messages = convertMessages(request.getMessages(), request.getPrompt());
+        OpenAiPayload payload = new OpenAiPayload(model.getModelCode(), messages);
+        OpenAiResponse resp = client.post()
+                .header("Authorization", "Bearer " + apiKey)
+                .bodyValue(payload)
+                .retrieve()
+                .bodyToMono(OpenAiResponse.class)
+                .blockOptional(Duration.ofSeconds(30))
+                .orElseThrow(() -> new IllegalStateException("OpenAI 兼容接口无响应"));
+        if (resp.getChoices() == null || resp.getChoices().isEmpty() || resp.getChoices().get(0).getMessage() == null) {
+            throw new IllegalStateException("OpenAI 兼容接口返回为空");
+        }
+        return resp.getChoices().get(0).getMessage().getContent();
     }
 
     private String callWenxin(AiModel model, AiCallRequest request, String apiKey) {
@@ -91,7 +89,7 @@ public class AiService {
         }
         String token = fetchBaiduToken(parts[0], parts[1]);
         WebClient client = webClientBuilder.baseUrl(model.getApiUrl()).build();
-        List<Message> messages = convertMessages(request.getMessages(), request.getPrompt());
+        List<SimpleMsg> messages = convertMessages(request.getMessages(), request.getPrompt());
         WenxinPayload payload = new WenxinPayload(model.getModelCode(), messages);
         return client.post()
                 .uri(uriBuilder -> uriBuilder.queryParam("access_token", token).build())
@@ -118,26 +116,18 @@ public class AiService {
                 .orElseThrow(() -> new IllegalStateException("获取文心 access_token 失败"));
     }
 
-    private List<Message> convertMessages(List<AiMessage> messages, String systemPrompt) {
-        List<Message> list = new ArrayList<>();
+    private List<SimpleMsg> convertMessages(List<AiMessage> messages, String systemPrompt) {
+        List<SimpleMsg> list = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isEmpty()) {
-            list.add(new SystemMessage(systemPrompt));
+            list.add(new SimpleMsg("system", systemPrompt));
         }
-        if (!CollectionUtils.isEmpty(messages)) {
+        if (messages != null) {
             for (AiMessage m : messages) {
-                switch (m.getRole()) {
-                    case "user":
-                        list.add(new UserMessage(m.getContent()));
-                        break;
-                    case "assistant":
-                        list.add(new AssistantMessage(m.getContent()));
-                        break;
-                    case "system":
-                        list.add(new SystemMessage(m.getContent()));
-                        break;
-                    default:
-                        list.add(new UserMessage(m.getContent()));
+                String role = m.getRole();
+                if (!"user".equals(role) && !"assistant".equals(role) && !"system".equals(role)) {
+                    role = "user";
                 }
+                list.add(new SimpleMsg(role, m.getContent()));
             }
         }
         return list;
@@ -174,15 +164,48 @@ public class AiService {
         public String getAccess_token() { return access_token; }
     }
 
-    private static class WenxinPayload {
+    private static class SimpleMsg {
+        private final String role;
+        private final String content;
+        SimpleMsg(String role, String content) {
+            this.role = role;
+            this.content = content;
+        }
+        public String getRole() { return role; }
+        public String getContent() { return content; }
+    }
+
+    private static class OpenAiPayload {
         private final String model;
-        private final List<Message> messages;
-        WenxinPayload(String model, List<Message> messages) {
+        private final List<SimpleMsg> messages;
+        OpenAiPayload(String model, List<SimpleMsg> messages) {
             this.model = model;
             this.messages = messages;
         }
         public String getModel() { return model; }
-        public List<Message> getMessages() { return messages; }
+        public List<SimpleMsg> getMessages() { return messages; }
+    }
+
+    private static class OpenAiResponse {
+        private List<Choice> choices;
+        public List<Choice> getChoices() { return choices; }
+        public void setChoices(List<Choice> choices) { this.choices = choices; }
+        private static class Choice {
+            private SimpleMsg message;
+            public SimpleMsg getMessage() { return message; }
+            public void setMessage(SimpleMsg message) { this.message = message; }
+        }
+    }
+
+    private static class WenxinPayload {
+        private final String model;
+        private final List<SimpleMsg> messages;
+        WenxinPayload(String model, List<SimpleMsg> messages) {
+            this.model = model;
+            this.messages = messages;
+        }
+        public String getModel() { return model; }
+        public List<SimpleMsg> getMessages() { return messages; }
     }
 
     private static class WenxinResponse {

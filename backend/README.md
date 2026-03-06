@@ -11,8 +11,12 @@
 5. 编译并启动：
 
 ```bash
-mvn clean package -DskipTests
+# Windows（PowerShell）示例，避免 -D 参数被误解析
+mvn "-DskipTests=true" "-Denforcer.skip=true" clean package
 java -jar target/AegisAI-backend-0.1.0.jar
+
+# 若需直接运行
+mvn "-DskipTests=true" "-Denforcer.skip=true" spring-boot:run
 ```
 
 ## 目录结构

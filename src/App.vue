@@ -34,9 +34,11 @@
         </el-menu>
       </aside>
       <main class="app-main">
-        <transition name="fade-slide" mode="out-in">
-          <router-view />
-        </transition>
+        <router-view v-slot="{ Component }">
+          <transition name="fade-slide" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </main>
     </div>
   </div>

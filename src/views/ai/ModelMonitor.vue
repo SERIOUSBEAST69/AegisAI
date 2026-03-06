@@ -3,7 +3,7 @@
     <div class="header">
       <div>
         <h2>调用监控</h2>
-        <p class="hint">近 500 次调用聚合，展示成功率与耗时</p>
+        <p class="hint">近 500 次调用聚合，展示成功率与耗时；趋势图无数据时将显示为空</p>
       </div>
       <el-button @click="fetchData">刷新</el-button>
     </div>
@@ -25,6 +25,7 @@ import * as echarts from 'echarts';
 import request from '../../api/request';
 
 const summary = ref([]);
+const trend = ref([]);
 const chartRef = ref();
 let chart;
 
@@ -35,15 +36,17 @@ function successRate(item) {
 
 async function fetchData() {
   summary.value = await request.get('/ai/monitor/summary');
+  trend.value = await request.get('/ai/monitor/trend');
 }
 
 function renderChart() {
   if (!chartRef.value) return;
   if (!chart) chart = echarts.init(chartRef.value);
   const x = summary.value.map(i => i.modelCode);
+  const trendSeries = buildTrendSeries();
   chart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['调用次数', '成功率%'] },
+    legend: { data: ['调用次数', '成功率%', ...trendSeries.legend] },
     xAxis: { type: 'category', data: x },
     yAxis: [
       { type: 'value', name: '次数' },
@@ -51,12 +54,33 @@ function renderChart() {
     ],
     series: [
       { name: '调用次数', type: 'bar', data: summary.value.map(i => i.total) },
-      { name: '成功率%', type: 'line', yAxisIndex: 1, data: summary.value.map(successRate) }
+      { name: '成功率%', type: 'line', yAxisIndex: 1, data: summary.value.map(successRate) },
+      ...trendSeries.series
     ]
   });
 }
 
+function buildTrendSeries() {
+  if (!trend.value || trend.value.length === 0) return { legend: [], series: [] };
+  const grouped = {};
+  const datesSet = new Set();
+  trend.value.forEach(item => {
+    datesSet.add(item.date);
+    if (!grouped[item.modelCode]) grouped[item.modelCode] = {};
+    grouped[item.modelCode][item.date] = item.total;
+  });
+  const dates = Array.from(datesSet).sort();
+  const series = Object.keys(grouped).map(code => ({
+    name: `${code} 趋势`,
+    type: 'line',
+    smooth: true,
+    data: dates.map(d => grouped[code][d] || 0)
+  }));
+  return { legend: series.map(s => s.name), series };
+}
+
 watch(summary, renderChart);
+watch(trend, renderChart);
 
 onMounted(() => {
   fetchData().then(renderChart);

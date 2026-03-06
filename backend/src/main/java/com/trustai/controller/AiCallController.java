@@ -46,17 +46,45 @@ public class AiCallController {
 
     @GetMapping("/monitor/summary")
     public R<?> monitorSummary() {
-        List<AiCallLog> logs = aiCallAuditService.list(new QueryWrapper<AiCallLog>().last("limit 500"));
-        Map<String, MonitorRow> map = new HashMap<>();
-        for (AiCallLog log : logs) {
-            MonitorRow row = map.computeIfAbsent(log.getModelCode(), k -> new MonitorRow(k, log.getProvider()));
-            row.total++;
-            if ("success".equalsIgnoreCase(log.getStatus())) row.success++;
-            if (log.getDurationMs() != null) row.totalDuration += log.getDurationMs();
+        try {
+            List<AiCallLog> logs = aiCallAuditService.list(new QueryWrapper<AiCallLog>().orderByDesc("create_time").last("limit 500"));
+            Map<String, MonitorRow> map = new HashMap<>();
+            for (AiCallLog log : logs) {
+                MonitorRow row = map.computeIfAbsent(log.getModelCode(), k -> new MonitorRow(k, log.getProvider()));
+                row.total++;
+                if ("success".equalsIgnoreCase(log.getStatus())) row.success++;
+                if (log.getDurationMs() != null) row.totalDuration += log.getDurationMs();
+            }
+            List<MonitorRow> result = new ArrayList<>(map.values());
+            result.forEach(MonitorRow::finish);
+            return R.ok(result);
+        } catch (Exception e) {
+            // 若表尚未建好或无数据，返回空列表避免前端报错
+            return R.ok(List.of());
         }
-        List<MonitorRow> result = new ArrayList<>(map.values());
-        result.forEach(MonitorRow::finish);
-        return R.ok(result);
+    }
+
+    @GetMapping("/monitor/trend")
+    public R<?> monitorTrend() {
+        try {
+            LocalDate today = LocalDate.now();
+            Map<String, TrendRow> trend = new HashMap<>();
+            List<AiCallLog> logs = aiCallAuditService.list(new QueryWrapper<AiCallLog>().orderByDesc("create_time").last("limit 1000"));
+            for (AiCallLog log : logs) {
+                if (log.getCreateTime() == null) continue;
+                LocalDate d = log.getCreateTime().toLocalDate();
+                String key = d.toString() + "|" + log.getModelCode();
+                TrendRow row = trend.computeIfAbsent(key, k -> new TrendRow(log.getModelCode(), log.getProvider(), d));
+                row.total++;
+                if ("success".equalsIgnoreCase(log.getStatus())) row.success++;
+            }
+            // 确保最近 7 天每个模型都有条目（即使 0）
+            List<TrendRow> list = new ArrayList<>(trend.values());
+            list.sort((a, b) -> a.date.compareTo(b.date));
+            return R.ok(list);
+        } catch (Exception e) {
+            return R.ok(List.of());
+        }
     }
 
     private static class MonitorRow {
@@ -73,6 +101,19 @@ public class AiCallController {
         }
         void finish() {
             if (total > 0 && totalDuration > 0) avgDuration = totalDuration / total;
+        }
+    }
+
+    private static class TrendRow {
+        public final String modelCode;
+        public final String provider;
+        public final LocalDate date;
+        public long total;
+        public long success;
+        TrendRow(String modelCode, String provider, LocalDate date) {
+            this.modelCode = modelCode;
+            this.provider = provider;
+            this.date = date;
         }
     }
 }
