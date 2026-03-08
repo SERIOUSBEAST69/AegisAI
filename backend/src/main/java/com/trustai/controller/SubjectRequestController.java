@@ -26,6 +26,7 @@ public class SubjectRequestController {
 
     private static final Set<String> ALLOWED_STATUS = new HashSet<>(Arrays.asList("pending", "processing", "done", "rejected"));
     private static final Set<String> FINAL_STATUS = new HashSet<>(Arrays.asList("done", "rejected"));
+    private static final Set<String> ALLOWED_TYPE = new HashSet<>(Arrays.asList("access", "export", "delete"));
 
     @GetMapping("/list")
     public R<List<SubjectRequest>> list(@RequestParam(required = false) String status) {
@@ -36,12 +37,15 @@ public class SubjectRequestController {
 
     @PostMapping("/create")
     public R<?> create(@RequestBody @Validated ApplyReq req) {
+        if (!ALLOWED_TYPE.contains(req.getType())) return R.error(40000, "不支持的类型");
         SubjectRequest entity = new SubjectRequest();
         entity.setUserId(req.getUserId());
         entity.setType(req.getType());
         entity.setComment(req.getComment());
         entity.setStatus("pending");
-        entity.setCreateTime(new Date());
+        Date now = new Date();
+        entity.setCreateTime(now);
+        entity.setUpdateTime(now);
         subjectRequestService.save(entity);
         return R.ok(entity);
     }
@@ -52,10 +56,9 @@ public class SubjectRequestController {
         if (sr == null) return R.error(40000, "申请不存在");
         if (!ALLOWED_STATUS.contains(req.getStatus())) return R.error(40000, "不支持的状态");
         if (FINAL_STATUS.contains(sr.getStatus())) return R.error(40000, "已完结的工单不可再次处理");
+        if (req.getHandlerId() == null) return R.error(40000, "处理人不能为空");
         sr.setStatus(req.getStatus());
-        if (req.getHandlerId() != null) {
-            sr.setHandlerId(req.getHandlerId());
-        }
+        sr.setHandlerId(req.getHandlerId());
         sr.setResult(req.getResult());
         sr.setUpdateTime(new Date());
         subjectRequestService.updateById(sr);
@@ -83,6 +86,7 @@ public class SubjectRequestController {
     public static class ProcessReq {
         @NotNull private Long id;
         @NotBlank private String status;
+        @NotNull private Long handlerId;
         private String result;
         public Long getId(){return id;}
         public void setId(Long v){id=v;}

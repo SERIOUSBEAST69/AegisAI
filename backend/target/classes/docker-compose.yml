@@ -1,57 +1,58 @@
+version: '3.8'
+
 services:
+  # 1. MySQL 容器
   mysql:
     image: mysql:8.0
     container_name: aegisai-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: root                # 改为 root
       MYSQL_DATABASE: aegisai
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
       MYSQL_ROOT_HOST: "%"
     ports:
-      - "3307:3306"          # 映射到主机3307，避免与本地MySQL冲突
-    command:
-      --default-authentication-plugin=mysql_native_password
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --lower_case_table_names=1
+      - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./aegisai.sql:/docker-entrypoint-initdb.d/aegisai.sql
     networks:
       - aegisai-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]   # 密码改为 root
       interval: 5s
       timeout: 10s
       retries: 10
 
+  # 2. Redis 容器
   redis:
-    image: redis:6.2
+    image: redis:7.0
     container_name: aegisai-redis
     restart: always
     ports:
       - "6379:6379"
-    command: redis-server --requirepass root
+    command: redis-server --requirepass root    # 密码改为 root
     volumes:
       - redis-data:/data
     networks:
       - aegisai-network
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "root", "ping"]
+      test: ["CMD", "redis-cli", "-a", "root", "ping"]   # 密码改为 root
       interval: 5s
       timeout: 10s
       retries: 10
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+  # 3. Elasticsearch 容器
+  es:
+    image: elasticsearch:8.14.0
     container_name: aegisai-es
     restart: always
     environment:
-      - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - discovery.type=single-node
       - xpack.security.enabled=false
+      - "TZ=Asia/Shanghai"
     ports:
       - "9200:9200"
       - "9300:9300"
@@ -60,13 +61,14 @@ services:
     networks:
       - aegisai-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9200 || exit 1"]
       interval: 10s
       timeout: 20s
       retries: 10
 
+  # 4. 应用容器
   aegisai-backend:
-    build: .                     # 使用根目录的 Dockerfile（后端）
+    build: .
     container_name: aegisai-backend
     restart: always
     ports:
@@ -74,34 +76,19 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/aegisai?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
       SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_DATASOURCE_PASSWORD: root          # 改为 root
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
-      SPRING_REDIS_PASSWORD: root
-      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_REDIS_PASSWORD: root               # 改为 root
+      SPRING_ELASTICSEARCH_URIS: http://es:9200
       AI_AES_KEY: 12345678901234567890123456789012
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
-      elasticsearch:
+      es:
         condition: service_healthy
-    networks:
-      - aegisai-network
-
-  aegisai-frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        VITE_API_BASE_URL: http://aegisai-backend:8080   # 容器内访问后端
-    container_name: aegisai-frontend
-    restart: always
-    ports:
-      - "80:80"                  # 访问 http://localhost 即可
-    depends_on:
-      - aegisai-backend
     networks:
       - aegisai-network
 
