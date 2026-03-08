@@ -1,6 +1,7 @@
 com\trustai\controller\DashboardController.class
 com\trustai\service\AiGatewayService$PayloadBuilder.class
 com\trustai\config\jwt\JwtAuthFilter.class
+com\trustai\controller\AuditLogController$IdReq.class
 com\trustai\entity\AuditLog.class
 com\trustai\service\RolePermissionService.class
 com\trustai\config\jwt\JwtUtil.class
@@ -37,9 +38,11 @@ com\trustai\controller\AlertController.class
 com\trustai\controller\SubjectRequestController$ApplyReq.class
 com\trustai\service\DesensitizeRuleService.class
 com\trustai\TrustaiBackendApplication.class
+com\trustai\controller\DataShareController$IdReq.class
 com\trustai\mapper\RoleMapper.class
 com\trustai\controller\AiGatewayController.class
 com\trustai\controller\SensitiveScanController$CreateReq.class
+com\trustai\controller\ApprovalController$IdReq.class
 com\trustai\controller\AiGatewayController$Message.class
 com\trustai\mapper\SubjectRequestMapper.class
 com\trustai\config\CorsConfig.class
@@ -50,6 +53,8 @@ com\trustai\controller\AiModelController.class
 com\trustai\controller\DataShareController$ApproveReq.class
 com\trustai\controller\AuditLogController.class
 com\trustai\controller\ApprovalController$ApproveReq.class
+com\trustai\controller\AlertController$IdReq.class
+com\trustai\controller\DesenseController$IdReq.class
 com\trustai\service\AiService$OpenAiPayload.class
 com\trustai\mapper\DataAssetMapper.class
 com\trustai\controller\RiskEventController.class
@@ -132,6 +137,7 @@ com\trustai\controller\ApprovalController.class
 com\trustai\controller\SensitiveScanController.class
 com\trustai\service\impl\SensitiveScanTaskServiceImpl.class
 com\trustai\mapper\DesensitizeRuleMapper.class
+com\trustai\controller\SubjectRequestController$IdReq.class
 com\trustai\service\UserService.class
 com\trustai\controller\DataAssetController$DataAssetReq.class
 com\trustai\service\impl\DataAssetServiceImpl.class

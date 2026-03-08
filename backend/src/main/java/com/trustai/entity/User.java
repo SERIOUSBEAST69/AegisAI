@@ -6,7 +6,7 @@ import lombok.Data;
 import java.util.Date;
 
 @Data
-@TableName("user")
+@TableName("sys_user")
 public class User {
     @TableId
     private Long id;

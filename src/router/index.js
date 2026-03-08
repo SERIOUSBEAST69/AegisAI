@@ -18,6 +18,8 @@ import SubjectRequest from '../views/SubjectRequest.vue';
 import DesensePreview from '../views/DesensePreview.vue';
 import GlobalSearch from '../views/GlobalSearch.vue';
 import Login from '../views/Login.vue';
+import Profile from '../views/Profile.vue';
+import Settings from '../views/Settings.vue';
 import ModelList from '../views/ai/ModelList.vue';
 import ModelMonitor from '../views/ai/ModelMonitor.vue';
 
@@ -41,7 +43,9 @@ const routes = [
   { path: '/desense-preview', name: 'DesensePreview', component: DesensePreview },
   { path: '/global-search', name: 'GlobalSearch', component: GlobalSearch },
   { path: '/ai/models', name: 'ModelList', component: ModelList },
-  { path: '/ai/monitor', name: 'ModelMonitor', component: ModelMonitor }
+  { path: '/ai/monitor', name: 'ModelMonitor', component: ModelMonitor },
+  { path: '/profile', name: 'Profile', component: Profile },
+  { path: '/settings', name: 'Settings', component: Settings }
 ];
 
 const router = createRouter({
