@@ -1,396 +1,1224 @@
 <template>
-  <div class="home-grid">
-    <el-card class="hero card-glass">
-      <div class="hero-left">
-        <div class="chip">2026 · 合规大屏</div>
-        <h1>可信AI数据治理与隐私合规中枢</h1>
-        <p>全链路数据资产可视化 · 国产AI工具合规接入 · 审计追溯一键生成</p>
-        <el-button type="primary" class="floating-btn" @click="$router.push('/global-search')">
-          <el-icon><Search /></el-icon>
-          全局搜索
-        </el-button>
+  <div class="workbench-home" ref="stageRef">
+    <section class="hero-scene card-glass scene-block" ref="heroRef">
+      <div class="hero-copy">
+        <div class="eyebrow">{{ personaExperience.kicker }}</div>
+        <h1 class="hero-headline">
+          <span class="hero-title-primary workbench-title-core" data-workbench-title-anchor="home">{{ heroHeadline.primary }}</span>
+          <span v-if="heroHeadline.suffix" class="hero-title-suffix">{{ heroHeadline.suffix }}</span>
+        </h1>
+        <p>{{ overview.subheadline }}</p>
+        <div class="scene-tags">
+          <span v-for="tag in overview.sceneTags" :key="tag" class="scene-tag">{{ tag }}</span>
+        </div>
+        <div class="operator-ribbon">
+          <div class="operator-label">当前指挥席位</div>
+          <div class="operator-name">{{ overview.operator.displayName }}</div>
+          <div class="operator-meta">{{ overview.operator.roleName }} · {{ overview.operator.department }}</div>
+        </div>
       </div>
-      <div class="hero-right">
-        <div class="orb">
-          <div class="orb-core"></div>
-          <div class="orb-ring orb-ring-1"></div>
-          <div class="orb-ring orb-ring-2"></div>
-          <div class="orb-ring orb-ring-3"></div>
+
+      <div class="hero-stage">
+        <div class="forecast-tower">
+          <span class="tower-label">明日风险预估</span>
+          <strong>{{ overview.trend.forecastNextDay }}</strong>
+          <span class="tower-unit">起重点事件</span>
+          <div class="tower-divider"></div>
+          <div class="tower-footnote">来自近 7 日风险事件数据库聚合预测</div>
+        </div>
+
+        <div class="tower-grid">
+          <article v-for="metric in overview.metrics.slice(0, 2)" :key="metric.key" class="tower-card">
+            <span>{{ metric.label }}</span>
+            <strong>{{ metric.value }}{{ metric.suffix }}</strong>
+            <em :class="metric.delta >= 0 ? 'rise' : 'fall'">{{ metric.delta >= 0 ? '+' : '' }}{{ metric.delta }}%</em>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="stat-grid scene-block">
+      <stat-card
+        v-for="card in statCards"
+        :key="card.key"
+        :title="card.label"
+        :value="card.value"
+        :suffix="card.suffix"
+        :icon="card.icon"
+        :color="card.color"
+        :trend="card.delta"
+      />
+    </div>
+
+    <section class="pulse-grid scene-block">
+      <el-card class="pulse-card card-glass">
+        <div class="panel-head">
+          <div>
+            <div class="card-header">治理脉冲引擎</div>
+            <p class="panel-subtitle">把数据边界、模型可信、流程闭环和审计准备度压缩成一个可执行脉冲。</p>
+          </div>
+          <div class="pulse-chip">{{ trustPulse.innovationLabel }}</div>
+        </div>
+        <div class="pulse-layout">
+          <div class="pulse-score-ring">
+            <span class="pulse-score">{{ trustPulse.score }}</span>
+            <em>{{ trustPulse.pulseLevel }}</em>
+          </div>
+          <div class="pulse-copy">
+            <strong>{{ trustPulse.mission }}</strong>
+            <div class="pulse-dimensions">
+              <article v-for="dimension in trustPulse.dimensions" :key="dimension.code" class="pulse-dimension">
+                <div class="pulse-dimension-head">
+                  <span>{{ dimension.label }}</span>
+                  <strong>{{ dimension.score }}</strong>
+                </div>
+                <div class="pulse-bar"><i :style="{ width: `${dimension.score}%` }"></i></div>
+                <p>{{ dimension.description }}</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </el-card>
+
+      <el-card class="pulse-signal-card card-glass">
+        <div class="panel-head">
+          <div>
+            <div class="card-header">行动窗口</div>
+            <p class="panel-subtitle">引擎自动标出当前最值得优先处理的三类治理压力。</p>
+          </div>
+        </div>
+        <div class="pulse-signal-list">
+          <article v-for="signal in trustPulse.signals" :key="signal.title" class="pulse-signal-item">
+            <div class="pulse-signal-top">
+              <strong>{{ signal.title }}</strong>
+              <span :class="['pulse-tone', signal.tone]">{{ signal.value }}</span>
+            </div>
+            <p>{{ signal.action }}</p>
+          </article>
+        </div>
+      </el-card>
+    </section>
+
+    <section class="persona-grid scene-block">
+      <el-card class="persona-card card-glass">
+        <div class="panel-head">
+          <div>
+            <div class="card-header">以 {{ personaExperience.label }} 身份登录后，你会得到什么</div>
+            <p class="panel-subtitle">不是所有人看同一块屏。工作台会优先把最适合你做判断和操作的内容推到前面。</p>
+          </div>
+        </div>
+        <div class="persona-benefits">
+          <article v-for="item in personaBenefits" :key="item.title" class="persona-benefit">
+            <span>{{ item.metric }}</span>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.description }}</p>
+          </article>
+        </div>
+      </el-card>
+
+      <el-card class="journey-card card-glass">
+        <div class="panel-head">
+          <div>
+            <div class="card-header">最自然的使用路径</div>
+            <p class="panel-subtitle">工作台先帮你定顺序，再帮你定优先级，减少进来以后“先点哪个”的犹豫。</p>
+          </div>
+        </div>
+        <div class="journey-list">
+          <article v-for="step in personaJourney" :key="step.step" class="journey-item">
+            <span class="journey-step">{{ step.step }}</span>
+            <div>
+              <strong>{{ step.title }}</strong>
+              <p>{{ step.description }}</p>
+            </div>
+          </article>
+        </div>
+      </el-card>
+    </section>
+
+    <section class="quick-scene scene-block">
+      <button
+        v-for="action in personaQuickActions"
+        :key="action.route"
+        class="quick-action-card clickable"
+        @click="$router.push(action.route)"
+      >
+        <span class="quick-action-kicker">PRIORITY ENTRY</span>
+        <strong>{{ action.title }}</strong>
+        <p>{{ action.description }}</p>
+      </button>
+    </section>
+
+    <governance-insight-panel
+      :insights="insights"
+      :loading="loading"
+      class="scene-block"
+    />
+
+    <el-card class="chart-card card-glass trend-card scene-block">
+      <div class="panel-head">
+        <div>
+          <div class="card-header">治理脉冲趋势</div>
+          <p class="panel-subtitle">风险事件、审计留痕、AI 调用量与成本全部来自数据库聚合结果。</p>
+        </div>
+        <div class="panel-badge">T+1 预测 {{ overview.trend.forecastNextDay }}</div>
+      </div>
+      <div ref="trendChartRef" class="chart-canvas trend-canvas"></div>
+    </el-card>
+
+    <el-card class="chart-card card-glass risk-card scene-block">
+      <div class="panel-head">
+        <div>
+          <div class="card-header">风险结构剖面</div>
+          <p class="panel-subtitle">按严重级别拆解平台内的实际风险事件，不再展示静态占位图。</p>
+        </div>
+      </div>
+      <div class="risk-layout">
+        <div ref="riskChartRef" class="chart-canvas risk-canvas"></div>
+        <div class="risk-list">
+          <div v-for="item in overview.riskDistribution" :key="item.level" class="risk-item">
+            <span class="risk-dot" :class="riskTone(item.level)"></span>
+            <div class="risk-copy">
+              <strong>{{ item.level }}</strong>
+              <span>{{ item.value }} 起</span>
+            </div>
+          </div>
         </div>
       </div>
     </el-card>
 
-    <div class="stat-grid">
-      <stat-card 
-        title="敏感数据资产" 
-        :value="stats.dataAsset" 
-        suffix="个"
-        icon="DataAnalysis"
-        color="var(--color-primary)"
-      />
-      <stat-card 
-        title="AI模型" 
-        :value="stats.aiModel" 
-        suffix="个"
-        icon="StarFilled"
-        color="var(--color-success)"
-      />
-      <stat-card 
-        title="风险事件" 
-        :value="stats.riskEvent" 
-        suffix="起"
-        icon="Warning"
-        color="var(--color-warning)"
-      />
-      <stat-card 
-        title="用户" 
-        :value="stats.user" 
-        suffix="人"
-        icon="UserFilled"
-        color="var(--color-info)"
-      />
-    </div>
-
-    <el-card class="card-glass" style="grid-column: span 2;">
-      <div class="card-header">风险趋势预测（近7天）</div>
-      <el-skeleton v-if="loading" animated :rows="3" class="skeleton-card" />
-      <el-table v-else :data="trendRows" max-height="280">
-        <el-table-column prop="hour" label="时段" width="120" />
-        <el-table-column prop="count" label="事件数">
-          <template #default="scope">
-            <div class="stat-value">
-              {{ scope.row.count }}
-              <span class="trend-indicator" :class="{ positive: scope.row.count > 5, negative: scope.row.count <= 5 }">
-                {{ scope.row.count > 5 ? '↑' : '↓' }}
-              </span>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div class="forecast">
-        <el-icon class="forecast-icon"><Warning /></el-icon>
-        下一时段预测：<span class="forecast-value">{{ forecast }}</span>
+    <el-card class="todo-card card-glass scene-block">
+      <div class="panel-head">
+        <div>
+          <div class="card-header">治理待办编排</div>
+          <p class="panel-subtitle">从风险、告警、主体权利和模型治理中提炼出的下一步动作。</p>
+        </div>
+      </div>
+      <div class="todo-list">
+        <button
+          v-for="item in overview.todos"
+          :key="item.title"
+          class="todo-item clickable"
+          @click="$router.push(item.route)"
+        >
+          <div class="todo-priority">{{ item.priority }}</div>
+          <div class="todo-copy">
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.description }}</p>
+          </div>
+          <div class="todo-metric">{{ item.metric }}</div>
+        </button>
       </div>
     </el-card>
 
-    <el-card class="card-glass" style="grid-column: span 1;">
-      <div class="card-header">待办速览</div>
-      <el-timeline>
-        <el-timeline-item 
-          v-for="item in todo" 
-          :key="item.text" 
-          :timestamp="item.time" 
-          type="primary"
-          placement="top"
-        >
-          <div class="todo-item">
-            <div class="todo-text">{{ item.text }}</div>
-            <div class="todo-actions">
-              <el-button size="small" type="primary" text>处理</el-button>
-              <el-button size="small" text>详情</el-button>
-            </div>
+    <el-card class="feed-card card-glass scene-block">
+      <div class="panel-head">
+        <div>
+          <div class="card-header">实时事件流</div>
+          <p class="panel-subtitle">展示最近进入工作台的风险、告警与履约工单。</p>
+        </div>
+      </div>
+      <div class="feed-list">
+        <article v-for="item in overview.feeds" :key="`${item.route}-${item.title}-${item.timeLabel}`" class="feed-item">
+          <div class="feed-topline">
+            <span class="feed-level" :class="riskTone(item.level)">{{ item.level || 'info' }}</span>
+            <span class="feed-time">{{ item.timeLabel }}</span>
           </div>
-        </el-timeline-item>
-      </el-timeline>
+          <strong>{{ item.title }}</strong>
+          <p>{{ item.description }}</p>
+        </article>
+      </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import request from '../api/request';
-import StatCard from '../components/StatCard.vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import * as echarts from 'echarts';
+import gsap from 'gsap';
 import { ElMessage } from 'element-plus';
-import { Search, Warning } from '@element-plus/icons-vue';
+import { dashboardApi } from '../api/dashboard';
+import GovernanceInsightPanel from '../components/GovernanceInsightPanel.vue';
+import StatCard from '../components/StatCard.vue';
+import { useUserStore } from '../store/user';
+import { getPersonaExperience, personalizeWorkbench } from '../utils/persona';
 
-const stats = ref({ dataAsset: 0, aiModel: 0, user: 0, riskEvent: 0 });
-const trend = ref({ perHour: {}, forecastNextHour: 0 });
-const loading = ref(false);
-const todo = ref([
-  { text: '审批高敏数据共享申请', time: '待办' },
-  { text: '处理 2 条风险告警', time: '今日' },
-  { text: '导出合规审计报告', time: '本周' }
-]);
-
-const trendRows = computed(() => Object.entries(trend.value.perHour || {}).map(([hour, count]) => ({ hour: `${hour}:00`, count })));
-const forecast = computed(() => trend.value.forecastNextHour || 0);
-
-async function fetchStats() {
-  try {
-    stats.value = await request.get('/dashboard/stats');
-  } catch (e) {
-    ElMessage.error('统计数据加载失败');
-  }
+function createEmptyOverview() {
+  return {
+    operator: {
+      displayName: '访客',
+      roleName: '待识别身份',
+      department: '可信AI治理中心',
+      avatar: ''
+    },
+    headline: 'Aegis Workbench 可信AI数据治理与隐私合规工作台',
+    subheadline: '正在加载真实治理态势...',
+    sceneTags: [],
+    metrics: [],
+    trend: {
+      labels: [],
+      riskSeries: [],
+      auditSeries: [],
+      aiCallSeries: [],
+      costSeries: [],
+      forecastNextDay: 0,
+    },
+    riskDistribution: [],
+    todos: [],
+    feeds: [],
+  };
 }
 
-async function fetchTrend() {
+const stageRef = ref(null);
+const heroRef = ref(null);
+const trendChartRef = ref(null);
+const riskChartRef = ref(null);
+const userStore = useUserStore();
+const overview = ref(createEmptyOverview());
+const insights = ref({ postureScore: 0, summary: {}, highlights: [], recommendations: [] });
+const trustPulse = ref({ score: 0, pulseLevel: '', mission: '', innovationLabel: '', dimensions: [], signals: [] });
+const loading = ref(true);
+
+let trendChart;
+let riskChart;
+let resizeHandler;
+
+const metricVisualMap = {
+  assets: { icon: 'DataAnalysis', color: 'var(--color-primary)' },
+  alerts: { icon: 'Warning', color: 'var(--color-danger)' },
+  aiCalls: { icon: 'StarFilled', color: 'var(--color-success)' },
+  audits: { icon: 'Timer', color: 'var(--color-info)' },
+};
+
+const statCards = computed(() => overview.value.metrics.map(item => ({
+  ...item,
+  icon: metricVisualMap[item.key]?.icon || 'DataAnalysis',
+  color: metricVisualMap[item.key]?.color || 'var(--color-primary)'
+})));
+const heroHeadline = computed(() => {
+  const prefix = 'Aegis Workbench';
+  const headline = String(overview.value.headline || prefix).trim();
+  if (headline.startsWith(prefix)) {
+    return {
+      primary: prefix,
+      suffix: headline.slice(prefix.length).trim()
+    };
+  }
+  return {
+    primary: prefix,
+    suffix: headline === prefix ? '' : headline
+  };
+});
+const personaExperience = computed(() => getPersonaExperience(userStore.userInfo));
+const personaBenefits = computed(() => personaExperience.value.benefits || []);
+const personaJourney = computed(() => personaExperience.value.journey || []);
+const personaQuickActions = computed(() => personaExperience.value.quickActions || []);
+
+function riskTone(level) {
+  const value = String(level || '').toLowerCase();
+  if (value.includes('高') || value.includes('high') || value.includes('critical') || value.includes('p0')) return 'danger';
+  if (value.includes('中') || value.includes('medium') || value.includes('processing') || value.includes('p1')) return 'warning';
+  if (value.includes('低') || value.includes('low')) return 'safe';
+  return 'neutral';
+}
+
+function renderTrendChart() {
+  if (!trendChartRef.value) return;
+  if (!trendChart) {
+    trendChart = echarts.init(trendChartRef.value);
+  }
+  trendChart.setOption({
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'axis' },
+    legend: {
+      top: 0,
+      textStyle: { color: '#b8c2d4' },
+      data: ['风险事件', '审计留痕', 'AI调用', '成本(分)']
+    },
+    grid: { left: 24, right: 28, top: 48, bottom: 24, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: overview.value.trend.labels,
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
+      axisLabel: { color: '#93a0b8' }
+    },
+    yAxis: [
+      {
+        type: 'value',
+        axisLine: { show: false },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+        axisLabel: { color: '#93a0b8' }
+      },
+      {
+        type: 'value',
+        axisLine: { show: false },
+        splitLine: { show: false },
+        axisLabel: { color: '#93a0b8' }
+      }
+    ],
+    series: [
+      {
+        name: '风险事件',
+        type: 'line',
+        smooth: true,
+        symbolSize: 8,
+        data: overview.value.trend.riskSeries,
+        lineStyle: { width: 3, color: '#ff7d66' },
+        itemStyle: { color: '#ff7d66' },
+        areaStyle: { color: 'rgba(255,125,102,0.12)' }
+      },
+      {
+        name: '审计留痕',
+        type: 'line',
+        smooth: true,
+        symbolSize: 7,
+        data: overview.value.trend.auditSeries,
+        lineStyle: { width: 3, color: '#6aa6ff' },
+        itemStyle: { color: '#6aa6ff' },
+        areaStyle: { color: 'rgba(106,166,255,0.12)' }
+      },
+      {
+        name: 'AI调用',
+        type: 'bar',
+        barMaxWidth: 18,
+        data: overview.value.trend.aiCallSeries,
+        itemStyle: {
+          borderRadius: [10, 10, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#4fe3c1' },
+            { offset: 1, color: '#1a8c74' }
+          ])
+        }
+      },
+      {
+        name: '成本(分)',
+        type: 'line',
+        smooth: true,
+        yAxisIndex: 1,
+        symbolSize: 6,
+        data: overview.value.trend.costSeries,
+        lineStyle: { width: 2, type: 'dashed', color: '#f5d06f' },
+        itemStyle: { color: '#f5d06f' }
+      }
+    ]
+  });
+}
+
+function renderRiskChart() {
+  if (!riskChartRef.value) return;
+  if (!riskChart) {
+    riskChart = echarts.init(riskChartRef.value);
+  }
+  riskChart.setOption({
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'item' },
+    series: [
+      {
+        type: 'pie',
+        radius: ['56%', '76%'],
+        center: ['50%', '52%'],
+        label: { show: false },
+        labelLine: { show: false },
+        itemStyle: {
+          borderColor: '#111826',
+          borderWidth: 6
+        },
+        data: overview.value.riskDistribution.map(item => ({
+          value: item.value,
+          name: item.level,
+          itemStyle: {
+            color: item.level === '高危'
+              ? '#ff6b6b'
+              : item.level === '中危'
+                ? '#ffb454'
+                : item.level === '低危'
+                  ? '#2ecc71'
+                  : '#7f8aa3'
+          }
+        }))
+      }
+    ]
+  });
+}
+
+function playEntryScene() {
+  if (!stageRef.value) return;
+  const blocks = Array.from(stageRef.value.querySelectorAll('.scene-block'));
+  const cinematicEntry = sessionStorage.getItem('aegis.transition.origin') === 'login';
+  sessionStorage.removeItem('aegis.transition.origin');
+
+  if (cinematicEntry) {
+    const revealBlocks = blocks.filter(block => block !== heroRef.value);
+    gsap.set(heroRef.value, { opacity: 1, y: 0 });
+    gsap.set(revealBlocks, { opacity: 0, y: 18 });
+    gsap.timeline({ defaults: { ease: 'power2.out' } })
+      .to(revealBlocks, {
+        opacity: 1,
+        y: 0,
+        duration: 0.32,
+        stagger: 0.04
+      }, 0.02);
+    return;
+  }
+
+  gsap.set(blocks, { opacity: 0, y: 16 });
+  gsap.timeline({ defaults: { ease: 'power2.out' } })
+    .to(heroRef.value, { opacity: 1, y: 0, duration: 0.34 })
+    .to(blocks, {
+      opacity: 1,
+      y: 0,
+      duration: 0.28,
+      stagger: 0.04
+    }, '-=0.18');
+}
+
+async function fetchData() {
   loading.value = true;
   try {
-    trend.value = await request.get('/risk/trend');
-  } catch (e) {
-    trend.value = { perHour: {}, forecastNextHour: 0 };
-    ElMessage.error('风险趋势加载失败');
+    const [workbench, insightData, pulseData] = await Promise.all([
+      dashboardApi.getWorkbench(),
+      dashboardApi.getInsights(),
+      dashboardApi.getTrustPulse(),
+    ]);
+    overview.value = personalizeWorkbench(workbench, userStore.userInfo);
+    insights.value = insightData;
+    trustPulse.value = pulseData;
+    await nextTick();
+    renderTrendChart();
+    renderRiskChart();
+    playEntryScene();
+  } catch (error) {
+    ElMessage.error(error?.message || '首页工作台加载失败');
   } finally {
     loading.value = false;
   }
 }
 
+watch(() => overview.value.trend, async () => {
+  await nextTick();
+  renderTrendChart();
+  renderRiskChart();
+}, { deep: true });
+
 onMounted(() => {
-  fetchStats();
-  fetchTrend();
+  fetchData();
+  resizeHandler = () => {
+    trendChart?.resize();
+    riskChart?.resize();
+  };
+  window.addEventListener('resize', resizeHandler);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeHandler);
+  trendChart?.dispose();
+  riskChart?.dispose();
 });
 </script>
 
 <style scoped>
-.home-grid { 
-  display: grid; 
-  grid-template-columns: repeat(2, 1fr); 
-  gap: 20px; 
-  position: relative;
-  z-index: 1;
+.workbench-home {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
 }
 
-.hero { 
-  grid-column: span 2; 
-  display:flex; 
-  justify-content:space-between; 
-  align-items:center; 
-  padding: 40px 48px;
+.hero-scene {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.85fr);
+  gap: 28px;
+  padding: 34px;
   position: relative;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 8% 18%, rgba(70, 118, 255, 0.28), transparent 30%),
+    radial-gradient(circle at 82% 20%, rgba(34, 208, 181, 0.18), transparent 28%),
+    linear-gradient(135deg, rgba(9, 14, 24, 0.98), rgba(12, 18, 31, 0.92));
 }
 
-.hero::before {
+.hero-scene::before {
   content: '';
   position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, var(--color-primary), transparent);
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.3;
-  z-index: 0;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 72px 72px;
+  opacity: 0.12;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.88), transparent 100%);
 }
 
-.hero-left {
-  flex: 1;
+.hero-copy,
+.hero-stage {
   position: relative;
   z-index: 1;
 }
 
-.hero-left h1 {
-  margin: 12px 0 16px;
-  font-size: 32px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--color-text), var(--color-text-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.2;
-}
-
-.hero-left p {
-  color: var(--color-text-muted);
-  margin: 0 0 24px;
-  font-size: 16px;
-  line-height: 1.5;
-  max-width: 600px;
-}
-
-.chip {
-  display:inline-block;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(22, 93, 255, 0.15), rgba(0, 180, 42, 0.15));
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid rgba(22, 93, 255, 0.2);
-}
-
-.hero-right {
-  width: 240px;
-  height: 240px;
-  position:relative;
-  z-index: 1;
-}
-
-.orb {
-  position:relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  display: flex;
+.eyebrow {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(118, 164, 255, 0.24);
+  background: rgba(19, 29, 49, 0.72);
+  color: #d8e6ff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
 }
 
-.orb-core {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--color-primary), var(--color-primary-dark));
-  box-shadow: 0 0 30px rgba(22, 93, 255, 0.6);
-  animation: pulse 3s ease-in-out infinite;
+.hero-headline {
+  margin: 18px 0 14px;
+  font-size: clamp(36px, 4vw, 52px);
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  color: #f6f8fe;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.18em 0.34em;
 }
 
-.orb-ring {
-  position: absolute;
-  border: 2px solid rgba(22, 93, 255, 0.3);
-  border-radius: 50%;
-  animation: rotate 20s linear infinite;
+.hero-title-primary {
+  display: inline-block;
+  color: #f6f8fe;
 }
 
-.orb-ring-1 {
-  width: 120px;
-  height: 120px;
-  animation-delay: 0s;
+.hero-title-suffix {
+  display: inline-block;
 }
 
-.orb-ring-2 {
-  width: 160px;
-  height: 160px;
-  animation-delay: -5s;
-  border-color: rgba(0, 180, 42, 0.3);
+.hero-copy p {
+  max-width: 720px;
+  margin: 0;
+  color: #98a5bb;
+  font-size: 16px;
+  line-height: 1.8;
 }
 
-.orb-ring-3 {
-  width: 200px;
-  height: 200px;
-  animation-delay: -10s;
-  border-color: rgba(255, 125, 0, 0.3);
+.scene-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
 }
 
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.scene-tag {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #d7deee;
+  font-size: 12px;
+}
+
+.operator-ribbon {
+  margin-top: 26px;
+  padding: 18px 20px;
+  width: min(100%, 420px);
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.operator-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: #7c8aa3;
+  text-transform: uppercase;
+}
+
+.operator-name {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.operator-meta {
+  margin-top: 4px;
+  color: #95a0b5;
+}
+
+.hero-stage {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 16px;
+}
+
+.forecast-tower,
+.tower-card {
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.04);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.forecast-tower {
+  padding: 24px;
+}
+
+.tower-label,
+.tower-footnote,
+.tower-card span,
+.tower-card em {
+  color: #93a0b8;
+}
+
+.forecast-tower strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 56px;
+  line-height: 1;
+  color: #f7f9fd;
+}
+
+.tower-unit {
+  display: inline-block;
+  margin-top: 8px;
+  color: #cdd8ec;
+}
+
+.tower-divider {
+  height: 1px;
+  margin: 16px 0 14px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.24), rgba(255,255,255,0));
+}
+
+.tower-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.tower-card {
+  padding: 20px;
+}
+
+.tower-card strong {
+  display: block;
+  margin: 14px 0 8px;
+  font-size: 26px;
+  color: #ffffff;
+}
+
+.tower-card em {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.tower-card em.rise {
+  color: #6ae6c2;
+}
+
+.tower-card em.fall {
+  color: #ff8e88;
 }
 
 .stat-grid {
-  display:grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  grid-column: span 2;
 }
 
-.card-header {
-  font-weight: 600;
-  margin-bottom: 16px;
-  color: var(--color-text);
+.pulse-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 20px;
+}
+
+.pulse-card,
+.pulse-signal-card {
+  padding: 22px;
+}
+
+.pulse-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(118, 164, 255, 0.2);
+  background: rgba(87, 127, 255, 0.08);
+  color: #dce7ff;
+  font-size: 12px;
+}
+
+.pulse-layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 22px;
+  align-items: center;
+}
+
+.pulse-score-ring {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border: 1px solid rgba(118, 164, 255, 0.16);
+  background:
+    radial-gradient(circle at center, rgba(7, 12, 21, 0.86) 0 54%, transparent 55%),
+    conic-gradient(from 180deg, #edf4ff, #85abff, #466de0, #edf4ff);
+  box-shadow: inset 0 0 40px rgba(255,255,255,0.04), 0 18px 42px rgba(52, 93, 210, 0.16);
+}
+
+.pulse-score {
+  font-size: 58px;
+  font-weight: 800;
+  line-height: 1;
+  color: #f7fbff;
+}
+
+.pulse-score-ring em {
+  margin-top: 6px;
+  color: #98a9c8;
+  font-style: normal;
+}
+
+.pulse-copy strong {
+  color: #f7fbff;
+  font-size: 20px;
+  line-height: 1.55;
+}
+
+.pulse-dimensions {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.pulse-dimension {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+}
+
+.pulse-dimension-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pulse-dimension-head span {
+  color: #dfe8f7;
+  font-weight: 700;
+}
+
+.pulse-dimension-head strong {
   font-size: 18px;
 }
 
-.forecast {
-  margin-top: 16px;
-  color: var(--color-text-muted);
+.pulse-bar {
+  height: 8px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  overflow: hidden;
+}
+
+.pulse-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f1f6ff, #85adff 36%, #4469db 100%);
+}
+
+.pulse-dimension p,
+.pulse-signal-item p {
+  margin: 10px 0 0;
+  color: #90a0b8;
+  line-height: 1.7;
+}
+
+.pulse-signal-list {
+  display: grid;
+  gap: 12px;
+}
+
+.pulse-signal-item {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+}
+
+.pulse-signal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pulse-signal-top strong {
+  color: #f6faff;
+}
+
+.pulse-tone {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pulse-tone.danger {
+  background: rgba(255, 107, 107, 0.12);
+  color: #ffd8d8;
+}
+
+.pulse-tone.warning {
+  background: rgba(118, 164, 255, 0.12);
+  color: #dce8ff;
+}
+
+.pulse-tone.safe {
+  background: rgba(105, 169, 255, 0.12);
+  color: #dcefff;
+}
+
+.persona-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 20px;
+}
+
+.persona-card,
+.journey-card {
+  padding: 22px;
+}
+
+.persona-benefits {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.persona-benefit,
+.journey-item,
+.quick-action-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+}
+
+.persona-benefit {
+  padding: 16px;
+}
+
+.persona-benefit span,
+.quick-action-kicker {
+  color: #88acff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.persona-benefit strong,
+.journey-item strong,
+.quick-action-card strong {
+  display: block;
+  margin-top: 10px;
+  color: #f5f8ff;
+  font-size: 18px;
+}
+
+.persona-benefit p,
+.journey-item p,
+.quick-action-card p {
+  margin: 10px 0 0;
+  color: #90a0b8;
+  line-height: 1.7;
+}
+
+.journey-list {
+  display: grid;
+  gap: 12px;
+}
+
+.journey-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  padding: 16px;
+}
+
+.journey-step {
+  min-width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(64, 122, 255, 0.28), rgba(31, 212, 191, 0.18));
+  color: #f4f8ff;
   font-size: 14px;
+  font-weight: 800;
+}
+
+.quick-scene {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.quick-action-card {
+  width: 100%;
+  padding: 20px;
+  text-align: left;
+  transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+}
+
+.quick-action-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(118, 168, 255, 0.34);
+  background: rgba(255,255,255,0.05);
+}
+
+.chart-card,
+.todo-card,
+.feed-card {
+  padding: 22px;
+}
+
+.trend-card {
+  grid-column: span 2;
+}
+
+.panel-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  background: rgba(255, 125, 0, 0.1);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 125, 0, 0.2);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
-.forecast-icon {
-  color: var(--color-warning);
-  font-size: 16px;
+.panel-subtitle {
+  margin: 8px 0 0;
+  color: #8f9bb1;
+  line-height: 1.7;
 }
 
-.forecast-value {
-  color: var(--color-warning);
-  font-weight: 700;
-  font-size: 16px;
-  margin-left: 4px;
-}
-
-.stat-value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.trend-indicator {
+.panel-badge {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 115, 115, 0.24);
+  background: rgba(255, 99, 99, 0.08);
+  color: #ffd3d3;
   font-size: 12px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
 }
 
-.trend-indicator.positive {
-  color: var(--color-danger);
-  background: rgba(245, 63, 63, 0.1);
+.chart-canvas {
+  width: 100%;
 }
 
-.trend-indicator.negative {
-  color: var(--color-success);
-  background: rgba(0, 180, 42, 0.1);
+.trend-canvas {
+  height: 360px;
+}
+
+.risk-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.risk-canvas {
+  height: 290px;
+}
+
+.risk-list {
+  display: grid;
+  gap: 12px;
+}
+
+.risk-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.risk-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.risk-dot.danger,
+.feed-level.danger {
+  background: #ff6b6b;
+}
+
+.risk-dot.warning,
+.feed-level.warning {
+  background: #ffb454;
+}
+
+.risk-dot.safe,
+.feed-level.safe {
+  background: #2ecc71;
+}
+
+.risk-dot.neutral,
+.feed-level.neutral,
+.feed-level.processing {
+  background: #7f8aa3;
+}
+
+.risk-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.risk-copy strong,
+.todo-copy strong,
+.feed-item strong {
+  color: #f6f8fe;
+}
+
+.risk-copy span,
+.todo-copy p,
+.feed-item p {
+  color: #90a0b8;
+}
+
+.todo-list,
+.feed-list {
+  display: grid;
+  gap: 12px;
 }
 
 .todo-item {
-  background: var(--color-card-strong);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  transition: all var(--transition-fast);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+  padding: 16px 18px;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.03);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
 .todo-item:hover {
-  background: var(--color-card-hover);
-  border-color: var(--color-primary-light);
-  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+  border-color: rgba(115, 164, 255, 0.28);
+  background: rgba(255,255,255,0.05);
 }
 
-.todo-text {
-  font-size: 14px;
-  color: var(--color-text);
-  margin-bottom: 8px;
-  line-height: 1.4;
+.todo-priority {
+  min-width: 48px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255,107,107,0.14);
+  color: #ffd6d6;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
 }
 
-.todo-actions {
+.todo-copy p,
+.feed-item p {
+  margin: 6px 0 0;
+  line-height: 1.6;
+}
+
+.todo-metric {
+  color: #e4ecfa;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.feed-item {
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+}
+
+.feed-topline {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
 
-/* 响应式设计 */
-@media (max-width: 1200px) {
-  .hero {
-    padding: 32px 24px;
+.feed-level {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #08101e;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.feed-time {
+  color: #7e8ca7;
+  font-size: 12px;
+}
+
+@media (max-width: 1280px) {
+  .pulse-grid,
+  .hero-scene,
+  .persona-grid,
+  .risk-layout,
+
+  .pulse-layout {
+    grid-template-columns: 1fr;
   }
-  
-  .hero-left h1 {
-    font-size: 24px;
-  }
-  
   .stat-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
+  }
+
+  .persona-benefits,
+  .quick-scene {
+    grid-template-columns: 1fr;
+  }
+
+  .trend-card {
+    grid-column: span 1;
   }
 }
 
 @media (max-width: 768px) {
-  .home-grid {
+  .workbench-home {
     grid-template-columns: 1fr;
   }
-  
-  .hero {
-    flex-direction: column;
-    text-align: center;
-    gap: 24px;
+
+  .hero-scene,
+  .chart-card,
+  .todo-card,
+  .feed-card {
+    padding: 18px;
   }
-  
-  .hero-right {
-    width: 180px;
-    height: 180px;
-  }
-  
-  .stat-grid {
+
+  .tower-grid,
+  .todo-item {
     grid-template-columns: 1fr;
+  }
+
+  .todo-metric {
+    text-align: left;
   }
 }
 </style>

@@ -7,13 +7,11 @@ import AiModelManage from '../views/AiModelManage.vue';
 import UserManage from '../views/UserManage.vue';
 import RoleManage from '../views/RoleManage.vue';
 import PermissionManage from '../views/PermissionManage.vue';
-import ApprovalManage from '../views/ApprovalManage.vue';
+import OperationsCommand from '../views/OperationsCommand.vue';
 import PolicyManage from '../views/PolicyManage.vue';
-import RiskEventManage from '../views/RiskEventManage.vue';
 import ModelCost from '../views/ModelCost.vue';
 import SensitiveScan from '../views/SensitiveScan.vue';
 import Alerts from '../views/Alerts.vue';
-import DataShare from '../views/DataShare.vue';
 import SubjectRequest from '../views/SubjectRequest.vue';
 import DesensePreview from '../views/DesensePreview.vue';
 import GlobalSearch from '../views/GlobalSearch.vue';
@@ -22,30 +20,33 @@ import Profile from '../views/Profile.vue';
 import Settings from '../views/Settings.vue';
 import ModelList from '../views/ai/ModelList.vue';
 import ModelMonitor from '../views/ai/ModelMonitor.vue';
+import { getSession, hasActiveSession } from '../utils/auth';
+import { canAccessPath } from '../utils/persona';
 
 const routes = [
-  { path: '/login', name: 'Login', component: Login, meta: { public: true } },
-  { path: '/', name: 'Home', component: Home },
-  { path: '/data-asset', name: 'DataAsset', component: DataAsset },
-  { path: '/audit-log', name: 'AuditLog', component: AuditLog },
-  { path: '/ai-model-manage', name: 'AiModelManage', component: AiModelManage },
-  { path: '/model-cost', name: 'ModelCost', component: ModelCost },
-  { path: '/user-manage', name: 'UserManage', component: UserManage },
-  { path: '/role-manage', name: 'RoleManage', component: RoleManage },
-  { path: '/permission-manage', name: 'PermissionManage', component: PermissionManage },
-  { path: '/approval-manage', name: 'ApprovalManage', component: ApprovalManage },
-  { path: '/policy-manage', name: 'PolicyManage', component: PolicyManage },
-  { path: '/risk-event-manage', name: 'RiskEventManage', component: RiskEventManage },
-  { path: '/sensitive-scan', name: 'SensitiveScan', component: SensitiveScan },
-  { path: '/alerts', name: 'Alerts', component: Alerts },
-  { path: '/data-share', name: 'DataShare', component: DataShare },
-  { path: '/subject-request', name: 'SubjectRequest', component: SubjectRequest },
-  { path: '/desense-preview', name: 'DesensePreview', component: DesensePreview },
-  { path: '/global-search', name: 'GlobalSearch', component: GlobalSearch },
-  { path: '/ai/models', name: 'ModelList', component: ModelList },
-  { path: '/ai/monitor', name: 'ModelMonitor', component: ModelMonitor },
-  { path: '/profile', name: 'Profile', component: Profile },
-  { path: '/settings', name: 'Settings', component: Settings }
+  { path: '/login', name: 'Login', component: Login, meta: { public: true, depth: 0 } },
+  { path: '/', name: 'Home', component: Home, meta: { depth: 1 } },
+  { path: '/data-asset', name: 'DataAsset', component: DataAsset, meta: { depth: 2 } },
+  { path: '/audit-log', name: 'AuditLog', component: AuditLog, meta: { depth: 2 } },
+  { path: '/ai-model-manage', name: 'AiModelManage', component: AiModelManage, meta: { depth: 2 } },
+  { path: '/model-cost', name: 'ModelCost', component: ModelCost, meta: { depth: 2 } },
+  { path: '/user-manage', name: 'UserManage', component: UserManage, meta: { depth: 3 } },
+  { path: '/role-manage', name: 'RoleManage', component: RoleManage, meta: { depth: 3 } },
+  { path: '/permission-manage', name: 'PermissionManage', component: PermissionManage, meta: { depth: 3 } },
+  { path: '/operations-command', name: 'OperationsCommand', component: OperationsCommand, meta: { depth: 3 } },
+  { path: '/approval-manage', name: 'ApprovalManage', component: OperationsCommand, meta: { depth: 3, lane: 'approval' } },
+  { path: '/policy-manage', name: 'PolicyManage', component: PolicyManage, meta: { depth: 3 } },
+  { path: '/risk-event-manage', name: 'RiskEventManage', component: OperationsCommand, meta: { depth: 3, lane: 'risk' } },
+  { path: '/sensitive-scan', name: 'SensitiveScan', component: SensitiveScan, meta: { depth: 2 } },
+  { path: '/alerts', name: 'Alerts', component: Alerts, meta: { depth: 2 } },
+  { path: '/data-share', name: 'DataShare', component: OperationsCommand, meta: { depth: 3, lane: 'share' } },
+  { path: '/subject-request', name: 'SubjectRequest', component: SubjectRequest, meta: { depth: 2 } },
+  { path: '/desense-preview', name: 'DesensePreview', component: DesensePreview, meta: { depth: 2 } },
+  { path: '/global-search', name: 'GlobalSearch', component: GlobalSearch, meta: { depth: 2 } },
+  { path: '/ai/models', name: 'ModelList', component: ModelList, meta: { depth: 3 } },
+  { path: '/ai/monitor', name: 'ModelMonitor', component: ModelMonitor, meta: { depth: 3 } },
+  { path: '/profile', name: 'Profile', component: Profile, meta: { depth: 2 } },
+  { path: '/settings', name: 'Settings', component: Settings, meta: { depth: 2 } }
 ];
 
 const router = createRouter({
@@ -56,8 +57,21 @@ const router = createRouter({
 // 简单登录守卫：无 token 则跳转登录
 router.beforeEach((to, from, next) => {
   if (to.meta.public) return next();
-  const token = localStorage.getItem('token');
-  if (!token) return next('/login');
+  if (!hasActiveSession()) {
+    return next({ path: '/login', query: { redirect: to.fullPath } });
+  }
+
+  const session = getSession();
+  if (!canAccessPath(to.path, session?.user)) {
+    return next('/');
+  }
+
+  // 根据路由深度自动设置转场方向（供 usePageTransition 读取）
+  // 深度相同视为同级，深度更大为"前进"，反之为"后退"
+  const fromDepth = from.meta?.depth ?? 1;
+  const toDepth   = to.meta?.depth   ?? 1;
+  to.meta._transitionDir = toDepth >= fromDepth ? 'forward' : 'back';
+
   next();
 });
 

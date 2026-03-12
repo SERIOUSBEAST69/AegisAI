@@ -67,7 +67,14 @@ public class SubjectRequestController {
 
     @PostMapping("/delete")
     public R<?> delete(@RequestBody @Validated IdReq req) {
-        subjectRequestService.removeById(req.getId());
+        SubjectRequest existing = subjectRequestService.getById(req.getId());
+        if (existing == null) {
+            return R.error(40000, "工单不存在或已删除");
+        }
+        boolean removed = subjectRequestService.removeById(req.getId());
+        if (!removed) {
+            return R.error(40000, "工单删除失败，请刷新后重试");
+        }
         return R.okMsg("删除成功");
     }
 

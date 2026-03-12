@@ -13,8 +13,13 @@ public class User {
     private String username;
     private String password;
     private String realName;
+    private String nickname;
+    private String avatar;
     private Long roleId;
     private String department;
+    private String organizationType;
+    private String loginType;
+    private String wechatOpenId;
     private String phone;
     private String email;
     private Integer status;

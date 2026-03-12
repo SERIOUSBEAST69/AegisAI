@@ -13,6 +13,7 @@ public class RiskEvent {
     private String type;
     private String level;
     private Long relatedLogId;
+    private String auditLogIds;
     private String status;
     private Long handlerId;
     private String processLog;

@@ -16,6 +16,8 @@ public class DataShareRequest {
     private String reason;
     private String status; // pending/approved/rejected
     private Long approverId;
+    private String shareToken;
+    private Date expireTime;
     private Date createTime;
     private Date updateTime;
 }

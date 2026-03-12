@@ -15,6 +15,8 @@ public class ApprovalRequest {
     private String reason;
     private String status;
     private Long approverId;
+    private String processInstanceId;
+    private String taskId;
     private Date createTime;
     private Date updateTime;
 }

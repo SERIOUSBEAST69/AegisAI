@@ -19,6 +19,7 @@ public class AuditLog {
     private String inputOverview;
     private String outputOverview;
     private String result;
+    private String riskLevel; // NORMAL/LOW/MEDIUM/HIGH
     private String hash;
     private Date createTime;
 }

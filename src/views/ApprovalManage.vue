@@ -30,7 +30,7 @@
     </el-table>
     <el-dialog v-model="showAdd" title="新建审批申请">
       <el-form :model="addForm" :rules="rules" ref="addFormRef">
-        <el-form-item label="申请人ID" prop="applicantId"><el-input v-model="addForm.applicantId" /></el-form-item>
+        <el-alert title="申请人将自动绑定为当前登录账号" type="info" :closable="false" show-icon style="margin-bottom: 16px;" />
         <el-form-item label="资产ID" prop="assetId"><el-input v-model="addForm.assetId" /></el-form-item>
         <el-form-item label="理由" prop="reason"><el-input v-model="addForm.reason" /></el-form-item>
       </el-form>
@@ -49,11 +49,10 @@ const approvals = ref([]);
 const loading = ref(false);
 const showAdd = ref(false);
 const saving = ref(false);
-const addForm = ref({ applicantId: '', assetId: '', reason: '' });
+const addForm = ref({ assetId: '', reason: '' });
 const query = ref({ applicantId: '', assetId: '' });
 const addFormRef = ref();
 const rules = {
-  applicantId: [{ required: true, message: '申请人ID不能为空', trigger: 'blur' }],
   assetId: [{ required: true, message: '资产ID不能为空', trigger: 'blur' }],
   reason: [{ required: true, message: '理由不能为空', trigger: 'blur' }]
 };
@@ -69,7 +68,7 @@ async function fetchApprovals() {
   }
 }
 function openAdd() {
-  addForm.value = { applicantId: '', assetId: '', reason: '' };
+  addForm.value = { assetId: '', reason: '' };
   showAdd.value = true;
 }
 async function addApproval() {
@@ -91,7 +90,7 @@ async function addApproval() {
 }
 async function approve(row, status) {
   try {
-    await request.post('/approval/approve', { requestId: row.id, approverId: 1, status });
+    await request.post('/approval/approve', { requestId: row.id, status });
     ElMessage.success('处理成功');
     fetchApprovals();
   } catch (err) {

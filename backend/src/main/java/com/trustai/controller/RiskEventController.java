@@ -2,16 +2,20 @@ package com.trustai.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.entity.RiskEvent;
+import com.trustai.entity.User;
+import com.trustai.service.CurrentUserService;
 import com.trustai.service.RiskEventService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import java.util.Date;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/risk-event")
 public class RiskEventController {
     @Autowired private RiskEventService riskEventService;
+    @Autowired private CurrentUserService currentUserService;
 
     @GetMapping("/list")
     public R<List<RiskEvent>> list(@RequestParam(required = false) String type) {
@@ -22,18 +26,29 @@ public class RiskEventController {
 
     @PostMapping("/add")
     public R<?> add(@RequestBody RiskEvent event) {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN");
+        User currentUser = currentUserService.requireCurrentUser();
+        event.setId(null);
+        event.setHandlerId(currentUser.getId());
+        event.setCreateTime(new Date());
+        event.setUpdateTime(new Date());
         riskEventService.save(event);
         return R.okMsg("添加成功");
     }
 
     @PostMapping("/update")
     public R<?> update(@RequestBody RiskEvent event) {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN");
+        User currentUser = currentUserService.requireCurrentUser();
+        event.setHandlerId(currentUser.getId());
+        event.setUpdateTime(new Date());
         riskEventService.updateById(event);
         return R.okMsg("更新成功");
     }
 
     @PostMapping("/delete")
     public R<?> delete(@RequestBody IdReq req) {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN");
         riskEventService.removeById(req.getId());
         return R.okMsg("删除成功");
     }

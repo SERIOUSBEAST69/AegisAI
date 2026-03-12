@@ -36,29 +36,70 @@
 import { ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import request from '../api/request';
+import { isMockSession } from '../utils/auth';
 
 const form = ref({ sourceType: 'file', sourcePath: '' });
 const list = ref([]);
 const loading = ref(false);
 const saving = ref(false);
+const usingDemoData = ref(false);
 const formRef = ref();
 const rules = {
   sourceType: [{ required: true, message: '请选择来源类型', trigger: 'change' }],
   sourcePath: [{ required: true, message: '请输入路径/表', trigger: 'blur' }]
 };
 
+function buildDemoTasks() {
+  return [
+    { id: 101, sourceType: 'file', sourcePath: '/demo/student_profiles.xlsx', status: 'done', sensitiveRatio: 32.6, reportPath: '/demo/reports/student-profiles.json' },
+    { id: 102, sourceType: 'db', sourcePath: 'campus.user_archive', status: 'done', sensitiveRatio: 18.9, reportPath: '/demo/reports/user-archive.json' },
+  ];
+}
+
+function loadDemoTasks(message) {
+  usingDemoData.value = true;
+  list.value = buildDemoTasks();
+  if (message) {
+    ElMessage.warning(message);
+  }
+}
+
 async function fetchList() {
+  if (isMockSession()) {
+    loadDemoTasks('当前为演示登录，敏感扫描已切换为本地示例数据');
+    return;
+  }
   loading.value = true;
   try {
+    usingDemoData.value = false;
     list.value = await request.get('/sensitive-scan/list');
   } catch (err) {
-    ElMessage.error(err?.message || '加载失败');
+    if (err?.sessionExpired) {
+      ElMessage.error(err.message || '登录态已失效');
+    } else {
+      loadDemoTasks(err?.message || '后端暂不可用，已切换为演示数据');
+    }
   } finally {
     loading.value = false;
   }
 }
 
 async function create() {
+  if (usingDemoData.value) {
+    list.value = [
+      {
+        id: Date.now(),
+        sourceType: form.value.sourceType,
+        sourcePath: form.value.sourcePath,
+        status: 'pending',
+        sensitiveRatio: 0,
+        reportPath: '/demo/reports/pending.json',
+      },
+      ...list.value,
+    ];
+    ElMessage.success('演示任务已创建');
+    return;
+  }
   if (!formRef.value) return;
   formRef.value.validate(async valid => {
     if (!valid) return;
@@ -76,6 +117,13 @@ async function create() {
 }
 
 async function run(id) {
+  if (usingDemoData.value) {
+    list.value = list.value.map(item => item.id === id
+      ? { ...item, status: 'done', sensitiveRatio: 27.4, reportPath: `/demo/reports/task-${id}.json` }
+      : item);
+    ElMessage.success('演示任务已执行');
+    return;
+  }
   try {
     await request.post('/sensitive-scan/run', { id });
     ElMessage.success('任务已执行');
@@ -88,6 +136,11 @@ async function run(id) {
 async function remove(id) {
   try {
     await ElMessageBox.confirm('确认删除该任务吗？', '提示', { type: 'warning' });
+    if (usingDemoData.value) {
+      list.value = list.value.filter(item => item.id !== id);
+      ElMessage.success('演示任务已删除');
+      return;
+    }
     await request.post('/sensitive-scan/delete', { id });
     ElMessage.success('删除成功');
     fetchList();

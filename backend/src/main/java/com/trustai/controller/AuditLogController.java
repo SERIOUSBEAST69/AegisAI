@@ -1,12 +1,13 @@
 package com.trustai.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.trustai.entity.AuditLog;
+import com.trustai.document.AuditLogDocument;
 import com.trustai.service.AuditLogService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import java.util.Date;
 import java.util.List;
 import jakarta.validation.constraints.NotNull;
 
@@ -16,13 +17,12 @@ import jakarta.validation.constraints.NotNull;
 public class AuditLogController {
     @Autowired private AuditLogService auditLogService;
 
-    @PostMapping("/search")
-    public R<List<AuditLog>> search(@RequestBody AuditLog query) {
-        QueryWrapper<AuditLog> qw = new QueryWrapper<>();
-        if (query.getUserId() != null) qw.eq("user_id", query.getUserId());
-        if (query.getAssetId() != null) qw.eq("asset_id", query.getAssetId());
-        List<AuditLog> list = auditLogService.list(qw);
-        return R.ok(list);
+    @GetMapping("/search")
+    public R<List<AuditLogDocument>> search(@RequestParam(required = false) Long userId,
+                                            @RequestParam(required = false) String operation,
+                                            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date from,
+                                            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date to) {
+        return R.ok(auditLogService.search(userId, operation, from, to));
     }
 
     @PostMapping("/delete")

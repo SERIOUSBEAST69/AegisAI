@@ -29,4 +29,7 @@ public class AiModel {
     private String description;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    @TableField(exist = false)
+    private String name; // 兼容前端使用 name 字段的旧写法
 }

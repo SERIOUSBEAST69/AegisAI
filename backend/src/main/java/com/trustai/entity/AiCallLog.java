@@ -16,6 +16,7 @@ public class AiCallLog {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long userId;
+    private Long dataAssetId;
     private Long modelId;
     private String modelCode;
     private String provider;

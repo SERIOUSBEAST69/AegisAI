@@ -42,9 +42,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(auth);
             chain.doFilter(request, response);
         } catch (Exception e) {
+            SecurityContextHolder.clearContext();
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":40100,\"msg\":\"token invalid or expired\"}");
+            response.getWriter().write("{\"code\":40100,\"msg\":\"登录态已过期，请重新登录\",\"data\":{\"reason\":\"TOKEN_INVALID\",\"sessionExpired\":true}}");
         }
     }
 }

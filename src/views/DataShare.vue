@@ -4,7 +4,6 @@
       <div class="card-header">数据资产共享审批</div>
       <el-form :inline="true" @submit.prevent ref="applyFormRef" :model="form" :rules="rules">
         <el-form-item label="资产ID" prop="assetId"><el-input v-model="form.assetId" /></el-form-item>
-        <el-form-item label="申请人" prop="applicantId"><el-input v-model="form.applicantId" /></el-form-item>
         <el-form-item label="协作人ID，逗号分隔"><el-input v-model="form.collaborators" /></el-form-item>
         <el-form-item label="理由" prop="reason"><el-input v-model="form.reason" style="width:240px" /></el-form-item>
         <el-button type="primary" :loading="saving" @click="apply">提交申请</el-button>
@@ -15,7 +14,9 @@
         <el-table-column prop="applicantId" label="申请人" />
         <el-table-column prop="collaborators" label="协作人" />
         <el-table-column prop="reason" label="理由" />
-        <el-table-column prop="status" label="状态" />
+        <el-table-column label="状态">
+          <template #default="scope">{{ formatShareStatus(scope.row.status) }}</template>
+        </el-table-column>
         <el-table-column label="审批" width="200">
           <template #default="scope">
             <el-button size="small" type="success" :loading="actionId===scope.row.id && actionType==='approve'" @click="approve(scope.row.id, 'approved')">通过</el-button>
@@ -33,7 +34,7 @@ import { ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import request from '../api/request';
 
-const form = ref({ assetId: '', applicantId: '', collaborators: '', reason: '' });
+const form = ref({ assetId: '', collaborators: '', reason: '' });
 const list = ref([]);
 const loading = ref(false);
 const saving = ref(false);
@@ -42,7 +43,6 @@ const actionType = ref('');
 const applyFormRef = ref();
 const rules = {
   assetId: [{ required: true, message: '资产ID不能为空', trigger: 'blur' }],
-  applicantId: [{ required: true, message: '申请人不能为空', trigger: 'blur' }],
   reason: [{ required: true, message: '理由不能为空', trigger: 'blur' }]
 };
 
@@ -77,7 +77,7 @@ async function apply() {
 async function approve(id, status) {
   actionId.value = id; actionType.value = status === 'approved' ? 'approve' : 'reject';
   try {
-    await request.post('/data-share/approve', { id, status, approverId: 1 });
+    await request.post('/data-share/approve', { id, status });
     ElMessage.success('处理成功');
     load();
   } catch (err) {
@@ -99,6 +99,12 @@ async function remove(id) {
   } finally {
     actionId.value = null; actionType.value = '';
   }
+}
+
+function formatShareStatus(status) {
+  if (status === 'approved') return '已通过';
+  if (status === 'rejected') return '已拒绝';
+  return '待审批';
 }
 
 load();

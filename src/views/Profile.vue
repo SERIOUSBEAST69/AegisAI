@@ -1,5 +1,5 @@
 <template>
-  <el-card class="card-glass">
+  <el-card class="card-glass" v-loading="loading">
     <div class="card-header">个人资料</div>
     <el-form :model="userInfo" label-width="120px">
       <el-form-item label="用户名">
@@ -7,6 +7,9 @@
       </el-form-item>
       <el-form-item label="真实姓名">
         <el-input v-model="userInfo.realName" />
+      </el-form-item>
+      <el-form-item label="显示名称">
+        <el-input v-model="userInfo.nickname" />
       </el-form-item>
       <el-form-item label="邮箱">
         <el-input v-model="userInfo.email" />
@@ -32,36 +35,63 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { computed, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
+import { useUserStore } from '../store/user';
 
-const userInfo = ref({
-  username: 'admin',
-  realName: '管理员',
-  email: 'admin@aegisai.com',
-  phone: '13800138000',
-  department: '技术部',
-  role: '超级管理员',
-  lastLogin: '2026-03-08 10:00:00'
+const userStore = useUserStore();
+const loading = computed(() => userStore.loading);
+const userInfo = reactive({
+  username: '',
+  realName: '',
+  nickname: '',
+  email: '',
+  phone: '',
+  department: '',
+  role: '',
+  lastLogin: ''
 });
 
-const saveProfile = () => {
-  // 模拟保存操作
-  ElMessage.success('个人资料保存成功');
-};
+function syncForm(profile) {
+  userInfo.username = profile?.username || '';
+  userInfo.realName = profile?.realName || '';
+  userInfo.nickname = profile?.nickname || '';
+  userInfo.email = profile?.email || '';
+  userInfo.phone = profile?.phone || '';
+  userInfo.department = profile?.department || '';
+  userInfo.role = profile?.roleName || '未分配角色';
+  userInfo.lastLogin = profile?.lastActiveAt || '';
+}
+
+async function saveProfile() {
+  try {
+    await userStore.updateProfile({
+      nickname: userInfo.nickname,
+      realName: userInfo.realName,
+      email: userInfo.email,
+      phone: userInfo.phone,
+      department: userInfo.department
+    });
+    syncForm(userStore.userInfo);
+    ElMessage.success('个人资料保存成功');
+  } catch (error) {
+    ElMessage.error(error?.message || '个人资料保存失败');
+  }
+}
 
 const resetForm = () => {
-  userInfo.value = {
-    username: 'admin',
-    realName: '管理员',
-    email: 'admin@aegisai.com',
-    phone: '13800138000',
-    department: '技术部',
-    role: '超级管理员',
-    lastLogin: '2026-03-08 10:00:00'
-  };
+  syncForm(userStore.userInfo);
   ElMessage.info('表单已重置');
 };
+
+onMounted(async () => {
+  try {
+    await userStore.fetchProfile();
+    syncForm(userStore.userInfo);
+  } catch (error) {
+    ElMessage.error(error?.message || '用户资料加载失败');
+  }
+});
 </script>
 
 <style scoped>

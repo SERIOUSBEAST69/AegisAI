@@ -1,5 +1,5 @@
 <template>
-  <el-card class="card-glass">
+  <el-card class="card-glass" v-loading="loading">
     <div class="card-header">系统设置</div>
     
     <el-tabs v-model="activeTab">
@@ -70,14 +70,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
+import { systemConfigApi, SYSTEM_CONFIG_KEYS } from '../api/systemConfig';
 
 const activeTab = ref('basic');
+const loading = ref(false);
 
 const settings = ref({
   basic: {
-    systemName: 'AegisAI 数据治理平台',
+    systemName: 'Aegis Workbench',
     version: 'v1.0.0',
     apiUrl: 'http://localhost:8080/api',
     backupFrequency: 'daily'
@@ -94,17 +96,71 @@ const settings = ref({
   }
 });
 
-const saveBasicSettings = () => {
-  ElMessage.success('基本设置保存成功');
-};
+function applyConfigs(configs) {
+  const map = Object.fromEntries((configs || []).map(item => [item.configKey, item.configValue]));
+  settings.value.basic.systemName = map[SYSTEM_CONFIG_KEYS.systemName] || settings.value.basic.systemName;
+  settings.value.basic.apiUrl = map[SYSTEM_CONFIG_KEYS.apiUrl] || settings.value.basic.apiUrl;
+  settings.value.basic.backupFrequency = map[SYSTEM_CONFIG_KEYS.backupFrequency] || settings.value.basic.backupFrequency;
+  settings.value.security.passwordPolicy = map[SYSTEM_CONFIG_KEYS.passwordPolicy] || settings.value.security.passwordPolicy;
+  settings.value.security.loginAttempts = Number(map[SYSTEM_CONFIG_KEYS.loginAttempts] || settings.value.security.loginAttempts);
+  settings.value.security.sessionTimeout = Number(map[SYSTEM_CONFIG_KEYS.sessionTimeout] || settings.value.security.sessionTimeout);
+  settings.value.notification.email = String(map[SYSTEM_CONFIG_KEYS.notificationEmail] || settings.value.notification.email) === 'true';
+  settings.value.notification.sms = String(map[SYSTEM_CONFIG_KEYS.notificationSms] || settings.value.notification.sms) === 'true';
+  settings.value.notification.system = String(map[SYSTEM_CONFIG_KEYS.notificationSystem] || settings.value.notification.system) === 'true';
+}
 
-const saveSecuritySettings = () => {
-  ElMessage.success('安全设置保存成功');
-};
+async function loadSettings() {
+  loading.value = true;
+  try {
+    const configs = await systemConfigApi.list();
+    applyConfigs(configs);
+  } catch (error) {
+    ElMessage.warning(error?.message || '系统配置读取失败，已展示默认值');
+  } finally {
+    loading.value = false;
+  }
+}
 
-const saveNotificationSettings = () => {
-  ElMessage.success('通知设置保存成功');
-};
+async function saveBasicSettings() {
+  try {
+    await Promise.all([
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.systemName, settings.value.basic.systemName, '系统名称'),
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.apiUrl, settings.value.basic.apiUrl, '后端 API 地址'),
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.backupFrequency, settings.value.basic.backupFrequency, '数据备份频率')
+    ]);
+    ElMessage.success('基本设置保存成功');
+  } catch (error) {
+    ElMessage.error(error?.message || '基本设置保存失败');
+  }
+}
+
+async function saveSecuritySettings() {
+  try {
+    await Promise.all([
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.passwordPolicy, settings.value.security.passwordPolicy, '密码策略等级'),
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.loginAttempts, settings.value.security.loginAttempts, '登录失败限制'),
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.sessionTimeout, settings.value.security.sessionTimeout, '会话超时时间（分钟）')
+    ]);
+    ElMessage.success('安全设置保存成功');
+  } catch (error) {
+    ElMessage.error(error?.message || '安全设置保存失败');
+  }
+}
+
+async function saveNotificationSettings() {
+  try {
+    await Promise.all([
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.notificationEmail, settings.value.notification.email, '邮件通知开关'),
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.notificationSms, settings.value.notification.sms, '短信通知开关'),
+      systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.notificationSystem, settings.value.notification.system, '系统通知开关')
+    ]);
+    ElMessage.success('通知设置保存成功');
+  } catch (error) {
+    ElMessage.error(error?.message || '通知设置保存失败');
+  }
+}
+
+onMounted(loadSettings);
 </script>
 
 <style scoped>

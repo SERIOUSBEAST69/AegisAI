@@ -7,7 +7,7 @@
       </div>
       <el-button type="primary" @click="openAdd">新增模型</el-button>
     </div>
-    <el-table :data="models" stripe v-loading="loading">
+    <el-table :data="models" class="page-table" stripe v-loading="loading">
       <el-table-column prop="modelName" label="名称" />
       <el-table-column prop="modelCode" label="代码" width="160" />
       <el-table-column prop="provider" label="供应商" width="120" />
@@ -81,24 +81,42 @@ async function handleSubmit(payload) {
     }
     ElMessage.success('保存成功');
     formVisible.value = false;
-    fetchData();
+    await fetchData();
   } finally {
     saving.value = false;
   }
 }
 
 async function handleDelete(id) {
-  await ElMessageBox.confirm('确认删除该模型吗？', '提示');
-  await request.post('/ai-model/delete', { id });
-  ElMessage.success('已删除');
-  fetchData();
+  try {
+    await ElMessageBox.confirm('确认删除该模型吗？', '提示');
+    await request.post('/ai-model/delete', { id });
+    models.value = models.value.filter(model => model.id !== id);
+    ElMessage.success('已删除');
+    await fetchData();
+  } catch (err) {
+    if (err !== 'cancel' && err !== 'close') {
+      ElMessage.error(err?.message || '删除失败');
+    }
+  }
 }
 
 fetchData();
 </script>
 
 <style scoped>
-.page { padding: 16px; }
+.page { padding: 16px; color: var(--color-text); }
 .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.hint { color: #6b7280; margin: 4px 0 0; }
+.header h2 { margin: 0; color: var(--color-text); }
+.hint { color: var(--color-text-secondary); margin: 4px 0 0; }
+
+:deep(.page-table) {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.04);
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.04);
+  --el-table-border-color: var(--color-border-light);
+  --el-table-text-color: var(--color-text);
+  --el-table-header-text-color: var(--color-text-secondary);
+}
 </style>

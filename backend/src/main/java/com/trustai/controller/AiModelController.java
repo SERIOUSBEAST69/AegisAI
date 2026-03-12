@@ -81,7 +81,14 @@ public class AiModelController {
 
     @PostMapping("/delete")
     public R<?> delete(@RequestBody @Validated IdReq req) {
-        aiModelService.removeById(req.getId());
+        AiModel existing = aiModelService.getById(req.getId());
+        if (existing == null) {
+            return R.error(40000, "模型不存在或已删除");
+        }
+        boolean removed = aiModelService.removeById(req.getId());
+        if (!removed) {
+            return R.error(40000, "模型删除失败，请刷新后重试");
+        }
         return R.okMsg("删除成功");
     }
 

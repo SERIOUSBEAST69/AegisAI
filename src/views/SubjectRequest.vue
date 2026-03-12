@@ -14,7 +14,7 @@
         <el-form-item label="备注" prop="comment"><el-input v-model="form.comment" style="width:220px" /></el-form-item>
         <el-button type="primary" :loading="saving" @click="create">提交申请</el-button>
       </el-form>
-      <el-table :data="list" style="margin-top:12px" v-loading="loading">
+      <el-table :data="list" class="page-table" style="margin-top:12px" v-loading="loading">
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="userId" label="用户ID" />
         <el-table-column prop="type" label="类型" />
@@ -41,17 +41,23 @@
 import { ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import request from '../api/request';
+import { useUserStore } from '../store/user';
 
 const form = ref({ userId: '', type: 'access', comment: '' });
 const list = ref([]);
 const loading = ref(false);
 const saving = ref(false);
 const formRef = ref();
+const userStore = useUserStore();
 const rules = {
   userId: [{ required: true, message: '用户ID不能为空', trigger: 'blur' }],
   type: [{ required: true, message: '类型不能为空', trigger: 'change' }],
   comment: [{ required: true, message: '备注不能为空', trigger: 'blur' }]
 };
+
+function removeRequestFromList(id) {
+  list.value = list.value.filter(item => item.id !== id);
+}
 
 async function load() {
   loading.value = true;
@@ -72,7 +78,7 @@ async function create() {
     try {
       await request.post('/subject-request/create', form.value);
       ElMessage.success('提交成功');
-      load();
+      await load();
     } catch (err) {
       ElMessage.error(err?.message || '提交失败');
     } finally {
@@ -83,9 +89,13 @@ async function create() {
 
 async function update(row) {
   try {
-    await request.post('/subject-request/process', row);
+    const payload = {
+      ...row,
+      handlerId: row.handlerId || userStore.userInfo?.id || null,
+    };
+    await request.post('/subject-request/process', payload);
     ElMessage.success('更新成功');
-    load();
+    await load();
   } catch (err) {
     ElMessage.error(err?.message || '更新失败');
   }
@@ -95,10 +105,11 @@ async function remove(id) {
   try {
     await ElMessageBox.confirm('确认删除该工单吗？', '提示', { type: 'warning' });
     await request.post('/subject-request/delete', { id });
+    removeRequestFromList(id);
     ElMessage.success('删除成功');
-    load();
+    await load();
   } catch (err) {
-    if (err !== 'cancel') ElMessage.error(err?.message || '删除失败');
+    if (err !== 'cancel' && err !== 'close') ElMessage.error(err?.message || '删除失败');
   }
 }
 
@@ -107,5 +118,15 @@ load();
 
 <style scoped>
 .page-grid { display: grid; gap: 16px; }
-.card-header { font-weight: 600; margin-bottom: 12px; }
+.card-header { font-weight: 600; margin-bottom: 12px; color: var(--color-text); }
+
+:deep(.page-table) {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.04);
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.04);
+  --el-table-border-color: var(--color-border-light);
+  --el-table-text-color: var(--color-text);
+  --el-table-header-text-color: var(--color-text-secondary);
+}
 </style>

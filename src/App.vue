@@ -1,175 +1,343 @@
 <template>
-  <div class="app-shell" :class="{ 'light-mode': theme === 'light' }" v-if="!isLogin">
+  <!-- 全局自定义光标（始终存在，登录页与主应用均生效） -->
+  <CustomCursor />
+
+  <div
+    ref="shellEl"
+    class="app-shell"
+    v-if="!isLogin && userStore.initialized"
+  >
     <header class="app-header card-glass">
       <div class="brand" @click="go('/')">
         <div class="logo">
-          <span class="dot" />
-          <span class="logo-text">AegisAI</span>
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 88 88" class="brand-mark-svg" role="presentation">
+              <defs>
+                <linearGradient id="brandShieldGradient" x1="18" y1="10" x2="70" y2="78" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#eef6ff" />
+                  <stop offset="34%" stop-color="#84bbff" />
+                  <stop offset="100%" stop-color="#3567dc" />
+                </linearGradient>
+              </defs>
+              <path d="M44 8 69 18v19.5c0 16.1-10.2 31-25 39.3C29.2 68.5 19 53.6 19 37.5V18L44 8Z" fill="rgba(7,14,24,0.88)" stroke="url(#brandShieldGradient)" stroke-width="3.2" stroke-linejoin="round" />
+              <path d="M44 23c8.4 0 15.2 4.3 19.4 11.8-4.2 7.5-11 11.8-19.4 11.8S28.8 42.3 24.6 34.8C28.8 27.3 35.6 23 44 23Z" fill="none" stroke="rgba(202,226,255,0.92)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+              <circle cx="44" cy="34.8" r="6.4" fill="url(#brandShieldGradient)" />
+              <path d="M44 51.5v10.5" fill="none" stroke="rgba(202,226,255,0.84)" stroke-width="3" stroke-linecap="round" />
+              <path d="M36 62h16" fill="none" stroke="rgba(202,226,255,0.84)" stroke-width="3" stroke-linecap="round" />
+            </svg>
+          </span>
+          <span ref="brandTitleEl" class="logo-text">Aegis Workbench</span>
         </div>
-        <span class="subtitle">数据治理与隐私合规平台</span>
+        <span class="subtitle">守护数据与隐私合规平台</span>
       </div>
       <div class="header-actions">
+        <StaggeredMenu
+          position="right"
+          :items="staggeredMenuItems"
+          :social-items="staggeredQuickLinks"
+          :highlights="personaHighlights"
+          panel-kicker="Navigation Layers"
+          :panel-title="menuPanelTitle"
+          :panel-subtitle="menuPanelSubtitle"
+          :colors="menuLayerColors"
+          :display-socials="true"
+          :display-item-numbering="true"
+          menu-button-color="#f6fbff"
+          open-menu-button-color="#0b1220"
+          :change-menu-color-on-open="true"
+          @select="handleMenuSelect"
+          @utility-select="handleUtilitySelect"
+        />
         <el-dropdown trigger="click" @command="handleDropdown">
           <div class="user-info">
-            <el-avatar :size="32" :icon="UserFilled" />
-            <span class="user-name">管理员</span>
+            <el-avatar :size="32" :src="userAvatar || undefined" :icon="UserFilled" />
+            <div class="user-copy">
+              <span class="user-name">{{ userDisplayName }}</span>
+              <span class="user-meta">{{ userIdentityLine }}</span>
+            </div>
+            <span class="user-role-chip">{{ userRoleName }}</span>
             <el-icon><ArrowDown /></el-icon>
           </div>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">个人资料</el-dropdown-item>
               <el-dropdown-item command="settings">系统设置</el-dropdown-item>
-              <el-dropdown-item command="theme">{{ themeLabel }}</el-dropdown-item>
-              <el-dropdown-item command="logout" divided @click="logout">退出登录</el-dropdown-item>
+              <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
       </div>
     </header>
     <div class="layout">
-      <aside class="app-aside card-glass">
-        <el-menu 
-          :default-active="active" 
-          @select="go" 
-          class="nav-menu"
-          background-color="transparent"
-          text-color="var(--color-text-secondary)"
-          active-text-color="#ffffff"
-        >
-          <div class="menu-section">
-            <div class="section-title">核心功能</div>
-            <el-menu-item index="/">
-              <el-icon><HomeFilled /></el-icon>
-              <template #title>首页</template>
-            </el-menu-item>
-            <el-menu-item index="/data-asset">
-              <el-icon><DataAnalysis /></el-icon>
-              <template #title>数据资产</template>
-            </el-menu-item>
-            <el-menu-item index="/ai-model-manage">
-              <el-icon><StarFilled /></el-icon>
-              <template #title>AI模型</template>
-            </el-menu-item>
-            <el-menu-item index="/audit-log">
-              <el-icon><Timer /></el-icon>
-              <template #title>审计日志</template>
-            </el-menu-item>
-            <el-menu-item index="/model-cost">
-              <el-icon><Money /></el-icon>
-              <template #title>调用成本</template>
-            </el-menu-item>
-          </div>
-          
-          <div class="menu-section">
-            <div class="section-title">安全合规</div>
-            <el-menu-item index="/sensitive-scan">
-              <el-icon><Search /></el-icon>
-              <template #title>敏感扫描</template>
-            </el-menu-item>
-            <el-menu-item index="/alerts">
-              <el-icon><Warning /></el-icon>
-              <template #title>告警闭环</template>
-            </el-menu-item>
-            <el-menu-item index="/data-share">
-              <el-icon><Share /></el-icon>
-              <template #title>资产共享</template>
-            </el-menu-item>
-            <el-menu-item index="/subject-request">
-              <el-icon><UserFilled /></el-icon>
-              <template #title>主体权利</template>
-            </el-menu-item>
-            <el-menu-item index="/desense-preview">
-              <el-icon><Lock /></el-icon>
-              <template #title>脱敏预览</template>
-            </el-menu-item>
-            <el-menu-item index="/global-search">
-              <el-icon><Search /></el-icon>
-              <template #title>全局搜索</template>
-            </el-menu-item>
-          </div>
-          
-          <div class="menu-section">
-            <div class="section-title">系统管理</div>
-            <el-menu-item index="/user-manage">
-              <el-icon><UserFilled /></el-icon>
-              <template #title>用户管理</template>
-            </el-menu-item>
-            <el-menu-item index="/role-manage">
-              <el-icon><Avatar /></el-icon>
-              <template #title>角色管理</template>
-            </el-menu-item>
-            <el-menu-item index="/permission-manage">
-              <el-icon><Key /></el-icon>
-              <template #title>权限管理</template>
-            </el-menu-item>
-            <el-menu-item index="/approval-manage">
-              <el-icon><Check /></el-icon>
-              <template #title>审批管理</template>
-            </el-menu-item>
-            <el-menu-item index="/policy-manage">
-              <el-icon><Document /></el-icon>
-              <template #title>策略管理</template>
-            </el-menu-item>
-            <el-menu-item index="/risk-event-manage">
-              <el-icon><Warning /></el-icon>
-              <template #title>风险事件</template>
-            </el-menu-item>
-          </div>
-        </el-menu>
-      </aside>
       <main class="app-main">
-        <router-view v-slot="{ Component }">
-          <transition name="fade-slide" mode="out-in">
-            <component :is="Component" />
-          </transition>
+        <router-view v-slot="{ Component, route }">
+          <div class="route-stage">
+            <transition :name="transitionName" @enter="onPageEnter">
+              <component :is="Component" :key="route.fullPath" class="route-layer" />
+            </transition>
+          </div>
         </router-view>
       </main>
+    </div>
+  </div>
+  <div v-if="showWorkbenchIntro" ref="introOverlayEl" class="workbench-intro">
+    <div class="workbench-intro-grid"></div>
+    <div class="workbench-intro-noise"></div>
+    <div ref="introGlowEl" class="workbench-intro-glow"></div>
+    <div class="workbench-intro-copy">
+      <div ref="introKickerEl" class="workbench-intro-kicker">{{ personaExperience.kicker }}</div>
+      <h1 ref="introTitleEl" class="workbench-intro-title workbench-title-core">Aegis Workbench</h1>
+      <p ref="introSubtitleEl" class="workbench-intro-subtitle">{{ personaExperience.introSubtitle }}</p>
+    </div>
+  </div>
+  <div v-else-if="!isLogin" class="app-boot">
+    <div class="boot-panel card-glass">
+      <div class="boot-title">Aegis Workbench</div>
+      <div class="boot-subtitle">正在恢复工作台上下文...</div>
     </div>
   </div>
   <router-view v-else />
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import gsap from 'gsap';
+import { useUserStore } from './store/user';
+import CustomCursor from './components/CustomCursor.vue';
+import StaggeredMenu from './components/StaggeredMenu.vue';
+import { usePageTransition } from './composables/usePageTransition';
+import { getPersonaExperience, getVisibleMenuSections } from './utils/persona';
 import {
   UserFilled,
   ArrowDown,
-  HomeFilled,
-  DataAnalysis,
-  StarFilled,
-  Timer,
-  Money,
-  Search,
-  Warning,
-  Share,
-  Lock,
-  Avatar,
-  Key,
-  Check,
-  Document
 } from '@element-plus/icons-vue';
 
-const route = useRoute();
+const route  = useRoute();
 const router = useRouter();
-const active = computed(() => route.path);
-const isLogin = computed(() => route.path === '/login');
+const userStore = useUserStore();
+const shellEl = ref(null);
+const brandTitleEl = ref(null);
+const introOverlayEl = ref(null);
+const introGlowEl = ref(null);
+const introKickerEl = ref(null);
+const introTitleEl = ref(null);
+const introSubtitleEl = ref(null);
+const introConsumed = ref(false);
+const showWorkbenchIntro = ref(false);
+const isLogin  = computed(() => route.path === '/login');
+const userDisplayName = computed(() => userStore.displayName);
+const userAvatar = computed(() => userStore.avatar);
+const userRoleName = computed(() => userStore.roleName);
+const userIdentityLine = computed(() => userStore.identityLine);
+const personaExperience = computed(() => getPersonaExperience(userStore.userInfo));
+const visibleMenuSections = computed(() => getVisibleMenuSections(userStore.userInfo));
+const personaHighlights = computed(() => personaExperience.value.benefits.slice(0, 2));
+const menuLayerColors = ['#08101b', '#12315f', '#274f97', '#88bfff'];
+const menuDescriptions = {
+  '/': '回到总控首页与当前角色主视图。',
+  '/operations-command': '查看跨模块治理命令和关键动作。',
+  '/global-search': '跨资产、模型、告警和日志检索上下文。',
+  '/data-asset': '进入数据资产全景与高敏分布。',
+  '/ai-model-manage': '管理模型状态、风险级别和调用准入。',
+  '/model-cost': '查看调用成本、预算和使用趋势。',
+  '/desense-preview': '校验脱敏策略与数据可用性平衡。',
+  '/alerts': '处理高危告警与闭环状态。',
+  '/audit-log': '追踪审计证据链和操作还原。',
+  '/sensitive-scan': '扫描敏感数据暴露与命中情况。',
+  '/subject-request': '处理主体权利和履约请求。',
+  '/policy-manage': '配置治理策略与门禁规则。',
+  '/user-manage': '维护组织、账号与成员结构。',
+  '/role-manage': '编排角色能力边界。',
+  '/permission-manage': '控制权限颗粒与访问路径。',
+};
+
+const staggeredMenuItems = computed(() => (
+  visibleMenuSections.value.flatMap(section =>
+    section.items.map(item => ({
+      ...item,
+      section: section.title,
+      description: menuDescriptions[item.path] || `进入${item.label}模块。`,
+    }))
+  )
+));
+const staggeredQuickLinks = computed(() => ([
+  { label: '个人资料', command: 'profile' },
+  { label: '系统设置', command: 'settings' },
+  { label: '退出登录', command: 'logout' },
+]));
+const menuPanelTitle = computed(() => `${personaExperience.value.label} 导航剧场`);
+const menuPanelSubtitle = computed(() => personaExperience.value.signature);
 const go = (path) => router.push(path);
-const logout = () => { localStorage.removeItem('token'); router.push('/login'); };
 
-const theme = ref('light');
-const themeLabel = computed(() => theme.value === 'dark' ? '白天模式' : '夜间模式');
+localStorage.removeItem('theme');
+document.documentElement.classList.remove('light-mode');
+document.body.classList.remove('light-mode');
 
-// 从localStorage读取主题设置
-const savedTheme = localStorage.getItem('theme');
-if (savedTheme) {
-  theme.value = savedTheme;
+const logout = async () => {
+  await userStore.logout();
+  router.push('/login');
+};
+
+function handleMenuSelect(item) {
+  if (item?.path) {
+    router.push(item.path);
+  }
 }
 
-const toggleTheme = () => {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark';
-  localStorage.setItem('theme', theme.value);
-};
+function handleUtilitySelect(item) {
+  if (!item?.command) {
+    return;
+  }
+  handleDropdown(item.command);
+}
+
+// ── 页面转场集成 ──────────────────────────────
+const { direction, triggerEnter } = usePageTransition();
+const transitionName = computed(() =>
+  direction.value === 'back' ? 'page-slide-right' : 'page-slide-left'
+);
+function onPageEnter() {
+  triggerEnter();
+}
+
+function getTitleGhost() {
+  return document.body.querySelector('[data-transition-title="login"]');
+}
+
+function removeTitleGhost() {
+  const ghost = getTitleGhost();
+  if (ghost) {
+    ghost.remove();
+  }
+}
+
+function removeTransitionArtifacts() {
+  removeTitleGhost();
+}
+
+function getIntroTitleTargetEl() {
+  return shellEl.value?.querySelector('[data-workbench-title-anchor="home"]') || brandTitleEl.value;
+}
+
+function getElementFlight(sourceEl, targetEl) {
+  if (!sourceEl || !targetEl) {
+    return null;
+  }
+  const sourceRect = sourceEl.getBoundingClientRect();
+  const targetRect = targetEl.getBoundingClientRect();
+  return {
+    x: targetRect.left + targetRect.width / 2 - (sourceRect.left + sourceRect.width / 2),
+    y: targetRect.top + targetRect.height / 2 - (sourceRect.top + sourceRect.height / 2),
+    scale: targetRect.width / Math.max(sourceRect.width, 1),
+  };
+}
+
+async function playWorkbenchIntro() {
+  if (!introOverlayEl.value || !shellEl.value) {
+    showWorkbenchIntro.value = false;
+    removeTransitionArtifacts();
+    return;
+  }
+
+  const titleGhost = getTitleGhost();
+  const targetTitle = getIntroTitleTargetEl();
+
+  gsap.killTweensOf([
+    introOverlayEl.value,
+    introGlowEl.value,
+    introKickerEl.value,
+    introTitleEl.value,
+    introSubtitleEl.value,
+    shellEl.value,
+    titleGhost,
+  ]);
+
+  gsap.set(introOverlayEl.value, { opacity: 1 });
+  gsap.set(shellEl.value, {
+    opacity: 0.82,
+  });
+  gsap.set(introKickerEl.value, { opacity: 0, y: 14, letterSpacing: '0.24em' });
+  gsap.set(introTitleEl.value, {
+    opacity: titleGhost ? 0 : 0,
+    y: '18vh',
+    scale: 0.94,
+    filter: 'blur(8px)',
+    transformOrigin: '50% 50%',
+  });
+  gsap.set(introSubtitleEl.value, { opacity: titleGhost ? 0 : 0, y: 10, filter: 'blur(4px)' });
+  gsap.set(introGlowEl.value, { opacity: 0, scale: 0.84, filter: 'blur(18px)' });
+  if (titleGhost) {
+    gsap.set(titleGhost, {
+      opacity: 1,
+      x: 0,
+      y: 0,
+      scale: 1,
+      filter: 'blur(0px)',
+      transformOrigin: '50% 50%',
+    });
+  }
+
+  let titleFlight = null;
+
+  gsap.timeline({
+    onComplete: () => {
+      showWorkbenchIntro.value = false;
+      removeTransitionArtifacts();
+    }
+  })
+    .to(shellEl.value, {
+      opacity: 1,
+      duration: 0.22,
+      ease: 'power2.out'
+    }, 0)
+    .to(introGlowEl.value, { opacity: 0.34, scale: 1.04, filter: 'blur(24px)', duration: 0.24, ease: 'power2.out' }, 0)
+    .add(() => {
+      titleFlight = getElementFlight(titleGhost || introTitleEl.value, targetTitle);
+    }, 0)
+    .to(titleGhost || introTitleEl.value, {
+      opacity: 1,
+      x: () => titleFlight?.x ?? 0,
+      y: () => titleFlight?.y ?? -window.innerHeight * 0.34,
+      scale: () => titleFlight?.scale ?? 0.34,
+      transformOrigin: '50% 50%',
+      duration: 0.46,
+      ease: 'expo.out'
+    }, 0)
+    .to(introGlowEl.value, {
+      opacity: 0,
+      scale: 1.1,
+      filter: 'blur(28px)',
+      duration: 0.22,
+      ease: 'power2.out'
+    }, 0.16)
+    .to(introOverlayEl.value, { opacity: 0, duration: 0.2, ease: 'power2.out' }, 0.18);
+}
+
+watch(isLogin, value => {
+  if (value) {
+    introConsumed.value = false;
+    showWorkbenchIntro.value = false;
+    removeTransitionArtifacts();
+  }
+});
+
+watch(
+  () => [isLogin.value, userStore.initialized, route.fullPath],
+  async ([login, initialized]) => {
+    if (login || !initialized || introConsumed.value) {
+      return;
+    }
+    if (sessionStorage.getItem('aegis.transition.origin') !== 'login') {
+      removeTransitionArtifacts();
+      return;
+    }
+    introConsumed.value = true;
+    showWorkbenchIntro.value = true;
+    await nextTick();
+    playWorkbenchIntro();
+  }
+);
 
 const handleDropdown = (command) => {
   switch (command) {
@@ -178,9 +346,6 @@ const handleDropdown = (command) => {
       break;
     case 'settings':
       router.push('/settings');
-      break;
-    case 'theme':
-      toggleTheme();
       break;
     case 'logout':
       logout();
@@ -195,6 +360,30 @@ const handleDropdown = (command) => {
   padding: 24px; 
   box-sizing: border-box; 
   transition: all var(--transition-normal);
+}
+
+.app-boot {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boot-panel {
+  min-width: 320px;
+  padding: 28px 32px;
+  text-align: center;
+}
+
+.boot-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.boot-subtitle {
+  margin-top: 10px;
+  color: var(--color-text-muted);
 }
 
 .app-header { 
@@ -213,12 +402,43 @@ const handleDropdown = (command) => {
   gap: 20px;
   cursor: pointer;
   flex: 1;
+  min-width: 0;
 }
 
 .logo {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.brand-mark {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: radial-gradient(circle at 30% 24%, rgba(146, 199, 255, 0.18), rgba(8, 14, 24, 0.95) 66%);
+  border: 1px solid rgba(169, 196, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 40px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.brand-mark-svg {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 6px 14px rgba(47, 112, 255, 0.24));
 }
 
 .logo-text {
@@ -239,24 +459,11 @@ const handleDropdown = (command) => {
   border-left: 1px solid var(--color-border-light);
 }
 
-.dot { 
-  width: 12px; 
-  height: 12px; 
-  border-radius: 50%; 
-  background: linear-gradient(135deg, var(--color-primary), var(--color-success)); 
-  box-shadow: 0 0 12px rgba(22, 93, 255, 0.6); 
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); box-shadow: 0 0 20px rgba(22, 93, 255, 0.8); }
-}
-
 .header-actions {
   display: flex;
   align-items: center;
   gap: var(--gap-md);
+  flex: 0 0 auto;
 }
 
 .user-info {
@@ -277,66 +484,48 @@ const handleDropdown = (command) => {
   box-shadow: var(--shadow-sm);
 }
 
+.user-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .user-name {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-text);
 }
 
+.user-meta {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.user-role-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(115, 188, 255, 0.24);
+  background: linear-gradient(135deg, rgba(34, 116, 255, 0.24), rgba(27, 217, 180, 0.1));
+  color: #dcecff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .layout { 
-  display: grid; 
-  grid-template-columns: 280px 1fr; 
-  gap: 20px; 
+  display: block;
   margin-top: 20px; 
   min-height: calc(100vh - 116px); 
   transition: all var(--transition-normal);
 }
 
-.app-aside { 
-  padding: 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-.app-aside::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, var(--color-primary), transparent);
-  border-radius: 50%;
-  filter: blur(40px);
-  opacity: 0.3;
-  z-index: 0;
-}
-
-.nav-menu { 
-  background: transparent; 
-  border-right: none;
-  position: relative;
-  z-index: 1;
-}
-
-.menu-section {
-  margin-bottom: 24px;
-}
-
-.section-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 0 16px 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--color-border-light);
-}
-
 .app-main { 
   padding: 0;
   position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .app-main::before {
@@ -359,12 +548,95 @@ const handleDropdown = (command) => {
   z-index: 1;
 }
 
+.route-stage {
+  position: relative;
+  min-height: calc(100vh - 116px);
+  isolation: isolate;
+}
+
+.route-layer {
+  width: 100%;
+}
+
+.workbench-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 54%, rgba(52, 110, 255, 0.18), transparent 24%),
+    linear-gradient(180deg, rgba(4, 8, 18, 0.64), rgba(5, 7, 13, 0.34));
+  pointer-events: none;
+}
+
+.workbench-intro-grid,
+.workbench-intro-noise,
+.workbench-intro-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.workbench-intro-grid {
+  opacity: 0.18;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 86px 86px;
+  mask-image: radial-gradient(circle at center, rgba(0,0,0,1), transparent 82%);
+}
+
+.workbench-intro-noise {
+  inset: -10%;
+  opacity: 0.08;
+  mix-blend-mode: screen;
+  background-image: radial-gradient(rgba(255,255,255,0.18) 0.8px, transparent 0.8px);
+  background-size: 4px 4px;
+}
+
+.workbench-intro-glow {
+  inset: auto 20% 24% 20%;
+  height: 24vh;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(49, 102, 255, 0), rgba(105, 205, 255, 0.9), rgba(49, 102, 255, 0));
+}
+
+.workbench-intro-copy {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 1600px);
+  text-align: center;
+  will-change: transform, opacity;
+}
+
+.workbench-intro-kicker {
+  color: #c7dcff;
+  font-size: clamp(12px, 1.25vw, 18px);
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.workbench-intro-title {
+  margin: 26px 0 18px;
+  font-size: clamp(78px, 13vw, 210px);
+  color: #f8fbff;
+  text-shadow: 0 0 32px rgba(112, 176, 255, 0.22), 0 18px 80px rgba(0, 0, 0, 0.72);
+}
+
+.workbench-intro-subtitle {
+  margin: 0;
+  color: #9db0c9;
+  font-size: clamp(14px, 1.5vw, 24px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
 /* 响应式设计 */
 @media (max-width: 1200px) {
-  .layout {
-    grid-template-columns: 240px 1fr;
-  }
-  
   .app-shell {
     padding: 16px;
   }
@@ -379,16 +651,18 @@ const handleDropdown = (command) => {
 }
 
 @media (max-width: 768px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  
-  .app-aside {
-    display: none;
+  .workbench-intro-title {
+    font-size: clamp(58px, 16vw, 108px);
   }
   
   .brand {
     gap: 12px;
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
   }
   
   .logo-text {

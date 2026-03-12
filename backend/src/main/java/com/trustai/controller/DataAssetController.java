@@ -1,27 +1,45 @@
 package com.trustai.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.trustai.dto.DataAssetDetailDto;
 import com.trustai.entity.DataAsset;
+import com.trustai.entity.User;
+import com.trustai.exception.BizException;
+import com.trustai.service.CurrentUserService;
 import com.trustai.service.DataAssetService;
+import com.trustai.utils.AssetContentExtractor;
 import com.trustai.utils.R;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Date;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/data-asset")
 @Validated
 public class DataAssetController {
     @Autowired private DataAssetService dataAssetService;
+    @Autowired private CurrentUserService currentUserService;
+    @Autowired private AssetContentExtractor assetContentExtractor;
 
     @GetMapping("/list")
     public R<List<DataAsset>> list(@RequestParam(required = false) String name) {
         QueryWrapper<DataAsset> qw = new QueryWrapper<>();
         if (name != null && !name.isEmpty()) qw.like("name", name);
-        return R.ok(dataAssetService.list(qw));
+        List<DataAsset> assets = dataAssetService.list(qw);
+        assets.forEach(this::hydrateReadableDescription);
+        return R.ok(assets);
     }
 
     @PostMapping("/register")
@@ -30,10 +48,46 @@ public class DataAssetController {
         entity.setName(asset.getName());
         entity.setType(asset.getType());
         entity.setSensitivityLevel(asset.getSensitivityLevel());
-        entity.setOwnerId(asset.getOwnerId());
+        entity.setOwnerId(resolveOwnerId(asset.getOwnerId()));
         entity.setLocation(asset.getLocation());
-        dataAssetService.save(entity);
+        entity.setDescription(asset.getDescription());
+        dataAssetService.register(entity);
         return R.okMsg("注册成功");
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<DataAsset> upload(
+        @RequestParam("file") MultipartFile file,
+        @RequestParam(required = false) String assetName,
+        @RequestParam(required = false) String type,
+        @RequestParam(required = false) String sensitivityLevel,
+        @RequestParam(required = false) String description,
+        @RequestParam(required = false) Long ownerId
+    ) {
+        if (file == null || file.isEmpty()) {
+            throw new BizException(40000, "请上传需要治理的数据文件");
+        }
+        User currentUser = currentUserService.requireCurrentUser();
+        String storedPath = storeGovernanceFile(file, currentUser.getUsername());
+        String preview = assetContentExtractor.extractPreview(file);
+
+        DataAsset entity = new DataAsset();
+        entity.setName(StringUtils.hasText(assetName) ? assetName : deriveName(file));
+        entity.setType(StringUtils.hasText(type) ? type : detectType(file.getOriginalFilename()));
+        entity.setSensitivityLevel(StringUtils.hasText(sensitivityLevel) ? sensitivityLevel : "medium");
+        entity.setOwnerId(resolveOwnerId(ownerId));
+        entity.setLocation(storedPath);
+        entity.setDescription(buildUploadDescription(description, currentUser, preview));
+        entity.setUpdateTime(new Date());
+
+        return R.ok(dataAssetService.register(entity));
+    }
+
+    @GetMapping("/{id}")
+    public R<DataAssetDetailDto> detail(@PathVariable Long id) {
+        DataAssetDetailDto detail = dataAssetService.detailWithCalls(id);
+        hydrateReadableDescription(detail);
+        return R.ok(detail);
     }
 
     @PostMapping("/update")
@@ -43,8 +97,9 @@ public class DataAssetController {
         entity.setName(asset.getName());
         entity.setType(asset.getType());
         entity.setSensitivityLevel(asset.getSensitivityLevel());
-        entity.setOwnerId(asset.getOwnerId());
+        entity.setOwnerId(resolveOwnerId(asset.getOwnerId()));
         entity.setLocation(asset.getLocation());
+        entity.setDescription(asset.getDescription());
         dataAssetService.updateById(entity);
         return R.okMsg("更新成功");
     }
@@ -55,18 +110,101 @@ public class DataAssetController {
         return R.okMsg("删除成功");
     }
 
-    public static class IdReq { @NotNull private Long id; public Long getId(){return id;} public void setId(Long id){this.id=id;} }
+    private Long resolveOwnerId(Long ownerId) {
+        if (ownerId != null) {
+            return ownerId;
+        }
+        return currentUserService.requireCurrentUser().getId();
+    }
+
+    private String displayName(User user) {
+        if (StringUtils.hasText(user.getRealName())) {
+            return user.getRealName();
+        }
+        if (StringUtils.hasText(user.getNickname())) {
+            return user.getNickname();
+        }
+        return user.getUsername();
+    }
+
+    private String deriveName(MultipartFile file) {
+        String original = file.getOriginalFilename();
+        if (!StringUtils.hasText(original)) {
+            return "治理数据上传";
+        }
+        int lastDot = original.lastIndexOf('.');
+        return lastDot > 0 ? original.substring(0, lastDot) : original;
+    }
+
+    private String detectType(String originalFilename) {
+        if (!StringUtils.hasText(originalFilename)) {
+            return "file";
+        }
+        String lower = originalFilename.toLowerCase();
+        if (lower.endsWith(".csv") || lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+            return "table";
+        }
+        if (lower.endsWith(".json") || lower.endsWith(".xml")) {
+            return "api";
+        }
+        if (lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".docx") || lower.endsWith(".txt")) {
+            return "document";
+        }
+        return "file";
+    }
+
+    private String buildUploadDescription(String description, User currentUser, String preview) {
+        if (StringUtils.hasText(description)) {
+            return description;
+        }
+        String prefix = "由 " + displayName(currentUser) + " 上传";
+        if (StringUtils.hasText(preview)) {
+            return prefix + "，已识别内容摘要：" + preview;
+        }
+        return prefix + "，已进入治理扫描队列";
+    }
+
+    private void hydrateReadableDescription(DataAsset asset) {
+        if (asset == null || !StringUtils.hasText(asset.getLocation())) {
+            return;
+        }
+        String preview = assetContentExtractor.extractPreview(asset.getLocation());
+        if (!StringUtils.hasText(preview)) {
+            return;
+        }
+        if (!StringUtils.hasText(asset.getDescription()) || !asset.getDescription().contains("已识别内容摘要")) {
+            asset.setDescription("已识别内容摘要：" + preview);
+        }
+    }
+
+    private String storeGovernanceFile(MultipartFile file, String username) {
+        try {
+            String original = file.getOriginalFilename();
+            String ext = original != null && original.contains(".") ? original.substring(original.lastIndexOf('.')) : "";
+            Path dir = Paths.get("uploads", "governance-data", username == null ? "anonymous" : username);
+            Files.createDirectories(dir);
+            Path target = dir.resolve(UUID.randomUUID() + ext);
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            return target.toString().replace('\\', '/');
+        } catch (IOException e) {
+            throw new BizException(50000, "数据文件上传失败: " + e.getMessage());
+        }
+    }
+
+    public static class IdReq { @jakarta.validation.constraints.NotNull private Long id; public Long getId(){return id;} public void setId(Long id){this.id=id;} }
     public static class DataAssetReq {
         @NotBlank private String name;
         @NotBlank private String type;
         private String sensitivityLevel;
-        @NotNull private Long ownerId;
+        private Long ownerId;
         private String location;
+        private String description;
         public String getName(){return name;} public void setName(String v){name=v;}
         public String getType(){return type;} public void setType(String v){type=v;}
         public String getSensitivityLevel(){return sensitivityLevel;} public void setSensitivityLevel(String v){sensitivityLevel=v;}
         public Long getOwnerId(){return ownerId;} public void setOwnerId(Long v){ownerId=v;}
         public String getLocation(){return location;} public void setLocation(String v){location=v;}
+        public String getDescription(){return description;} public void setDescription(String v){description=v;}
     }
-    public static class DataAssetUpdateReq extends DataAssetReq { @NotNull private Long id; public Long getId(){return id;} public void setId(Long v){id=v;} }
+    public static class DataAssetUpdateReq extends DataAssetReq { @jakarta.validation.constraints.NotNull private Long id; public Long getId(){return id;} public void setId(Long v){id=v;} }
 }

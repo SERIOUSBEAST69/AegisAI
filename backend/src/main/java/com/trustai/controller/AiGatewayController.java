@@ -32,6 +32,8 @@ public class AiGatewayController {
         private String model;
         @NotEmpty
         private List<Message> messages;
+        private Long assetId; // optional data asset association
+        private String accessReason;
 
         public String getProvider() { return provider; }
         public void setProvider(String provider) { this.provider = provider; }
@@ -39,6 +41,10 @@ public class AiGatewayController {
         public void setModel(String model) { this.model = model; }
         public List<Message> getMessages() { return messages; }
         public void setMessages(List<Message> messages) { this.messages = messages; }
+        public Long getAssetId() { return assetId; }
+        public void setAssetId(Long assetId) { this.assetId = assetId; }
+        public String getAccessReason() { return accessReason; }
+        public void setAccessReason(String accessReason) { this.accessReason = accessReason; }
     }
 
     public static class Message {

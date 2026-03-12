@@ -8,7 +8,7 @@
       <el-button @click="fetchData">刷新</el-button>
     </div>
     <div class="cards">
-      <el-card v-for="item in summary" :key="item.modelCode" class="card">
+      <el-card v-for="item in summary" :key="item.modelCode" class="card card-glass">
         <div class="card-title">{{ item.modelCode }} ({{ item.provider }})</div>
         <div class="metric">今日调用：{{ item.total }}</div>
         <div class="metric">成功率：{{ successRate(item) }}%</div>
@@ -89,11 +89,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page { padding: 16px; }
+.page { padding: 16px; color: var(--color-text); }
 .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.hint { color: #6b7280; margin: 4px 0 0; }
+.header h2 { margin: 0; color: var(--color-text); }
+.hint { color: var(--color-text-secondary); margin: 4px 0 0; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.card-title { font-weight: 600; margin-bottom: 4px; }
-.metric { color: #374151; margin: 2px 0; }
-.chart { width: 100%; height: 360px; }
+.card-title { font-weight: 600; margin-bottom: 4px; color: var(--color-text); }
+.metric { color: var(--color-text-secondary); margin: 2px 0; }
+.chart {
+  width: 100%;
+  height: 360px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border-light);
+  background: rgba(255, 255, 255, 0.03);
+}
 </style>

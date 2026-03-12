@@ -1,10 +1,12 @@
 -- TrustAI 数据治理平台核心表 DDL
 
-CREATE TABLE `user` (
+CREATE TABLE `sys_user` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
   `username` VARCHAR(50) NOT NULL COMMENT '用户名',
   `password` VARCHAR(100) NOT NULL COMMENT '密码（加密存储）',
   `real_name` VARCHAR(50) COMMENT '真实姓名',
+  `nickname` VARCHAR(50) COMMENT '昵称',
+  `avatar` VARCHAR(255) COMMENT '头像地址',
   `role_id` BIGINT COMMENT '角色ID',
   `department` VARCHAR(50) COMMENT '部门',
   `phone` VARCHAR(20) COMMENT '联系方式',
@@ -61,12 +63,16 @@ CREATE TABLE `data_asset` (
 
 CREATE TABLE `ai_model` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '模型ID',
-  `name` VARCHAR(100) NOT NULL COMMENT '模型名称',
-  `type` VARCHAR(50) COMMENT '类型（外部API/ONNX/PMML等）',
+  `model_name` VARCHAR(100) NOT NULL COMMENT '模型名称',
+  `model_code` VARCHAR(50) NOT NULL COMMENT '模型编码',
+  `provider` VARCHAR(50) COMMENT '供应商',
+  `api_url` VARCHAR(200) COMMENT '调用地址',
+  `api_key` VARCHAR(200) COMMENT '密钥（加密存储）',
+  `model_type` VARCHAR(50) COMMENT '模型类型',
   `risk_level` VARCHAR(20) COMMENT '风险等级（低/中/高）',
-  `endpoint` VARCHAR(200) COMMENT '接入方式/端点',
-  `developer` VARCHAR(50) COMMENT '开发者',
-  `status` TINYINT DEFAULT 1 COMMENT '状态 1-启用 0-下架',
+  `status` VARCHAR(20) DEFAULT 'enabled' COMMENT '状态 enabled/disabled',
+  `call_limit` INT DEFAULT 0 COMMENT '每日限额',
+  `current_calls` INT DEFAULT 0 COMMENT '当前已调用次数',
   `description` VARCHAR(200) COMMENT '描述',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
@@ -83,6 +89,7 @@ CREATE TABLE `audit_log` (
   `input_overview` VARCHAR(200) COMMENT '输入概要（脱敏）',
   `output_overview` VARCHAR(200) COMMENT '输出概要（脱敏）',
   `result` VARCHAR(20) COMMENT '结果（成功/失败）',
+  `risk_level` VARCHAR(20) COMMENT '风险等级',
   `hash` VARCHAR(128) COMMENT '哈希链/签名',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   INDEX idx_user(`user_id`),
@@ -119,6 +126,7 @@ CREATE TABLE `risk_event` (
   `type` VARCHAR(50) COMMENT '事件类型',
   `level` VARCHAR(20) COMMENT '风险等级',
   `related_log_id` BIGINT COMMENT '关联日志ID',
+  `audit_log_ids` VARCHAR(500) COMMENT '关联审计日志ID集合',
   `status` VARCHAR(20) COMMENT '状态（待处理/已处理）',
   `handler_id` BIGINT COMMENT '处置人ID',
   `process_log` TEXT COMMENT '处置记录',
@@ -202,3 +210,24 @@ CREATE TABLE `desensitize_rule` (
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) COMMENT='脱敏规则定义';
+
+CREATE TABLE `desense_recommend_rule` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `data_category` VARCHAR(50) COMMENT '数据分类：如身份证、银行卡',
+  `user_role` VARCHAR(50) COMMENT '调用方角色：如admin/auditor',
+  `strategy` VARCHAR(50) COMMENT '策略：mask/hash/tokenize',
+  `rule_id` BIGINT COMMENT '关联脱敏规则ID',
+  `priority` INT DEFAULT 0 COMMENT '优先级，越小越高',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_cat_role(`data_category`, `user_role`)
+) COMMENT='脱敏推荐规则表';
+
+CREATE TABLE `system_config` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `config_key` VARCHAR(128) NOT NULL UNIQUE COMMENT '配置键',
+  `config_value` TEXT NOT NULL COMMENT '配置值',
+  `description` VARCHAR(255) COMMENT '配置说明',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) COMMENT='系统配置表';

@@ -1,6 +1,8 @@
 package com.trustai.controller;
 
 import com.trustai.entity.DesensitizeRule;
+import com.trustai.dto.DesenseRecommendationDto;
+import com.trustai.service.RecommendationService;
 import com.trustai.utils.R;
 import com.trustai.service.DesensitizeRuleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,8 @@ public class DesenseController {
 
     @Autowired
     private DesensitizeRuleService ruleService;
+    @Autowired
+    private RecommendationService recommendationService;
 
     @GetMapping("/rules")
     public R<List<DesensitizeRule>> rules() {
@@ -29,6 +33,12 @@ public class DesenseController {
     public R<?> save(@RequestBody DesensitizeRule rule) {
         if (rule.getId() == null) ruleService.save(rule); else ruleService.updateById(rule);
         return R.ok(rule);
+    }
+
+    @PostMapping("/recommend")
+    public R<List<DesenseRecommendationDto>> recommend(@RequestBody RecommendReq req) {
+        List<DesenseRecommendationDto> data = recommendationService.recommend(req.getDataCategory(), req.getUserRole(), req.getSensitivityLevel());
+        return R.ok(data);
     }
 
     @PostMapping("/delete")
@@ -63,6 +73,18 @@ public class DesenseController {
         private String sample; private String mask;
         public String getSample(){return sample;} public void setSample(String s){this.sample=s;}
         public String getMask(){return mask;} public void setMask(String m){this.mask=m;}
+    }
+
+    public static class RecommendReq {
+        private String dataCategory;
+        private String userRole;
+        private String sensitivityLevel;
+        public String getDataCategory(){return dataCategory;}
+        public void setDataCategory(String dataCategory){this.dataCategory=dataCategory;}
+        public String getUserRole(){return userRole;}
+        public void setUserRole(String userRole){this.userRole=userRole;}
+        public String getSensitivityLevel(){return sensitivityLevel;}
+        public void setSensitivityLevel(String sensitivityLevel){this.sensitivityLevel=sensitivityLevel;}
     }
 
     public static class IdReq {

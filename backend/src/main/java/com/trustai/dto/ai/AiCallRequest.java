@@ -11,6 +11,8 @@ public class AiCallRequest {
     @NotBlank
     private String modelCode;
     private String prompt;
+    private Long assetId;
+    private String accessReason;
     @NotEmpty
     private List<AiMessage> messages;
 }

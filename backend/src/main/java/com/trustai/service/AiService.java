@@ -26,6 +26,7 @@ public class AiService {
     private static final Logger log = LoggerFactory.getLogger(AiService.class);
 
     private final AiModelService aiModelService;
+    private final AiModelAccessGuardService aiModelAccessGuardService;
     private final RateLimiterService rateLimiterService;
     private final AesEncryptor aesEncryptor;
     private final AiCallAuditService aiCallAuditService;
@@ -34,11 +35,8 @@ public class AiService {
     public AiCallResponse chat(AiCallRequest request, Long userId, String ip) {
         AiModel model = aiModelService.lambdaQuery()
                 .eq(AiModel::getModelCode, request.getModelCode())
-                .eq(AiModel::getStatus, "enabled")
                 .one();
-        if (model == null) {
-            throw new IllegalArgumentException("未找到可用模型:" + request.getModelCode());
-        }
+        aiModelAccessGuardService.validate(model, request.getAssetId(), request.getAccessReason(), mergeRequestText(request));
         String apiKey = aesEncryptor.decrypt(model.getApiKey());
         if (apiKey == null || apiKey.isEmpty()) {
             throw new IllegalStateException("模型未配置密钥");
@@ -144,6 +142,7 @@ public class AiService {
         logEntry.setUserId(userId);
         logEntry.setModelId(model.getId());
         logEntry.setModelCode(model.getModelCode());
+        logEntry.setDataAssetId(req.getAssetId());
         logEntry.setProvider(model.getProvider());
         String inputPreview = req.getMessages() == null || req.getMessages().isEmpty() ? "" : req.getMessages().get(req.getMessages().size() - 1).getContent();
         if (inputPreview != null && inputPreview.length() > 100) inputPreview = inputPreview.substring(0, 100);
@@ -158,6 +157,20 @@ public class AiService {
         logEntry.setIp(ip);
         logEntry.setCreateTime(java.time.LocalDateTime.now());
         return logEntry;
+    }
+
+    private String mergeRequestText(AiCallRequest request) {
+        StringBuilder builder = new StringBuilder();
+        if (request.getPrompt() != null) {
+            builder.append(request.getPrompt()).append(' ');
+        }
+        if (request.getMessages() != null) {
+            request.getMessages().stream()
+                    .map(AiMessage::getContent)
+                    .filter(Objects::nonNull)
+                    .forEach(text -> builder.append(text).append(' '));
+        }
+        return builder.toString().trim();
     }
 
     private record TokenResp(String access_token) {

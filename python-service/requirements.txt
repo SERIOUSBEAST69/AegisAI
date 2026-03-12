@@ -1,0 +1,11 @@
+# 核心基础依赖
+flask==2.3.3
+requests==2.31.0
+numpy==1.24.3
+pandas==2.0.3
+scikit-learn==1.2.2
+
+# ========== 关键修复：指定 torch CPU 版本（避免下载 GPU 版失败） ==========
+# 适配 Python 3.10 + Windows/Linux Docker
+torch==2.1.0 -f https://download.pytorch.org/whl/torch_stable.html
+transformers==4.35.2  # BERT 模型依赖（需配合 torch）

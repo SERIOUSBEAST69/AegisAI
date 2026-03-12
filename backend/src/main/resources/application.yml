@@ -1,22 +1,56 @@
 server:
   port: 8080
+
+# Spring 核心配置（所有子节点必须正确缩进）
 spring:
+  # H2 数据库配置（适配内存库+控制台）
   datasource:
     url: jdbc:h2:mem:aegisai;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL;NON_KEYWORDS=USER
     username: sa
     password:
     driver-class-name: org.h2.Driver
+  # H2 控制台配置（必须归属于spring节点）
   h2:
     console:
       enabled: true
       path: /h2-console
+  # SQL 初始化配置
   sql:
     init:
       mode: always
       schema-locations: classpath:db-h2.sql
+  # Jackson 日期格式化
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
+  # RabbitMQ 配置（仅保留一份，适配Docker环境）
+  rabbitmq:
+    host: rabbitmq        # Docker容器名，而非localhost
+    port: 5672
+    username: admin       # 和Docker Compose中的配置一致
+    password: 123456
+    virtual-host: /aegisai
+    listener:
+      simple:
+        acknowledge-mode: manual  # 手动确认消息
+  cloud:
+    openfeign:
+      client:
+        config:
+          aiInferenceClient:
+            connect-timeout: 2000
+            read-timeout: 5000
+  # Elasticsearch 配置（适配Docker容器）
+  elasticsearch:
+    uris: http://elasticsearch:9200  # Docker容器名，而非localhost
+
+# Flowable 配置（和spring同级，正确缩进）
+flowable:
+  check-process-definitions: true
+  database-schema-update: true
+  async-executor-activate: false
+
+# MyBatis-Plus 配置
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
@@ -24,12 +58,33 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+
+# 日志配置
 logging:
   level:
     com.trustai: debug
 
+# 自定义配置（修复risk层级错误）
 ai:
   security:
-   aes-key: ${AI_AES_KEY:12345678901234567890123456789012}
+    aes-key: ${AI_AES_KEY:12345678901234567890123456789012}
   routing:
-   default-system-prompt: "你是一个安全合规的企业助手，回答需脱敏且遵守中国法律。"
+    default-system-prompt: "你是一个安全合规的企业助手，回答需脱敏且遵守中国法律。"
+  inference:
+    base-url: ${AI_INFERENCE_URL:http://ai-inference:5000}
+
+# 风险规则配置（修复层级+语法错误）
+risk:
+  login:
+    fail:
+      threshold: 5        # 登录失败阈值
+      window: 10          # 时间窗口（分钟）
+  sensitive:
+    access:
+      threshold: 20       # 敏感数据访问阈值
+  model:
+    fail:
+      rate: 0.3           # 模型调用失败率阈值
+  # 风险等级允许值（修正缩进和语法）
+  risk-level:
+    allow-values: [LOW, MEDIUM, HIGH]

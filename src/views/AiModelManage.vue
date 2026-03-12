@@ -1,6 +1,6 @@
 <template>
-  <el-card>
-    <h2>AI模型管理</h2>
+  <el-card class="card-glass page-card">
+    <h2 class="page-title">AI模型管理</h2>
     <el-form :inline="true" @submit.prevent>
       <el-form-item label="关键字">
         <el-input v-model="query.keyword" placeholder="名称/编码" />
@@ -10,7 +10,7 @@
         <el-button @click="openAdd">新增模型</el-button>
       </el-form-item>
     </el-form>
-    <el-table :data="models" style="width: 100%" v-loading="loading">
+    <el-table :data="models" class="page-table" style="width: 100%" v-loading="loading">
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="modelName" label="模型名称" />
       <el-table-column prop="modelCode" label="编码" />
@@ -101,6 +101,10 @@ const baseRules = {
 const addRules = { ...baseRules, apiKey: [{ required: true, message: 'API Key不能为空', trigger: 'blur' }] };
 const editRules = baseRules; // apiKey 可选
 
+function removeModelFromList(id) {
+  models.value = models.value.filter(model => model.id !== id);
+}
+
 async function fetchModels() {
   loading.value = true;
   try {
@@ -138,7 +142,7 @@ async function addModel() {
       await request.post('/ai-model/add', addForm.value);
       ElMessage.success('添加成功');
       showAdd.value = false;
-      fetchModels();
+      await fetchModels();
     } catch (err) {
       ElMessage.error(err?.message || '添加失败');
     } finally {
@@ -161,7 +165,7 @@ async function updateModel() {
       await request.post('/ai-model/update', editForm.value);
       ElMessage.success('更新成功');
       showEdit.value = false;
-      fetchModels();
+      await fetchModels();
     } catch (err) {
       ElMessage.error(err?.message || '更新失败');
     } finally {
@@ -174,12 +178,34 @@ async function deleteModel(id) {
   try {
     await ElMessageBox.confirm('确认删除该模型吗？', '提示', { type: 'warning' });
     await request.post('/ai-model/delete', { id });
+    removeModelFromList(id);
     ElMessage.success('删除成功');
-    fetchModels();
+    await fetchModels();
   } catch (err) {
-    if (err !== 'cancel') ElMessage.error(err?.message || '删除失败');
+    if (err !== 'cancel' && err !== 'close') ElMessage.error(err?.message || '删除失败');
   }
 }
 
 fetchModels();
 </script>
+
+<style scoped>
+.page-card {
+  color: var(--color-text);
+}
+
+.page-title {
+  margin: 0 0 16px;
+  color: var(--color-text);
+}
+
+:deep(.page-table) {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.04);
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.04);
+  --el-table-border-color: var(--color-border-light);
+  --el-table-text-color: var(--color-text);
+  --el-table-header-text-color: var(--color-text-secondary);
+}
+</style>

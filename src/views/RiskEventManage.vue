@@ -25,10 +25,10 @@
     </el-table>
     <el-dialog v-model="showAdd" title="新增风险事件">
       <el-form :model="addForm" :rules="rules" ref="addFormRef">
+        <el-alert title="处置人将自动记录为当前操作账号" type="info" :closable="false" show-icon style="margin-bottom: 16px;" />
         <el-form-item label="类型" prop="type"><el-input v-model="addForm.type" /></el-form-item>
         <el-form-item label="风险等级" prop="level"><el-input v-model="addForm.level" /></el-form-item>
         <el-form-item label="状态" prop="status"><el-input v-model="addForm.status" /></el-form-item>
-        <el-form-item label="处置人ID" prop="handlerId"><el-input v-model="addForm.handlerId" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAdd = false">取消</el-button>
@@ -37,10 +37,10 @@
     </el-dialog>
     <el-dialog v-model="showEdit" title="编辑风险事件">
       <el-form :model="editForm" :rules="rules" ref="editFormRef">
+        <el-alert title="保存后将自动刷新处置人为当前操作账号" type="info" :closable="false" show-icon style="margin-bottom: 16px;" />
         <el-form-item label="类型" prop="type"><el-input v-model="editForm.type" /></el-form-item>
         <el-form-item label="风险等级" prop="level"><el-input v-model="editForm.level" /></el-form-item>
         <el-form-item label="状态" prop="status"><el-input v-model="editForm.status" /></el-form-item>
-        <el-form-item label="处置人ID" prop="handlerId"><el-input v-model="editForm.handlerId" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showEdit = false">取消</el-button>
@@ -58,7 +58,7 @@ const loading = ref(false);
 const showAdd = ref(false);
 const showEdit = ref(false);
 const saving = ref(false);
-const addForm = ref({ type: '', level: '', status: '', handlerId: '' });
+const addForm = ref({ type: '', level: '', status: '' });
 const editForm = ref({});
 const query = ref({ type: '' });
 const addFormRef = ref();
@@ -66,8 +66,7 @@ const editFormRef = ref();
 const rules = {
   type: [{ required: true, message: '类型不能为空', trigger: 'blur' }],
   level: [{ required: true, message: '风险等级不能为空', trigger: 'blur' }],
-  status: [{ required: true, message: '状态不能为空', trigger: 'blur' }],
-  handlerId: [{ required: true, message: '处置人ID不能为空', trigger: 'blur' }]
+  status: [{ required: true, message: '状态不能为空', trigger: 'blur' }]
 };
 async function fetchEvents() {
   loading.value = true;
@@ -81,7 +80,7 @@ async function fetchEvents() {
   }
 }
 function openAdd() {
-  addForm.value = { type: '', level: '', status: '', handlerId: '' };
+  addForm.value = { type: '', level: '', status: '' };
   showAdd.value = true;
 }
 async function addEvent() {
