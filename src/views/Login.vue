@@ -944,22 +944,22 @@ function applyDemoAccount(account) {
 function getPortalPose(lifted) {
   if (lifted) {
     return {
-      heroY: -34,
-      heroScale: 0.98,
-      panelY: -18,
+      heroY: -24,
+      heroScale: 0.995,
+      panelY: -10,
       panelScale: 1,
-      beamOpacity: 0.72,
-      beamScaleX: 1,
+      beamOpacity: 0.66,
+      beamScaleX: 0.96,
     };
   }
 
   return {
-    heroY: 18,
-    heroScale: 1.34,
-    panelY: 112,
-    panelScale: 0.992,
-    beamOpacity: 0.38,
-    beamScaleX: 0.78,
+    heroY: 8,
+    heroScale: 1.26,
+    panelY: 92,
+    panelScale: 0.996,
+    beamOpacity: 0.34,
+    beamScaleX: 0.74,
   };
 }
 
@@ -1325,12 +1325,12 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(12px, 1.8vh, 20px);
+  gap: clamp(10px, 1.4vh, 18px);
   padding: 0;
 }
 
 .portal-shell[data-lifted] {
-  gap: 10px;
+  gap: 8px;
 }
 
 .portal-shell-edge {
@@ -1345,14 +1345,14 @@ onBeforeUnmount(() => {
 
 .hero-marquee {
   position: relative;
-  width: min(100%, 980px);
+  width: min(100%, 920px);
   display: grid;
   justify-items: center;
   text-align: center;
   will-change: transform, opacity;
   min-width: 0;
   gap: clamp(4px, 0.7vh, 8px);
-  padding: 0 clamp(6px, 1.4vw, 18px) clamp(18px, 2.8vh, 28px);
+  padding: 0 clamp(6px, 1.4vw, 18px) clamp(16px, 2.2vh, 22px);
   overflow: visible;
 }
 
@@ -1367,10 +1367,10 @@ onBeforeUnmount(() => {
 .login-title {
   margin: 0;
   max-width: 100%;
-  font-size: clamp(52px, 11vw, 196px);
+  font-size: clamp(50px, 9.8vw, 172px);
   font-weight: 900;
-  letter-spacing: -0.08em;
-  line-height: 1.04;
+  letter-spacing: -0.075em;
+  line-height: 1.01;
   padding: 0 0 0.12em 0.02em;
   text-wrap: balance;
   color: transparent;
@@ -1385,9 +1385,9 @@ onBeforeUnmount(() => {
   margin: 0;
   max-width: min(100%, 28ch);
   color: #e6f0ff;
-  font-size: 16px;
+  font-size: clamp(14px, 1.5vw, 16px);
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   text-wrap: balance;
 }
@@ -1412,10 +1412,10 @@ onBeforeUnmount(() => {
 .beam-track {
   position: absolute;
   left: 50%;
-  bottom: clamp(-28px, -2.6vh, -16px);
-  width: min(62vw, 620px);
+  bottom: clamp(-22px, -2.1vh, -12px);
+  width: min(58vw, 560px);
   max-width: calc(100% - 28px);
-  height: 68px;
+  height: 60px;
   transform: translateX(-50%);
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(72, 119, 255, 0), rgba(105, 208, 255, 0.68), rgba(72, 119, 255, 0));
@@ -1427,13 +1427,13 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
   margin-top: 0;
-  width: min(760px, 100%);
+  width: min(780px, 100%);
   min-width: 0;
   max-height: min(680px, calc(100vh - 220px));
   max-height: min(720px, calc(100dvh - 220px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   display: flex;
   flex-direction: column;
-  padding: clamp(16px, 2.4vh, 20px) clamp(16px, 2.4vw, 22px) clamp(18px, 2.8vh, 22px);
+  padding: clamp(18px, 2.6vh, 22px) clamp(18px, 2.8vw, 26px) clamp(20px, 3vh, 24px);
   border-radius: clamp(24px, 3vw, 32px);
   border: 1px solid rgba(186, 210, 255, 0.18);
   background:
@@ -1469,15 +1469,15 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px 12px;
 }
 
 .step-indicator-row {
   display: flex;
   align-items: center;
   width: 100%;
-  margin-top: 18px;
-  padding: 18px 0 10px;
+  margin-top: 16px;
+  padding: 16px 0 8px;
 }
 
 .step-indicator {
@@ -1567,21 +1567,21 @@ onBeforeUnmount(() => {
 }
 
 .wizard-head {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .wizard-head strong {
   display: block;
   color: #f7fbff;
-  font-size: clamp(22px, 3vw, 26px);
-  line-height: 1.15;
+  font-size: clamp(22px, 2.6vw, 26px);
+  line-height: 1.1;
 }
 
 .wizard-head p {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: #c3d4ee;
   font-size: 14px;
-  line-height: 1.8;
+  line-height: 1.7;
   min-height: 0;
 }
 
@@ -1591,7 +1591,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  margin-top: clamp(14px, 2vh, 18px);
+  margin-top: clamp(12px, 1.6vh, 16px);
   max-height: min(380px, 40vh);
   max-height: min(420px, 42dvh);
   padding-right: 2px;
@@ -2037,7 +2037,7 @@ onBeforeUnmount(() => {
   }
 
   .login-title {
-    font-size: clamp(62px, 12vw, 132px);
+    font-size: clamp(58px, 10vw, 126px);
   }
 
   .wizard-shell {
@@ -2087,17 +2087,17 @@ onBeforeUnmount(() => {
   }
 
   .login-title {
-    font-size: clamp(48px, 14vw, 88px);
-    line-height: 1.06;
+    font-size: clamp(46px, 12vw, 82px);
+    line-height: 1.03;
   }
 
   .hero-subtitle {
     font-size: 13px;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
   }
 
   .wizard-shell {
-    padding: 18px;
+    padding: 16px;
     border-radius: 26px;
     max-height: none;
   }
@@ -2165,7 +2165,7 @@ onBeforeUnmount(() => {
   }
 
   .login-title {
-    font-size: clamp(40px, 15vw, 64px);
+    font-size: clamp(38px, 13.8vw, 58px);
     letter-spacing: -0.06em;
   }
 
@@ -2230,7 +2230,7 @@ onBeforeUnmount(() => {
   }
 
   .login-title {
-    font-size: clamp(54px, 9vh, 148px);
+    font-size: clamp(52px, 8.2vh, 136px);
   }
 
   .wizard-shell {
@@ -2254,7 +2254,7 @@ onBeforeUnmount(() => {
   }
 
   .login-title {
-    font-size: clamp(44px, 8.4vh, 108px);
+    font-size: clamp(42px, 7.8vh, 96px);
   }
 
   .hero-subtitle {
