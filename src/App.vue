@@ -2,6 +2,14 @@
   <!-- 全局自定义光标（始终存在，登录页与主应用均生效） -->
   <CustomCursor />
 
+  <!-- App Static Background (Liquid Chrome) -->
+  <LiquidChrome 
+    v-if="!isLogin && userStore.initialized"
+    :baseColor="[0.01, 0.02, 0.04]" 
+    :interactive="false"
+    :staticTimeOffset="850.0"
+  />
+
   <div
     ref="shellEl"
     class="app-shell"
@@ -11,20 +19,7 @@
       <div class="brand" @click="go('/')">
         <div class="logo">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 88 88" class="brand-mark-svg" role="presentation">
-              <defs>
-                <linearGradient id="brandShieldGradient" x1="18" y1="10" x2="70" y2="78" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#eef6ff" />
-                  <stop offset="34%" stop-color="#84bbff" />
-                  <stop offset="100%" stop-color="#3567dc" />
-                </linearGradient>
-              </defs>
-              <path d="M44 8 69 18v19.5c0 16.1-10.2 31-25 39.3C29.2 68.5 19 53.6 19 37.5V18L44 8Z" fill="rgba(7,14,24,0.88)" stroke="url(#brandShieldGradient)" stroke-width="3.2" stroke-linejoin="round" />
-              <path d="M44 23c8.4 0 15.2 4.3 19.4 11.8-4.2 7.5-11 11.8-19.4 11.8S28.8 42.3 24.6 34.8C28.8 27.3 35.6 23 44 23Z" fill="none" stroke="rgba(202,226,255,0.92)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-              <circle cx="44" cy="34.8" r="6.4" fill="url(#brandShieldGradient)" />
-              <path d="M44 51.5v10.5" fill="none" stroke="rgba(202,226,255,0.84)" stroke-width="3" stroke-linecap="round" />
-              <path d="M36 62h16" fill="none" stroke="rgba(202,226,255,0.84)" stroke-width="3" stroke-linecap="round" />
-            </svg>
+            <img src="./assets/logo.svg" alt="Aegis Logo" class="brand-mark-svg" style="width: 100%; height: 100%; object-fit: contain;" />
           </span>
           <span ref="brandTitleEl" class="logo-text">Aegis Workbench</span>
         </div>
@@ -90,7 +85,7 @@
       <p ref="introSubtitleEl" class="workbench-intro-subtitle">{{ personaExperience.introSubtitle }}</p>
     </div>
   </div>
-  <div v-else-if="!isLogin" class="app-boot">
+  <div v-else-if="!isLogin && !userStore.initialized" class="app-boot">
     <div class="boot-panel card-glass">
       <div class="boot-title">Aegis Workbench</div>
       <div class="boot-subtitle">正在恢复工作台上下文...</div>
@@ -106,6 +101,7 @@ import gsap from 'gsap';
 import { useUserStore } from './store/user';
 import CustomCursor from './components/CustomCursor.vue';
 import StaggeredMenu from './components/StaggeredMenu.vue';
+import LiquidChrome from './components/LiquidChrome.vue';
 import { usePageTransition } from './composables/usePageTransition';
 import { getPersonaExperience, getVisibleMenuSections } from './utils/persona';
 import {
@@ -135,21 +131,21 @@ const visibleMenuSections = computed(() => getVisibleMenuSections(userStore.user
 const personaHighlights = computed(() => personaExperience.value.benefits.slice(0, 2));
 const menuLayerColors = ['#08101b', '#12315f', '#274f97', '#88bfff'];
 const menuDescriptions = {
-  '/': '回到总控首页与当前角色主视图。',
-  '/operations-command': '查看跨模块治理命令和关键动作。',
-  '/global-search': '跨资产、模型、告警和日志检索上下文。',
-  '/data-asset': '进入数据资产全景与高敏分布。',
-  '/ai-model-manage': '管理模型状态、风险级别和调用准入。',
-  '/model-cost': '查看调用成本、预算和使用趋势。',
-  '/desense-preview': '校验脱敏策略与数据可用性平衡。',
-  '/alerts': '处理高危告警与闭环状态。',
-  '/audit-log': '追踪审计证据链和操作还原。',
-  '/sensitive-scan': '扫描敏感数据暴露与命中情况。',
-  '/subject-request': '处理主体权利和履约请求。',
-  '/policy-manage': '配置治理策略与门禁规则。',
-  '/user-manage': '维护组织、账号与成员结构。',
-  '/role-manage': '编排角色能力边界。',
-  '/permission-manage': '控制权限颗粒与访问路径。',
+  '/': '总控视窗',
+  '/operations-command': '治理关键动作',
+  '/global-search': '跨流检索',
+  '/data-asset': '资产全景分布',
+  '/ai-model-manage': '模型状态管控',
+  '/model-cost': '使用趋势概览',
+  '/desense-preview': '脱敏策略校验',
+  '/alerts': '高危告警闭环',
+  '/audit-log': '证据链与还原',
+  '/sensitive-scan': '敏感暴露扫描',
+  '/subject-request': '履约请求处理',
+  '/policy-manage': '治理规则配置',
+  '/user-manage': '组织与账号',
+  '/role-manage': '角色能力边界',
+  '/permission-manage': '细粒度访问',
 };
 
 const staggeredMenuItems = computed(() => (
@@ -157,7 +153,7 @@ const staggeredMenuItems = computed(() => (
     section.items.map(item => ({
       ...item,
       section: section.title,
-      description: menuDescriptions[item.path] || `进入${item.label}模块。`,
+      description: menuDescriptions[item.path] || `进入 ${item.label}`,
     }))
   )
 ));
@@ -173,6 +169,7 @@ const go = (path) => router.push(path);
 localStorage.removeItem('theme');
 document.documentElement.classList.remove('light-mode');
 document.body.classList.remove('light-mode');
+document.documentElement.classList.add('dark');
 
 const logout = async () => {
   await userStore.logout();
@@ -234,9 +231,20 @@ function getElementFlight(sourceEl, targetEl) {
 }
 
 async function playWorkbenchIntro() {
+  if (document.startViewTransition) {
+    showWorkbenchIntro.value = false;
+    removeTransitionArtifacts();
+    return;
+  }
+
   if (!introOverlayEl.value || !shellEl.value) {
     showWorkbenchIntro.value = false;
     removeTransitionArtifacts();
+    return;
+  }
+
+  if (document.startViewTransition) {
+    showWorkbenchIntro.value = false;
     return;
   }
 
@@ -333,6 +341,10 @@ watch(
       return;
     }
     introConsumed.value = true;
+    if (document.startViewTransition) {
+      showWorkbenchIntro.value = false;
+      return;
+    }
     showWorkbenchIntro.value = true;
     await nextTick();
     playWorkbenchIntro();
