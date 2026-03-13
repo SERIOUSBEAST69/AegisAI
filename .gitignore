@@ -1,1 +1,5 @@
 node_modules
+python-service/__pycache__
+python-service/models/
+*.pyc
+*.pyo
