@@ -91,7 +91,7 @@
       <div class="boot-subtitle">正在恢复工作台上下文...</div>
     </div>
   </div>
-  <router-view v-else />
+  <router-view v-else-if="isLogin" />
 </template>
 
 <script setup>
