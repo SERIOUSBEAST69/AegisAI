@@ -177,6 +177,19 @@ public class DataAssetController {
         }
     }
 
+    private void hydrateReadableDescription(DataAssetDetailDto asset) {
+        if (asset == null || !StringUtils.hasText(asset.getLocation())) {
+            return;
+        }
+        String preview = assetContentExtractor.extractPreview(asset.getLocation());
+        if (!StringUtils.hasText(preview)) {
+            return;
+        }
+        if (!StringUtils.hasText(asset.getDescription()) || !asset.getDescription().contains("已识别内容摘要")) {
+            asset.setDescription("已识别内容摘要：" + preview);
+        }
+    }
+
     private String storeGovernanceFile(MultipartFile file, String username) {
         try {
             String original = file.getOriginalFilename();

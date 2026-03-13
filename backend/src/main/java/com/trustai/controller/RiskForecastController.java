@@ -3,6 +3,7 @@ package com.trustai.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.entity.RiskEvent;
 import com.trustai.service.RiskEventService;
+import com.trustai.service.RiskPredictionService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +26,9 @@ public class RiskForecastController {
     @Autowired
     private RiskEventService riskEventService;
 
+    @Autowired
+    private RiskPredictionService riskPredictionService;
+
     @GetMapping("/trend")
     public R<Map<String, Object>> trend(@RequestParam(defaultValue = "7") int days) {
         LocalDate from = LocalDate.now().minusDays(days);
@@ -40,6 +44,19 @@ public class RiskForecastController {
         Map<String, Object> res = new HashMap<>();
         res.put("perHour", perHour);
         res.put("forecastNextHour", perHour.isEmpty() ? 0 : Math.max(1, Math.round(avg + Math.sqrt(avg))));
+        return R.ok(res);
+    }
+
+    /**
+     * LSTM 风险预测接口：返回未来 7 天的风险事件数预测序列。
+     * 调用 Python 微服务中的 LSTM 模型，不可用时降级为移动平均。
+     */
+    @GetMapping("/forecast")
+    public R<Map<String, Object>> forecast() {
+        List<Double> forecastSeries = riskPredictionService.forecastNext7Days();
+        Map<String, Object> res = new HashMap<>();
+        res.put("forecast", forecastSeries);
+        res.put("horizon", forecastSeries.size());
         return R.ok(res);
     }
 }

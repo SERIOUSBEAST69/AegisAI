@@ -117,6 +117,11 @@ function buildWorkbenchFallback() {
   };
 }
 
+const FALLBACK_FORECAST = {
+  forecast: [5.2, 6.0, 4.8, 7.1, 6.5, 5.9, 8.0],
+  horizon: 7,
+};
+
 export const dashboardApi = {
   async getStats() {
     if (isMockSession()) {
@@ -183,6 +188,24 @@ export const dashboardApi = {
     } catch (error) {
       if (shouldUseApiFallback(error)) {
         return { ...EMPTY_TRUST_PULSE, _mock: true };
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * LSTM 风险预测：获取未来 7 天的风险事件数预测序列。
+   * 对应后端 /api/risk/forecast，底层调用 Python 微服务 LSTM 模型。
+   */
+  async getForecast() {
+    if (isMockSession()) {
+      return { ...FALLBACK_FORECAST, _mock: true };
+    }
+    try {
+      return await request.get('/risk/forecast');
+    } catch (error) {
+      if (shouldUseApiFallback(error)) {
+        return { ...FALLBACK_FORECAST, _mock: true };
       }
       throw error;
     }

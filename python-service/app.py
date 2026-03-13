@@ -1,17 +1,21 @@
 import math
 import os
+import re
 from typing import List, Dict
 
 import numpy as np
 import torch
 from flask import Flask, jsonify, request
 from torch import nn
-from transformers import AutoModel, AutoTokenizer
 
 # Basic Flask app
 app = Flask(__name__)
 
-MODEL_NAME = os.environ.get("BERT_MODEL", "bert-base-chinese")
+# ── Mock mode ─────────────────────────────────────────────────────────────────
+# Set BERT_MOCK=true to run without loading the BERT model (dev / CI / testing).
+MOCK_MODE: bool = os.environ.get("BERT_MOCK", "false").lower() in ("true", "1", "yes")
+MODEL_NAME: str = os.environ.get("BERT_MODEL", "bert-base-chinese")
+
 LABEL_PROMPTS: Dict[str, str] = {
     "id_card": "身份证号码",
     "bank_card": "银行卡号",
@@ -22,43 +26,66 @@ LABEL_PROMPTS: Dict[str, str] = {
     "unknown": "其他信息",
 }
 
-# Load BERT backbone once
-_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-_model = AutoModel.from_pretrained(MODEL_NAME)
-_model.eval()
+# ── Regex patterns used by mock classifier and fallback ───────────────────────
+_RE_ID_CARD = re.compile(r"[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]")
+_RE_PHONE   = re.compile(r"1[3-9]\d{9}")
+_RE_BANK    = re.compile(r"\d{12,19}")
+_RE_EMAIL   = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
-def _cls_embedding(text: str) -> torch.Tensor:
-    inputs = _tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
-    with torch.no_grad():
-        outputs = _model(**inputs)
-    # Use CLS token representation
-    return outputs.last_hidden_state[:, 0, :]  # (1, hidden)
+def _regex_classify(text: str) -> Dict:
+    """Rule-based fallback classifier (no model required)."""
+    t = text or ""
+    if _RE_ID_CARD.search(t):
+        return {"label": "id_card",   "score": 0.72, "labelScores": []}
+    if _RE_EMAIL.search(t):
+        return {"label": "email",     "score": 0.68, "labelScores": []}
+    if _RE_PHONE.search(t):
+        return {"label": "phone",     "score": 0.70, "labelScores": []}
+    if _RE_BANK.search(t):
+        return {"label": "bank_card", "score": 0.60, "labelScores": []}
+    return {"label": "unknown", "score": 0.0, "labelScores": []}
 
-# Pre-compute label embeddings
-_label_embeddings: Dict[str, torch.Tensor] = {
-    label: _cls_embedding(prompt) for label, prompt in LABEL_PROMPTS.items()
-}
 
+if not MOCK_MODE:
+    from transformers import AutoModel, AutoTokenizer
 
-def classify_text(text: str) -> Dict:
-    if not text:
-        return {"label": "unknown", "score": 0.0, "label_scores": []}
+    _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    _model = AutoModel.from_pretrained(MODEL_NAME)
+    _model.eval()
 
-    text_emb = _cls_embedding(text)
-    sims = {}
-    for label, emb in _label_embeddings.items():
-        # Cosine similarity
-        num = torch.sum(text_emb * emb, dim=1)
-        denom = torch.norm(text_emb, dim=1) * torch.norm(emb, dim=1)
-        sims[label] = (num / (denom + 1e-8)).item()
+    def _cls_embedding(text: str) -> torch.Tensor:
+        inputs = _tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
+        with torch.no_grad():
+            outputs = _model(**inputs)
+        # Use CLS token representation
+        return outputs.last_hidden_state[:, 0, :]  # (1, hidden)
 
-    # Exclude unknown from argmax but keep score list
-    ranked = sorted(sims.items(), key=lambda kv: kv[1], reverse=True)
-    best_label, best_score = ranked[0]
-    label_scores = [
-        {"label": label, "score": round(score, 4)} for label, score in ranked
-    ]
-    return {"label": best_label, "score": round(best_score, 4), "labelScores": label_scores}
+    # Pre-compute label embeddings
+    _label_embeddings: Dict[str, torch.Tensor] = {
+        label: _cls_embedding(prompt) for label, prompt in LABEL_PROMPTS.items()
+    }
+
+    def classify_text(text: str) -> Dict:
+        if not text:
+            return {"label": "unknown", "score": 0.0, "labelScores": []}
+
+        text_emb = _cls_embedding(text)
+        sims = {}
+        for label, emb in _label_embeddings.items():
+            num = torch.sum(text_emb * emb, dim=1)
+            denom = torch.norm(text_emb, dim=1) * torch.norm(emb, dim=1)
+            sims[label] = (num / (denom + 1e-8)).item()
+
+        ranked = sorted(sims.items(), key=lambda kv: kv[1], reverse=True)
+        best_label, best_score = ranked[0]
+        label_scores = [
+            {"label": lbl, "score": round(sc, 4)} for lbl, sc in ranked
+        ]
+        return {"label": best_label, "score": round(best_score, 4), "labelScores": label_scores}
+else:
+    # Mock mode: use regex classifier, no model loaded
+    def classify_text(text: str) -> Dict:  # type: ignore[misc]
+        return _regex_classify(text)
 
 
 class SimpleLSTM(nn.Module):
@@ -154,7 +181,7 @@ def predict_risk():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "model": MODEL_NAME})
+    return jsonify({"status": "ok", "model": MODEL_NAME, "mock": MOCK_MODE})
 
 
 if __name__ == "__main__":
