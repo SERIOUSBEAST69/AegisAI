@@ -4,59 +4,43 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trustai.config.RabbitConfig;
 import com.trustai.dto.AiCallBriefDto;
 import com.trustai.dto.DataAssetDetailDto;
 import com.trustai.dto.DataAssetDto;
-import com.trustai.dto.SensitiveScanReport;
 import com.trustai.document.AssetDocument;
 import com.trustai.entity.AiCallLog;
 import com.trustai.entity.DataAsset;
-import com.trustai.entity.RiskEvent;
-import com.trustai.entity.SensitiveScanTask;
 import com.trustai.exception.BizException;
 import com.trustai.mapper.AiCallLogMapper;
 import com.trustai.mapper.DataAssetMapper;
 import com.trustai.repository.AssetEsRepository;
 import com.trustai.service.DataAssetService;
-import com.trustai.service.RiskEventService;
-import com.trustai.service.SensitiveScanEngine;
-import com.trustai.service.SensitiveScanTaskService;
-import com.trustai.utils.AssetContentExtractor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
-import java.time.Instant;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class DataAssetServiceImpl extends ServiceImpl<DataAssetMapper, DataAsset> implements DataAssetService {
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
 	private final AiCallLogMapper aiCallLogMapper;
-	private final SensitiveScanTaskService sensitiveScanTaskService;
-	private final RiskEventService riskEventService;
 	private final AssetEsRepository assetEsRepository;
-	private final SensitiveScanEngine sensitiveScanEngine;
-	private final AssetContentExtractor assetContentExtractor;
+	private final RabbitTemplate rabbitTemplate;
 
 	public DataAssetServiceImpl(AiCallLogMapper aiCallLogMapper,
-							 SensitiveScanTaskService sensitiveScanTaskService,
-							 RiskEventService riskEventService,
 							 AssetEsRepository assetEsRepository,
-							 SensitiveScanEngine sensitiveScanEngine,
-							 AssetContentExtractor assetContentExtractor) {
+							 RabbitTemplate rabbitTemplate) {
 		this.aiCallLogMapper = aiCallLogMapper;
-		this.sensitiveScanTaskService = sensitiveScanTaskService;
-		this.riskEventService = riskEventService;
 		this.assetEsRepository = assetEsRepository;
-		this.sensitiveScanEngine = sensitiveScanEngine;
-		this.assetContentExtractor = assetContentExtractor;
+		this.rabbitTemplate = rabbitTemplate;
 	}
 
 	@Override
@@ -66,15 +50,14 @@ public class DataAssetServiceImpl extends ServiceImpl<DataAssetMapper, DataAsset
 		this.save(entity);
 		saveEs(entity);
 
-		SensitiveScanTask task = new SensitiveScanTask();
-		task.setAssetId(entity.getId());
-		task.setSourceType(entity.getType() == null ? "asset" : entity.getType());
-		task.setSourcePath(entity.getLocation() == null ? ("asset-" + entity.getId()) : entity.getLocation());
-		task.setStatus("running");
-		task.setCreateTime(now);
-		sensitiveScanTaskService.save(task);
+		// 异步触发扫描：通过 RabbitMQ 发布资产注册事件
+		// AssetRegisterConsumer 负责创建扫描任务、执行扫描并生成风险事件
+		try {
+			rabbitTemplate.convertAndSend(RabbitConfig.ASSET_REGISTER_QUEUE, MAPPER.writeValueAsString(entity));
+		} catch (Exception e) {
+			log.warn("Failed to publish asset register event for asset {}, scan will be skipped", entity.getId(), e);
+		}
 
-		runScanAndRecord(task, entity);
 		return entity;
 	}
 
@@ -132,46 +115,5 @@ public class DataAssetServiceImpl extends ServiceImpl<DataAssetMapper, DataAsset
 			doc.setCreateTime(entity.getCreateTime());
 			assetEsRepository.save(doc);
 		} catch (Exception ignored) { }
-	}
-
-	private void runScanAndRecord(SensitiveScanTask task, DataAsset asset) {
-		List<String> samples = new java.util.ArrayList<>();
-		String contentPreview = assetContentExtractor.extractPreview(asset.getLocation());
-		if (StringUtils.hasText(contentPreview)) {
-			samples.add(contentPreview);
-		}
-		if (asset.getDescription() != null && !asset.getDescription().isEmpty()) {
-			samples.add(asset.getDescription());
-		}
-		if (!StringUtils.hasText(contentPreview) && asset.getLocation() != null && !asset.getLocation().isEmpty()) {
-			samples.add(asset.getLocation());
-		}
-		if (samples.isEmpty() && asset.getName() != null) {
-			samples.add(asset.getName());
-		}
-
-		SensitiveScanReport report = sensitiveScanEngine.scan(samples);
-		double ratio = report.getSummary() == null ? 0.0 : report.getSummary().getRatio();
-
-		try {
-			String json = MAPPER.writeValueAsString(report);
-			task.setReportData(json);
-		} catch (Exception ignored) { }
-		task.setSensitiveRatio(ratio);
-		task.setStatus("done");
-		task.setReportPath("/reports/task-" + task.getId() + ".json");
-		task.setUpdateTime(Date.from(Instant.now()));
-		sensitiveScanTaskService.updateById(task);
-
-		String level = ratio > 60 ? "critical" : (ratio > 30 ? "high" : "medium");
-		RiskEvent event = new RiskEvent();
-		event.setType("敏感数据扫描");
-		event.setLevel(level);
-		event.setRelatedLogId(task.getId());
-		event.setStatus("open");
-		event.setProcessLog("自动创建，敏感占比" + String.format("%.2f", ratio) + "%");
-		event.setCreateTime(new Date());
-		event.setUpdateTime(new Date());
-		riskEventService.save(event);
 	}
 }
