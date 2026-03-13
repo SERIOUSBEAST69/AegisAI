@@ -28,10 +28,16 @@ public class RiskPredictionServiceImpl implements RiskPredictionService {
     private final AiInferenceClient aiInferenceClient;
 
     @Override
-    public List<Double> forecastNext7Days() {
+    public RiskForecastResponse forecastNext7Days() {
         List<Double> history = loadHistory();
         if (history.isEmpty()) {
-            return Collections.nCopies(7, 0.0);
+            RiskForecastResponse empty = new RiskForecastResponse();
+            empty.setForecast(Collections.nCopies(7, 0.0));
+            empty.setTrainingSamples(0);
+            empty.setTrainingMae(0.0);
+            empty.setMethod("no-data");
+            empty.setFallback(true);
+            return empty;
         }
         try {
             RiskForecastRequest req = new RiskForecastRequest();
@@ -39,12 +45,19 @@ public class RiskPredictionServiceImpl implements RiskPredictionService {
             req.setHorizon(7);
             RiskForecastResponse resp = aiInferenceClient.predictRisk(req);
             if (resp != null && resp.getForecast() != null && !resp.getForecast().isEmpty()) {
-                return resp.getForecast();
+                // Ensure trainingSamples is populated even if service omits it
+                if (resp.getTrainingSamples() == null) {
+                    resp.setTrainingSamples(history.size());
+                }
+                if (resp.getMethod() == null) {
+                    resp.setMethod("lstm-online");
+                }
+                return resp;
             }
         } catch (Exception e) {
             log.warn("AI risk forecast unavailable, using moving average fallback", e);
         }
-        return movingAverage(history, 7);
+        return movingAverageFallback(history, 7);
     }
 
     private List<Double> loadHistory() {
@@ -63,12 +76,18 @@ public class RiskPredictionServiceImpl implements RiskPredictionService {
                 .toList();
     }
 
-    private List<Double> movingAverage(List<Double> history, int horizon) {
+    private RiskForecastResponse movingAverageFallback(List<Double> history, int horizon) {
         double avg = history.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
         List<Double> forecast = new ArrayList<>();
         for (int i = 0; i < horizon; i++) {
             forecast.add(Math.round(avg * 100.0) / 100.0);
         }
-        return forecast;
+        RiskForecastResponse resp = new RiskForecastResponse();
+        resp.setForecast(forecast);
+        resp.setTrainingSamples(history.size());
+        resp.setTrainingMae(null);
+        resp.setMethod("moving-average");
+        resp.setFallback(true);
+        return resp;
     }
 }

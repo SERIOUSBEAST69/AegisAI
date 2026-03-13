@@ -1,7 +1,7 @@
 package com.trustai.service;
 
-import java.util.List;
+import com.trustai.dto.ai.RiskForecastResponse;
 
 public interface RiskPredictionService {
-    List<Double> forecastNext7Days();
+    RiskForecastResponse forecastNext7Days();
 }

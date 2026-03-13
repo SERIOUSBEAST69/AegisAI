@@ -60,8 +60,15 @@ public class DashboardController {
     }
 
     @GetMapping("/risk-forecast")
-    public R<List<Double>> riskForecast() {
-        return R.ok(riskPredictionService.forecastNext7Days());
+    public R<Map<String, Object>> riskForecast() {
+        var result = riskPredictionService.forecastNext7Days();
+        Map<String, Object> res = new java.util.HashMap<>();
+        res.put("forecast", result.getForecast());
+        res.put("trainingSamples", result.getTrainingSamples());
+        res.put("trainingMae", result.getTrainingMae());
+        res.put("method", result.getMethod());
+        res.put("fallback", result.getFallback());
+        return R.ok(res);
     }
 
     @GetMapping("/workbench")

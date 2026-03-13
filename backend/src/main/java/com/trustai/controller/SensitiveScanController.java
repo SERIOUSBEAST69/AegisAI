@@ -31,6 +31,8 @@ public class SensitiveScanController {
     private SensitiveScanEngine scanEngine;
     @Autowired
     private com.trustai.utils.AssetContentExtractor assetContentExtractor;
+    @Autowired
+    private com.trustai.client.AiInferenceClient aiInferenceClient;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -100,6 +102,21 @@ public class SensitiveScanController {
     public R<?> delete(@RequestBody @Validated IdReq req) {
         taskService.removeById(req.getId());
         return R.okMsg("删除成功");
+    }
+
+    /**
+     * 代理 Python AI 服务的 /benchmark 端点，返回 BERT 零样本分类与正则的精度对比结果。
+     * 前端报告弹窗通过此接口拉取实时基准数据。
+     */
+    @GetMapping("/benchmark")
+    public R<java.util.Map<String, Object>> benchmark() {
+        try {
+            java.util.Map<String, Object> result = aiInferenceClient.benchmark();
+            return R.ok(result);
+        } catch (Exception e) {
+            log.warn("AI benchmark endpoint unavailable: {}", e.getMessage());
+            return R.error(50000, "AI 基准测试服务暂不可用");
+        }
     }
 
     public static class IdReq { @NotNull private Long id; public Long getId(){return id;} public void setId(Long id){this.id=id;} }

@@ -163,6 +163,21 @@
         <div class="panel-badge">T+1 预测 {{ overview.trend.forecastNextDay }}</div>
       </div>
       <div ref="trendChartRef" class="chart-canvas trend-canvas"></div>
+      <!-- LSTM 预测算法透明度面板 -->
+      <div v-if="forecastMeta" class="lstm-meta-bar">
+        <span class="lstm-meta-chip" :class="forecastMeta.fallback ? 'lstm-fallback' : 'lstm-online'">
+          {{ forecastMeta.fallback ? '降级: ' + (forecastMeta.method || 'moving-average') : 'LSTM 在线预测' }}
+        </span>
+        <span class="lstm-meta-item">
+          训练样本：<strong>{{ forecastMeta.trainingSamples ?? '—' }} 天</strong>
+        </span>
+        <span v-if="forecastMeta.trainingMae != null" class="lstm-meta-item">
+          训练 MAE：<strong>{{ forecastMeta.trainingMae }}</strong>
+        </span>
+        <span class="lstm-meta-note">
+          模型每次请求基于真实风险事件历史数据在线训练，并返回样本量与误差供评估
+        </span>
+      </div>
     </el-card>
 
     <el-card class="chart-card card-glass risk-card scene-block">
@@ -277,6 +292,7 @@ const overview = ref(createEmptyOverview());
 const insights = ref({ postureScore: 0, summary: {}, highlights: [], recommendations: [] });
 const trustPulse = ref({ score: 0, pulseLevel: '', mission: '', innovationLabel: '', dimensions: [], signals: [] });
 const loading = ref(true);
+const forecastMeta = ref(null);
 
 let trendChart;
 let riskChart;
@@ -523,6 +539,13 @@ async function fetchData() {
         // 追加 7 日预测时序（供图表展示），并以第一天预测值作为"明日事件数"
         forecastSeries: series,
         forecastNextDay: Math.round(series[0] ?? personalized.trend.forecastNextDay),
+      };
+      // 存储 LSTM 元数据供 UI 展示
+      forecastMeta.value = {
+        trainingSamples: forecastData.trainingSamples ?? null,
+        trainingMae: forecastData.trainingMae ?? null,
+        method: forecastData.method ?? null,
+        fallback: forecastData.fallback ?? false,
       };
     }
 
@@ -1222,6 +1245,52 @@ onBeforeUnmount(() => {
 .feed-time {
   color: #7e8ca7;
   font-size: 12px;
+}
+
+/* LSTM 预测元数据条 */
+.lstm-meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(199,125,255,0.18);
+  background: rgba(199,125,255,0.06);
+}
+
+.lstm-meta-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.lstm-online {
+  background: rgba(199,125,255,0.2);
+  color: #e4c3ff;
+}
+
+.lstm-fallback {
+  background: rgba(255,180,84,0.18);
+  color: #ffd9a0;
+}
+
+.lstm-meta-item {
+  font-size: 12px;
+  color: #9babc6;
+}
+
+.lstm-meta-item strong {
+  color: #d5dfef;
+}
+
+.lstm-meta-note {
+  font-size: 11px;
+  color: #7a8ba3;
+  margin-left: auto;
 }
 
 @media (max-width: 1280px) {
