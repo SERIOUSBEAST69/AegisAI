@@ -1,22 +1,20 @@
 <template>
   <div class="login-stage" ref="pageEl">
-    <!-- Login Dynamic Background: Fast, moving, interactive -->
-    <LiquidChrome 
-      :baseColor="[0.01, 0.02, 0.04]" 
-      :speed="0.4" 
-      :amplitude="0.6" 
-      :interactive="true" 
-    />
+    <div class="atmosphere atmosphere-grid" aria-hidden="true"></div>
+    <div class="atmosphere atmosphere-noise" aria-hidden="true"></div>
+    <div class="atmosphere atmosphere-vignette" aria-hidden="true"></div>
+    <div class="atmosphere atmosphere-aurora" aria-hidden="true"></div>
+    <div class="atmosphere atmosphere-scanline" aria-hidden="true"></div>
+    <div class="cinema-halo cinema-halo-left" aria-hidden="true"></div>
+    <div class="cinema-halo cinema-halo-right" aria-hidden="true"></div>
 
     <div class="stage-center">
       <div class="portal-shell" :data-lifted="isPortalLifted || undefined">
         <div class="portal-shell-edge" aria-hidden="true"></div>
 
         <section class="hero-marquee" ref="heroTitleEl">
-          <div class="title-container" ref="titleTextEl">
-            <img src="../assets/logo.svg" class="login-logo" alt="logo" />
-            <h1 class="login-title workbench-title-core" data-text="Aegis Workbench">Aegis Workbench</h1>
-          </div>
+          <div class="hero-kicker">TRUSTED AI GOVERNANCE</div>
+          <h1 ref="titleTextEl" class="login-title workbench-title-core">Aegis Workbench</h1>
           <p class="hero-subtitle">可信AI治理工作台</p>
           <div class="beam-track" ref="beamEl"></div>
         </section>
@@ -426,7 +424,6 @@ import { ElMessage } from 'element-plus';
 import { ChatDotRound, Iphone, UserFilled } from '@element-plus/icons-vue';
 import { authApi } from '../api/auth';
 import { useUserStore } from '../store/user';
-import LiquidChrome from '../components/LiquidChrome.vue';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -789,19 +786,10 @@ function selectMode(value) {
 async function establishAndRoute(response) {
   await userStore.establishSession(response);
   await playCinematicSuccess();
+  createTitleGhost();
   sessionStorage.setItem('aegis.transition.origin', 'login');
   const redirect = typeof router.currentRoute.value.query.redirect === 'string' ? router.currentRoute.value.query.redirect : '/';
-
-  // Use the modern View Transitions API if supported for silky smooth transition
-  if (document.startViewTransition) {
-    document.startViewTransition(async () => {
-      await router.push(redirect);
-      await nextTick();
-    });
-  } else {
-    createTitleGhost();
-    await router.push(redirect);
-  }
+  await router.push(redirect);
 }
 
 function createTitleGhost() {
@@ -956,8 +944,8 @@ function applyDemoAccount(account) {
 function getPortalPose(lifted) {
   if (lifted) {
     return {
-      heroY: -14,
-      heroScale: 1,
+      heroY: -24,
+      heroScale: 0.995,
       panelY: -10,
       panelScale: 1,
       beamOpacity: 0.66,
@@ -966,9 +954,9 @@ function getPortalPose(lifted) {
   }
 
   return {
-    heroY: -14,
-    heroScale: 1,
-    panelY: 80,
+    heroY: 8,
+    heroScale: 1.26,
+    panelY: 92,
     panelScale: 0.996,
     beamOpacity: 0.34,
     beamScaleX: 0.74,
@@ -1063,7 +1051,7 @@ function playCinematicSuccess() {
       })
       .to(heroTitleEl.value, {
         y: -8,
-        scale: 1,
+        scale: 1.015,
         duration: 0.18,
         ease: 'power2.out',
       }, 0)
@@ -1168,7 +1156,7 @@ onMounted(async () => {
   gsap.set(heroTitleEl.value, {
     opacity: 0,
     y: initialPose.heroY + 12,
-    scale: initialPose.heroScale,
+    scale: initialPose.heroScale + 0.05,
     filter: 'blur(8px)',
     transformOrigin: '50% 50%',
   });
@@ -1376,44 +1364,20 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
 }
 
-.title-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin: 6px 0;
-}
-
-.login-logo {
-  width: clamp(40px, 6vw, 64px);
-  height: clamp(40px, 6vw, 64px);
-  object-fit: contain;
-  filter: drop-shadow(0 0 16px rgba(59, 130, 246, 0.4));
-  animation: logoFloat 6s ease-in-out infinite;
-}
-
-@keyframes logoFloat {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-4px) scale(1.02); }
-}
-
 .login-title {
   margin: 0;
   max-width: 100%;
-  font-size: clamp(38px, 6.5vw, 82px);
+  font-size: clamp(50px, 9.8vw, 172px);
   font-weight: 900;
-  letter-spacing: -0.05em;
-  line-height: 1.05;
-  padding: 0 0 0.12em 0;
+  letter-spacing: -0.075em;
+  line-height: 1.01;
+  padding: 0 0 0.12em 0.02em;
   text-wrap: balance;
   color: transparent;
-  background: 
-    url('data:image/svg+xml;utf8,<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="2" fill="rgba(255,255,255,0.2)"/></svg>'),
-    linear-gradient(135deg, #ffffff 0%, #edf4ff 35%, #93c5fd 75%, #3b82f6 100%);
-  background-size: 16px 16px, 100% 100%;
+  background: linear-gradient(180deg, #ffffff 0%, #edf4ff 30%, #c7d8ff 68%, #7aa2ff 100%);
   -webkit-background-clip: text;
   background-clip: text;
-  text-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 16px 48px rgba(0, 0, 0, 0.42), 0 0 22px rgba(155, 198, 255, 0.08);
   overflow: visible;
 }
 

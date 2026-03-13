@@ -14,30 +14,8 @@
         <el-table-column prop="applicantId" label="申请人" />
         <el-table-column prop="collaborators" label="协作人" />
         <el-table-column prop="reason" label="理由" />
-        <el-table-column label="状态" width="90">
+        <el-table-column label="状态">
           <template #default="scope">{{ formatShareStatus(scope.row.status) }}</template>
-        </el-table-column>
-        <!-- 通过后显示令牌 -->
-        <el-table-column label="访问令牌" min-width="220">
-          <template #default="scope">
-            <template v-if="scope.row.status === 'approved' && scope.row.shareToken">
-              <div class="token-cell">
-                <el-tooltip :content="scope.row.shareToken" placement="top">
-                  <code class="token-code">{{ truncateToken(scope.row.shareToken) }}</code>
-                </el-tooltip>
-                <el-button
-                  size="small"
-                  type="primary"
-                  link
-                  @click="copyToken(scope.row.shareToken)"
-                >复制</el-button>
-              </div>
-              <div v-if="scope.row.expireTime" class="token-expire">
-                有效至：{{ scope.row.expireTime }}
-              </div>
-            </template>
-            <span v-else class="token-none">—</span>
-          </template>
         </el-table-column>
         <el-table-column label="审批" width="200">
           <template #default="scope">
@@ -100,7 +78,7 @@ async function approve(id, status) {
   actionId.value = id; actionType.value = status === 'approved' ? 'approve' : 'reject';
   try {
     await request.post('/data-share/approve', { id, status });
-    ElMessage.success(status === 'approved' ? '已通过，系统已生成访问令牌' : '已拒绝');
+    ElMessage.success('处理成功');
     load();
   } catch (err) {
     ElMessage.error(err?.message || '处理失败');
@@ -129,57 +107,10 @@ function formatShareStatus(status) {
   return '待审批';
 }
 
-function truncateToken(token) {
-  if (!token) return '';
-  if (token.length <= 16) return token;
-  return token.substring(0, 8) + '...' + token.substring(token.length - 4);
-}
-
-async function copyToken(token) {
-  try {
-    await navigator.clipboard.writeText(token);
-    ElMessage.success('令牌已复制到剪贴板');
-  } catch {
-    ElMessage.info('令牌：' + token);
-  }
-}
-
 load();
 </script>
 
 <style scoped>
 .page-grid { display: grid; gap: 16px; }
 .card-header { font-weight: 600; margin-bottom: 12px; }
-
-.token-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.token-code {
-  font-family: monospace;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--color-primary-light);
-  cursor: default;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.token-expire {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  margin-top: 3px;
-}
-
-.token-none {
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
 </style>
-

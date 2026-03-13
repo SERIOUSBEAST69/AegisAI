@@ -34,7 +34,11 @@
         <span class="sm-backdrop-fog" aria-hidden="true"></span>
         <span class="sm-backdrop-grid" aria-hidden="true"></span>
         <span class="sm-backdrop-emblem" aria-hidden="true">
-          <img src="../assets/logo.svg" alt="Aegis Logo Overlay" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;" />
+          <svg viewBox="0 0 120 120" role="presentation">
+            <path d="M60 10 93 22v27.5c0 22-13.3 42.5-33 54.2C40.3 92 27 71.5 27 49.5V22L60 10Z" fill="none" stroke="rgba(183,211,255,0.74)" stroke-width="2.4" stroke-linejoin="round" />
+            <path d="M60 35c11.4 0 20.5 5.8 26.1 16-5.6 10.2-14.7 16-26.1 16S39.5 61.2 33.9 51C39.5 40.8 48.6 35 60 35Z" fill="none" stroke="rgba(141,194,255,0.78)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="60" cy="51" r="8.2" fill="rgba(132,187,255,0.9)" />
+          </svg>
         </span>
       </button>
 
@@ -64,14 +68,7 @@
                 <button type="button" class="sm-panel-item clickable" :style="getItemRhythm(index)" @click="handleItemClick(item)">
                   <span class="sm-panel-item-aura" aria-hidden="true"></span>
                   <span class="sm-panel-item-meta">{{ item.section }}</span>
-                  <span class="sm-panel-item-label" :data-number="formatNumber(index + 1)">
-                    {{ item.label }}
-                    <svg class="sm-item-pattern" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
-                      <rect x="7" y="0" width="2" height="16" fill="currentColor" fill-opacity="0.3"></rect>
-                      <rect x="0" y="7" width="16" height="2" fill="currentColor" fill-opacity="0.3"></rect>
-                      <circle cx="8" cy="8" r="2" fill="currentColor"></circle>
-                    </svg>
-                  </span>
+                  <span class="sm-panel-item-label" :data-number="formatNumber(index + 1)">{{ item.label }}</span>
                   <span v-if="item.description" class="sm-panel-item-description">{{ item.description }}</span>
                   <span class="sm-panel-item-arrow" aria-hidden="true">North East</span>
                 </button>
@@ -144,22 +141,19 @@ function formatNumber(value) {
 }
 
 function getItemRhythm(index) {
-  const item = props.items[index];
-  const isImportant = item.label === '首页' || item.label.endsWith('管理');
-
-  // 统一对齐，更符合逻辑审美的排版 (Unified alignment, logical aesthetics)
-  const size = isImportant ? 'clamp(36px, 4vw, 50px)' : 'clamp(24px, 2.5vw, 32px)';
-  const offset = '0px'; 
-  const desc = '100%';
-  const padTop = isImportant ? '24px' : '14px';
-  const accent = isImportant ? '#FFD700' : '#e0edff'; // Highlight important items with gold
+  const rhythm = [
+    { size: 'clamp(54px, 5.4vw, 78px)', offset: '0px', desc: '82%', padTop: '20px', accent: '#9fc4ff' },
+    { size: 'clamp(38px, 4vw, 54px)', offset: '32px', desc: '70%', padTop: '14px', accent: '#d7e8ff' },
+    { size: 'clamp(46px, 4.6vw, 64px)', offset: '12px', desc: '76%', padTop: '18px', accent: '#81c3ff' },
+    { size: 'clamp(34px, 3.6vw, 46px)', offset: '54px', desc: '62%', padTop: '12px', accent: '#6f9cff' },
+  ][index % 4];
 
   return {
-    '--sm-item-size': size,
-    '--sm-item-offset': offset,
-    '--sm-item-desc-width': desc,
-    '--sm-item-pad-top': padTop,
-    '--sm-item-accent': accent,
+    '--sm-item-size': rhythm.size,
+    '--sm-item-offset': rhythm.offset,
+    '--sm-item-desc-width': rhythm.desc,
+    '--sm-item-pad-top': rhythm.padTop,
+    '--sm-item-accent': rhythm.accent,
   };
 }
 
@@ -489,14 +483,13 @@ onBeforeUnmount(() => {
   inset: auto auto 9vh 6vw;
   width: 168px;
   height: 168px;
-  opacity: 0.45; /* Slightly higher opacity so the user can see the new logo */
-  filter: drop-shadow(0 20px 48px rgba(0, 0, 0, 0.4));
+  opacity: 0.26;
+  filter: drop-shadow(0 20px 48px rgba(0, 0, 0, 0.28));
 }
 
-.sm-backdrop-emblem img {
+.sm-backdrop-emblem svg {
   width: 100%;
   height: 100%;
-  object-fit: contain;
 }
 
 .sm-prelayers {
@@ -690,30 +683,13 @@ onBeforeUnmount(() => {
   position: relative;
   display: inline-block;
   padding-right: 78px;
-  color: transparent;
-  background: linear-gradient(135deg, #ffffff 0%, #edf4ff 40%, #aab8d0 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  font-size: var(--sm-item-size, clamp(42px, 5vw, 68px));
-  font-weight: 900;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  color: #f7fbff;
+  font-size: var(--sm-item-size, clamp(36px, 4vw, 58px));
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.06em;
   text-wrap: balance;
-  transition: transform 0.34s ease, filter 0.34s ease, text-shadow 0.34s ease;
-}
-
-.sm-item-pattern {
-  display: inline-block;
-  vertical-align: middle;
-  margin-left: 12px;
-  color: var(--sm-item-accent, #e0edff);
-  opacity: 0.6;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.sm-panel-list:hover .sm-panel-item:hover .sm-item-pattern {
-  transform: rotate(90deg) scale(1.2);
-  opacity: 1;
+  transition: color 0.34s ease, transform 0.34s ease, text-shadow 0.34s ease;
 }
 
 .sm-panel-item-label::after {
@@ -721,9 +697,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0.14em;
   right: 0;
-  color: rgba(255, 255, 255, 0.4);
-  -webkit-text-fill-color: initial;
-  background: none;
+  color: var(--color-primary, #77a8ff);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -776,11 +750,9 @@ onBeforeUnmount(() => {
 }
 
 .sm-panel-list:hover .sm-panel-item:hover .sm-panel-item-label {
-  background: linear-gradient(135deg, #ffffff 0%, #b3dcff 40%, #7db3ff 100%);
-  -webkit-background-clip: text;
-  color: transparent;
+  color: #f3f8ff;
+  text-shadow: 0 8px 26px rgba(103, 151, 255, 0.22);
   transform: translateX(10px);
-  filter: drop-shadow(0 8px 16px rgba(103, 151, 255, 0.4));
 }
 
 .sm-panel-list:hover .sm-panel-item:hover .sm-panel-item-description,
