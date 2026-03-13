@@ -7,7 +7,6 @@ import com.trustai.entity.SensitiveScanTask;
 import com.trustai.service.SensitiveScanEngine;
 import com.trustai.service.SensitiveScanTaskService;
 import com.trustai.utils.R;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -20,19 +19,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/sensitive-scan")
 @Validated
-@Slf4j
 public class SensitiveScanController {
-
-    private static final String SOURCE_TYPE_FILE = "file";
 
     @Autowired
     private SensitiveScanTaskService taskService;
     @Autowired
     private SensitiveScanEngine scanEngine;
-    @Autowired
-    private com.trustai.utils.AssetContentExtractor assetContentExtractor;
-    @Autowired
-    private com.trustai.client.AiInferenceClient aiInferenceClient;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -59,23 +51,7 @@ public class SensitiveScanController {
     public R<SensitiveScanTask> run(@RequestBody @Validated IdReq req) {
         SensitiveScanTask task = taskService.getById(req.getId());
         if (task == null) return R.error(40000, "任务不存在");
-
-        // 优先尝试从文件路径中提取真实内容用于 BERT 扫描；
-        // 若无法提取（非文件路径或文件不存在），则以路径字符串本身作为样本
-        List<String> samples;
-        String sourcePath = task.getSourcePath();
-        if (sourcePath != null && !sourcePath.isEmpty() && SOURCE_TYPE_FILE.equals(task.getSourceType())) {
-            String content = assetContentExtractor.extractPreview(sourcePath);
-            if (content != null && !content.isEmpty()) {
-                samples = List.of(content);
-            } else {
-                log.warn("SensitiveScan task {}: could not extract text from '{}', falling back to path as sample", task.getId(), sourcePath);
-                samples = List.of(sourcePath);
-            }
-        } else {
-            samples = (sourcePath != null && !sourcePath.isEmpty()) ? List.of(sourcePath) : List.of("待扫描文本样例");
-        }
-
+        List<String> samples = task.getSourcePath() == null ? List.of("待扫描文本样例") : List.of(task.getSourcePath());
         SensitiveScanReport report = scanEngine.scan(samples);
         try {
             task.setReportData(MAPPER.writeValueAsString(report));
@@ -102,21 +78,6 @@ public class SensitiveScanController {
     public R<?> delete(@RequestBody @Validated IdReq req) {
         taskService.removeById(req.getId());
         return R.okMsg("删除成功");
-    }
-
-    /**
-     * 代理 Python AI 服务的 /benchmark 端点，返回 BERT 零样本分类与正则的精度对比结果。
-     * 前端报告弹窗通过此接口拉取实时基准数据。
-     */
-    @GetMapping("/benchmark")
-    public R<java.util.Map<String, Object>> benchmark() {
-        try {
-            java.util.Map<String, Object> result = aiInferenceClient.benchmark();
-            return R.ok(result);
-        } catch (Exception e) {
-            log.warn("AI benchmark endpoint unavailable: {}", e.getMessage());
-            return R.error(50000, "AI 基准测试服务暂不可用");
-        }
     }
 
     public static class IdReq { @NotNull private Long id; public Long getId(){return id;} public void setId(Long id){this.id=id;} }

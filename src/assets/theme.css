@@ -649,12 +649,6 @@ body:not(.light-mode) .el-table-filter__bottom button:hover {
   white-space: nowrap;
   transform-origin: 50% 50%;
   font-kerning: normal;
-  view-transition-name: workbench-title;
-}
-
-::view-transition-group(workbench-title) {
-  animation-duration: 0.7s;
-  animation-timing-function: cubic-bezier(0.25, 1, 0.3, 1);
 }
 
 .light-mode .el-input__wrapper,
@@ -917,43 +911,4 @@ body:not(.light-mode) .el-table-filter__bottom button:hover {
 @media (hover: hover) and (pointer: fine) {
   /* 让 CustomCursor 完全接管；保留降级 */
   * { cursor: inherit; }
-}
-
-/* Element Plus Dark Theme Overrides for AegisAI */
-html.dark {
-  --el-bg-color: var(--color-bg);
-  --el-bg-color-page: var(--color-bg);
-  --el-bg-color-overlay: var(--color-card);
-  --el-text-color-primary: var(--color-text);
-  --el-text-color-regular: var(--color-text-secondary);
-  --el-text-color-secondary: var(--color-text-tertiary);
-  --el-border-color: var(--color-border);
-  --el-border-color-light: var(--color-border-light);
-  --el-border-color-lighter: rgba(169, 196, 255, 0.04);
-  --el-fill-color-blank: var(--color-card-strong);
-  --el-color-primary: var(--color-primary);
-  --el-color-success: var(--color-success);
-  --el-color-warning: var(--color-warning);
-  --el-color-danger: var(--color-danger);
-  --el-mask-color: rgba(0, 0, 0, 0.7);
-}
-.el-table {
-  --el-table-bg-color: var(--color-card);
-  --el-table-tr-bg-color: var(--color-card);
-  --el-table-header-bg-color: var(--color-card-strong);
-  --el-table-header-text-color: var(--color-text-secondary);
-  --el-table-text-color: var(--color-text-soft);
-  --el-table-row-hover-bg-color: var(--color-card-hover);
-  --el-table-border-color: var(--color-border-light);
-}
-.el-dialog {
-  --el-dialog-bg-color: var(--color-card);
-}
-.el-card {
-  --el-card-bg-color: var(--color-card);
-}
-.el-input {
-  --el-input-bg-color: var(--color-card-strong);
-  --el-input-border-color: var(--color-border);
-  --el-input-text-color: var(--color-text);
 }

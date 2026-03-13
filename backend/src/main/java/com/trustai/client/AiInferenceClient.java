@@ -6,9 +6,7 @@ import com.trustai.dto.ai.AiClassificationRequest;
 import com.trustai.dto.ai.AiClassificationResult;
 import com.trustai.dto.ai.RiskForecastRequest;
 import com.trustai.dto.ai.RiskForecastResponse;
-import java.util.Map;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -23,7 +21,4 @@ public interface AiInferenceClient {
 
     @PostMapping("/predict/risk")
     RiskForecastResponse predictRisk(@RequestBody RiskForecastRequest request);
-
-    @GetMapping("/benchmark")
-    Map<String, Object> benchmark();
 }

@@ -163,21 +163,6 @@
         <div class="panel-badge">T+1 预测 {{ overview.trend.forecastNextDay }}</div>
       </div>
       <div ref="trendChartRef" class="chart-canvas trend-canvas"></div>
-      <!-- LSTM 预测算法透明度面板 -->
-      <div v-if="forecastMeta" class="lstm-meta-bar">
-        <span class="lstm-meta-chip" :class="forecastMeta.fallback ? 'lstm-fallback' : 'lstm-online'">
-          {{ forecastMeta.fallback ? '降级: ' + (forecastMeta.method || 'moving-average') : 'LSTM 在线预测' }}
-        </span>
-        <span class="lstm-meta-item">
-          训练样本：<strong>{{ forecastMeta.trainingSamples ?? '—' }} 天</strong>
-        </span>
-        <span v-if="forecastMeta.trainingMae != null" class="lstm-meta-item">
-          训练 MAE：<strong>{{ forecastMeta.trainingMae }}</strong>
-        </span>
-        <span class="lstm-meta-note">
-          模型每次请求基于真实风险事件历史数据在线训练，并返回样本量与误差供评估
-        </span>
-      </div>
     </el-card>
 
     <el-card class="chart-card card-glass risk-card scene-block">
@@ -292,7 +277,6 @@ const overview = ref(createEmptyOverview());
 const insights = ref({ postureScore: 0, summary: {}, highlights: [], recommendations: [] });
 const trustPulse = ref({ score: 0, pulseLevel: '', mission: '', innovationLabel: '', dimensions: [], signals: [] });
 const loading = ref(true);
-const forecastMeta = ref(null);
 
 let trendChart;
 let riskChart;
@@ -342,41 +326,18 @@ function renderTrendChart() {
   if (!trendChart) {
     trendChart = echarts.init(trendChartRef.value);
   }
-  const trend = overview.value.trend;
-  const hasForecast = Array.isArray(trend.forecastSeries) && trend.forecastSeries.length > 0;
-
-  // 若有 LSTM 预测序列，将其拼接在历史 x 轴之后
-  const historicLabels = trend.labels || [];
-  const forecastLabels = hasForecast
-    ? trend.forecastSeries.map((_, i) => `预测+${i + 1}`)
-    : [];
-  const allLabels = [...historicLabels, ...forecastLabels];
-
-  // 历史部分对应预测列以 null 填充，保证 x 轴对齐
-  const forecastPad = hasForecast ? trend.forecastSeries.map(() => null) : [];
-
-  // 历史风险序列留 null 给预测占位，预测序列前面留 null 给历史占位
-  const riskWithForecast = hasForecast
-    ? [...(trend.riskSeries || []), ...forecastPad]
-    : (trend.riskSeries || []);
-  const forecastWithPad = hasForecast
-    ? [...(trend.riskSeries || []).map(() => null), ...trend.forecastSeries]
-    : [];
-
   trendChart.setOption({
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' },
     legend: {
       top: 0,
       textStyle: { color: '#b8c2d4' },
-      data: hasForecast
-        ? ['风险事件', '审计留痕', 'AI调用', '成本(分)', 'LSTM预测']
-        : ['风险事件', '审计留痕', 'AI调用', '成本(分)']
+      data: ['风险事件', '审计留痕', 'AI调用', '成本(分)']
     },
     grid: { left: 24, right: 28, top: 48, bottom: 24, containLabel: true },
     xAxis: {
       type: 'category',
-      data: allLabels,
+      data: overview.value.trend.labels,
       axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
       axisLabel: { color: '#93a0b8' }
     },
@@ -400,27 +361,17 @@ function renderTrendChart() {
         type: 'line',
         smooth: true,
         symbolSize: 8,
-        data: riskWithForecast,
+        data: overview.value.trend.riskSeries,
         lineStyle: { width: 3, color: '#ff7d66' },
         itemStyle: { color: '#ff7d66' },
         areaStyle: { color: 'rgba(255,125,102,0.12)' }
       },
-      ...(hasForecast ? [{
-        name: 'LSTM预测',
-        type: 'line',
-        smooth: true,
-        symbolSize: 7,
-        data: forecastWithPad,
-        lineStyle: { width: 2, type: 'dashed', color: '#c77dff' },
-        itemStyle: { color: '#c77dff' },
-        areaStyle: { color: 'rgba(199,125,255,0.08)' }
-      }] : []),
       {
         name: '审计留痕',
         type: 'line',
         smooth: true,
         symbolSize: 7,
-        data: [...(trend.auditSeries || []), ...forecastPad],
+        data: overview.value.trend.auditSeries,
         lineStyle: { width: 3, color: '#6aa6ff' },
         itemStyle: { color: '#6aa6ff' },
         areaStyle: { color: 'rgba(106,166,255,0.12)' }
@@ -429,7 +380,7 @@ function renderTrendChart() {
         name: 'AI调用',
         type: 'bar',
         barMaxWidth: 18,
-        data: [...(trend.aiCallSeries || []), ...forecastPad],
+        data: overview.value.trend.aiCallSeries,
         itemStyle: {
           borderRadius: [10, 10, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -444,7 +395,7 @@ function renderTrendChart() {
         smooth: true,
         yAxisIndex: 1,
         symbolSize: 6,
-        data: [...(trend.costSeries || []), ...forecastPad],
+        data: overview.value.trend.costSeries,
         lineStyle: { width: 2, type: 'dashed', color: '#f5d06f' },
         itemStyle: { color: '#f5d06f' }
       }
@@ -523,33 +474,12 @@ function playEntryScene() {
 async function fetchData() {
   loading.value = true;
   try {
-    const [workbench, insightData, pulseData, forecastData] = await Promise.all([
+    const [workbench, insightData, pulseData] = await Promise.all([
       dashboardApi.getWorkbench(),
       dashboardApi.getInsights(),
       dashboardApi.getTrustPulse(),
-      dashboardApi.getForecast(),
     ]);
-    const personalized = personalizeWorkbench(workbench, userStore.userInfo);
-
-    // 将 LSTM 7 日预测序列合并到 trend 中，使预测气泡数字来自实际模型
-    if (forecastData?.forecast?.length) {
-      const series = forecastData.forecast.map(v => Math.round(v * 10) / 10);
-      personalized.trend = {
-        ...personalized.trend,
-        // 追加 7 日预测时序（供图表展示），并以第一天预测值作为"明日事件数"
-        forecastSeries: series,
-        forecastNextDay: Math.round(series[0] ?? personalized.trend.forecastNextDay),
-      };
-      // 存储 LSTM 元数据供 UI 展示
-      forecastMeta.value = {
-        trainingSamples: forecastData.trainingSamples ?? null,
-        trainingMae: forecastData.trainingMae ?? null,
-        method: forecastData.method ?? null,
-        fallback: forecastData.fallback ?? false,
-      };
-    }
-
-    overview.value = personalized;
+    overview.value = personalizeWorkbench(workbench, userStore.userInfo);
     insights.value = insightData;
     trustPulse.value = pulseData;
     await nextTick();
@@ -1245,52 +1175,6 @@ onBeforeUnmount(() => {
 .feed-time {
   color: #7e8ca7;
   font-size: 12px;
-}
-
-/* LSTM 预测元数据条 */
-.lstm-meta-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 18px;
-  margin-top: 16px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(199,125,255,0.18);
-  background: rgba(199,125,255,0.06);
-}
-
-.lstm-meta-chip {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-
-.lstm-online {
-  background: rgba(199,125,255,0.2);
-  color: #e4c3ff;
-}
-
-.lstm-fallback {
-  background: rgba(255,180,84,0.18);
-  color: #ffd9a0;
-}
-
-.lstm-meta-item {
-  font-size: 12px;
-  color: #9babc6;
-}
-
-.lstm-meta-item strong {
-  color: #d5dfef;
-}
-
-.lstm-meta-note {
-  font-size: 11px;
-  color: #7a8ba3;
-  margin-left: auto;
 }
 
 @media (max-width: 1280px) {

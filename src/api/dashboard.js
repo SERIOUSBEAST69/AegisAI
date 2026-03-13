@@ -91,13 +91,13 @@ const MOCK_WORKBENCH = {
     { level: '待研判', value: 1 },
   ],
   todos: [
-    { priority: 'P0', title: '闭环高风险事件', description: '优先压降高风险事件，避免平台只监测不处置。', route: '/alerts', metric: '3 个高危事件' },
+    { priority: 'P0', title: '闭环高风险事件', description: '优先压降高风险事件，避免平台只监测不处置。', route: '/risk-event-manage', metric: '3 个高危事件' },
     { priority: 'P0', title: '处理待闭环告警', description: '仍有告警未完成签收或处置，需进入告警闭环视图。', route: '/alerts', metric: '5 条未关闭告警' },
     { priority: 'P1', title: '履约主体权利请求', description: '访问、删除、导出类工单仍在队列中，影响隐私履约体验。', route: '/subject-request', metric: '2 个待处理工单' },
     { priority: 'P1', title: '巡检启用AI模型', description: '核验高风险模型额度、状态与绑定资产是否仍符合最新策略。', route: '/ai-model-manage', metric: '14 个启用模型' },
   ],
   feeds: [
-    { level: 'high', title: '风险事件 · 敏感数据异常导出', description: '状态：open，处置日志：待法务与安全联合复核。', route: '/alerts', timeLabel: '03-11 10:15' },
+    { level: 'high', title: '风险事件 · 敏感数据异常导出', description: '状态：open，处置日志：待法务与安全联合复核。', route: '/risk-event-manage', timeLabel: '03-11 10:15' },
     { level: 'medium', title: '告警闭环 · AI调用阈值逼近', description: '状态：claimed，处置说明：正在核验高风险模型额度。', route: '/alerts', timeLabel: '03-11 09:30' },
     { level: 'processing', title: '主体权利 · export', description: '请求导出个人数据副本，当前状态：processing', route: '/subject-request', timeLabel: '03-11 08:40' },
   ]
@@ -120,10 +120,6 @@ function buildWorkbenchFallback() {
 const FALLBACK_FORECAST = {
   forecast: [5.2, 6.0, 4.8, 7.1, 6.5, 5.9, 8.0],
   horizon: 7,
-  trainingSamples: null,
-  trainingMae: null,
-  method: 'demo',
-  fallback: true,
 };
 
 export const dashboardApi = {

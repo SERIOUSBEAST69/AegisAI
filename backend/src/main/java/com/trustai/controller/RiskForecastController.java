@@ -50,18 +50,13 @@ public class RiskForecastController {
     /**
      * LSTM 风险预测接口：返回未来 7 天的风险事件数预测序列。
      * 调用 Python 微服务中的 LSTM 模型，不可用时降级为移动平均。
-     * 同时返回训练样本量和训练 MAE，便于前端展示算法可信度。
      */
     @GetMapping("/forecast")
     public R<Map<String, Object>> forecast() {
-        var result = riskPredictionService.forecastNext7Days();
+        List<Double> forecastSeries = riskPredictionService.forecastNext7Days();
         Map<String, Object> res = new HashMap<>();
-        res.put("forecast", result.getForecast());
-        res.put("horizon", result.getForecast() != null ? result.getForecast().size() : 0);
-        res.put("trainingSamples", result.getTrainingSamples());
-        res.put("trainingMae", result.getTrainingMae());
-        res.put("method", result.getMethod());
-        res.put("fallback", result.getFallback());
+        res.put("forecast", forecastSeries);
+        res.put("horizon", forecastSeries.size());
         return R.ok(res);
     }
 }

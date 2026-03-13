@@ -21,9 +21,9 @@ const PERSONAS = {
       { step: '03', title: '下达资源动作', description: '根据工作台信号决定是加审计、加算力、加治理，还是冻结高风险模型。' },
     ],
     quickActions: [
-      { title: '查看风险事件', description: '优先压降高危事件', route: '/alerts' },
+      { title: '查看风险事件', description: '优先压降高危事件', route: '/risk-event-manage' },
       { title: '查看调用成本', description: '核验 AI ROI 与预算压力', route: '/model-cost' },
-      { title: '审计日志', description: '识别卡点与责任链', route: '/audit-log' },
+      { title: '查看审批流', description: '识别卡点与责任链', route: '/approval-manage' },
     ],
     roleHints: ['exec', 'ceo', 'cxo', 'director', 'management', 'leader', 'principal', 'president', '校长', '院长', '管理层', '总经理'],
   },
@@ -74,7 +74,7 @@ const PERSONAS = {
     ],
     quickActions: [
       { title: '数据资产', description: '进入资产清单与画像', route: '/data-asset' },
-      { title: '主体权利', description: '处理主体权利请求', route: '/subject-request' },
+      { title: '资产共享', description: '处理共享申请与审批', route: '/data-share' },
       { title: '脱敏预览', description: '校验脱敏效果', route: '/desense-preview' },
     ],
     roleHints: ['data', 'asset', 'steward', 'dba', 'privacy', '数据', '资产', '数据管理员'],
@@ -126,8 +126,8 @@ const PERSONAS = {
     ],
     quickActions: [
       { title: '主体权利', description: '处理师生个人数据请求', route: '/subject-request' },
-      { title: '数据资产', description: '审批跨院系数据流转', route: '/data-asset' },
-      { title: '风险事件', description: '查看校园风险处置', route: '/alerts' },
+      { title: '数据共享', description: '审批跨院系数据流转', route: '/data-share' },
+      { title: '风险事件', description: '查看校园风险处置', route: '/risk-event-manage' },
     ],
     roleHints: ['school', 'campus', 'education', 'teacher', 'academy', '校园', '学校', '教务', '院系'],
   },
@@ -151,8 +151,8 @@ const PERSONAS = {
       { step: '03', title: '推动跨部门协同', description: '把问题拆给数据、安全、研发与治理负责人，加速业务闭环。' },
     ],
     quickActions: [
-      { title: '数据共享', description: '推进业务所需数据流转', route: '/data-asset' },
-      { title: '运营指挥台', description: '跟进关键卡点审批', route: '/operations-command' },
+      { title: '数据共享', description: '推进业务所需数据流转', route: '/data-share' },
+      { title: '审批管理', description: '跟进关键卡点审批', route: '/approval-manage' },
       { title: '数据资产', description: '查看可用资产与上传新数据', route: '/data-asset' },
     ],
     roleHints: ['business', 'owner', 'product', '运营', '业务', '业务负责人', '产品'],
@@ -179,7 +179,7 @@ const PERSONAS = {
     quickActions: [
       { title: '用户管理', description: '调整组织与角色', route: '/user-manage' },
       { title: '策略管理', description: '更新平台策略与门禁', route: '/policy-manage' },
-      { title: '风险事件', description: '总览全域风险闭环', route: '/alerts' },
+      { title: '风险事件', description: '总览全域风险闭环', route: '/risk-event-manage' },
     ],
     roleHints: ['admin', 'governance', 'compliance', '管理员', '合规'],
   },
@@ -237,6 +237,9 @@ const EXTRA_ROUTE_AUDIENCES = {
   '/profile': [ALL],
   '/settings': [ALL],
   '/operations-command': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
+  '/approval-manage': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
+  '/risk-event-manage': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
+  '/data-share': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
   '/ai/models': ['governanceAdmin', 'aiBuilder', 'executive', 'businessOwner'],
   '/ai/monitor': ['governanceAdmin', 'aiBuilder', 'executive', 'secops'],
 };
