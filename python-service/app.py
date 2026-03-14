@@ -1,22 +1,37 @@
 import collections
+import csv
+import datetime
 import hashlib
+import json
+import logging
 import math
 import os
 import re
-from typing import Dict, List, Optional, Tuple
+import sqlite3
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import joblib
 import numpy as np
 import torch
 from flask import Flask, jsonify, request
+from sklearn.ensemble import IsolationForest
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 
 app = Flask(__name__)
+
+# ── Logging ────────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("aegisai")
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 # Set BERT_MOCK=true to skip loading the heavy BERT model (dev / CI / testing).
@@ -757,6 +772,387 @@ def health():
         "model": MODEL_NAME,
         "mock": MOCK_MODE,
         "ml_classifier_ready": _ml_clf.pipeline is not None,
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODULE: AI 服务风险评级 (/api/risk/*)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_RISK_DATA_FILE = Path(__file__).parent / "ai_risk_data.json"
+_risk_db: Dict[str, Any] = {}
+
+
+def _load_risk_db() -> None:
+    """从 ai_risk_data.json 加载风险评级数据库到内存缓存。"""
+    global _risk_db
+    if _RISK_DATA_FILE.exists():
+        try:
+            with open(_RISK_DATA_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+            # 建立 id → service 的映射
+            _risk_db = {s["id"]: s for s in data.get("services", [])}
+            logger.info("[RiskRating] 已加载 %d 个AI服务风险数据", len(_risk_db))
+        except Exception as e:
+            logger.error("[RiskRating] 加载风险数据失败: %s", e)
+    else:
+        logger.warning("[RiskRating] 风险数据文件不存在: %s", _RISK_DATA_FILE)
+
+
+_load_risk_db()
+
+
+@app.route("/api/risk/score", methods=["GET"])
+def risk_score():
+    """
+    查询指定 AI 服务的风险评分。
+
+    参数：
+      ?service=chatgpt   服务 ID（小写，与 ai_risk_data.json 中 id 字段一致）
+
+    返回 JSON：
+      { id, name, provider, total_risk_score, risk_level, scores, tags, recommendations }
+    """
+    service_id = request.args.get("service", "").lower().strip()
+    if not service_id:
+        return jsonify({"error": "缺少参数 service"}), 400
+
+    if service_id not in _risk_db:
+        all_ids = list(_risk_db.keys())
+        return jsonify({
+            "error": f"未找到服务: {service_id}",
+            "available": all_ids,
+        }), 404
+
+    result = _risk_db[service_id]
+    return jsonify(result)
+
+
+@app.route("/api/risk/list", methods=["GET"])
+def risk_list():
+    """返回所有已收录 AI 服务的风险评级列表（摘要视图，不含详细 scores）。"""
+    summaries = []
+    for svc in _risk_db.values():
+        summaries.append({
+            "id": svc["id"],
+            "name": svc["name"],
+            "provider": svc["provider"],
+            "logo": svc.get("logo", ""),
+            "category": svc.get("category", ""),
+            "total_risk_score": svc["total_risk_score"],
+            "risk_level": svc["risk_level"],
+            "tags": svc.get("tags", []),
+        })
+    # 按风险分数从高到低排序
+    summaries.sort(key=lambda x: x["total_risk_score"], reverse=True)
+    return jsonify({"services": summaries, "total": len(summaries)})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODULE: 员工 AI 行为异常检测 (/api/anomaly/*)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_ANOMALY_MODEL_DIR = Path(MODEL_DIR) / ""  # 与 MODEL_DIR 共用
+_ANOMALY_MODEL_FILE = Path(MODEL_DIR) / "anomaly_model.joblib"
+_ANOMALY_ENC_FILE   = Path(MODEL_DIR) / "anomaly_encoder.joblib"
+_ANOMALY_SCALER_FILE= Path(MODEL_DIR) / "anomaly_scaler.joblib"
+_ANOMALY_META_FILE  = Path(MODEL_DIR) / "anomaly_meta.json"
+
+# 模型对象（启动时懒加载）
+_anomaly_model: Optional[Any] = None
+_anomaly_encoders: Optional[Dict] = None
+_anomaly_scaler: Optional[Any] = None
+_anomaly_meta: Optional[Dict] = None
+
+# 异常事件日志数据库
+_ANOMALY_DB_FILE = Path(__file__).parent / "anomaly_events.db"
+
+CATEGORICAL_COLS = ["department", "ai_service"]
+NUMERIC_COLS = [
+    "hour_of_day", "day_of_week", "message_length",
+    "topic_code", "session_duration_min", "is_new_service",
+]
+
+
+def _init_anomaly_db() -> None:
+    """初始化 SQLite 异常事件日志表。"""
+    conn = sqlite3.connect(str(_ANOMALY_DB_FILE))
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS anomaly_events (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id TEXT    NOT NULL,
+            department  TEXT,
+            ai_service  TEXT,
+            anomaly_score REAL,
+            is_anomaly  INTEGER DEFAULT 0,
+            details     TEXT,
+            created_at  TEXT    DEFAULT (datetime('now','localtime'))
+        )
+    """)
+    conn.commit()
+    conn.close()
+    logger.info("[Anomaly] 异常事件数据库初始化完成: %s", _ANOMALY_DB_FILE)
+
+
+def _load_anomaly_model() -> bool:
+    """加载已训练的异常检测模型文件（懒加载，仅在第一次推理时触发）。"""
+    global _anomaly_model, _anomaly_encoders, _anomaly_scaler, _anomaly_meta
+
+    if _anomaly_model is not None:
+        return True  # 已加载
+
+    required = [_ANOMALY_MODEL_FILE, _ANOMALY_ENC_FILE, _ANOMALY_SCALER_FILE]
+    if not all(f.exists() for f in required):
+        logger.warning(
+            "[Anomaly] 模型文件不存在，请先运行: python train_anomaly.py\n"
+            "  缺少: %s",
+            [str(f) for f in required if not f.exists()],
+        )
+        return False
+
+    try:
+        _anomaly_model    = joblib.load(_ANOMALY_MODEL_FILE)
+        _anomaly_encoders = joblib.load(_ANOMALY_ENC_FILE)
+        _anomaly_scaler   = joblib.load(_ANOMALY_SCALER_FILE)
+        if _ANOMALY_META_FILE.exists():
+            with open(_ANOMALY_META_FILE, encoding="utf-8") as f:
+                _anomaly_meta = json.load(f)
+        logger.info("[Anomaly] 模型加载成功")
+        return True
+    except Exception as e:
+        logger.error("[Anomaly] 模型加载失败: %s", e)
+        return False
+
+
+def _build_anomaly_features(record: Dict) -> Optional[np.ndarray]:
+    """
+    将单条行为记录转换为特征向量，供孤立森林推理使用。
+    与 train_anomaly.py 中的 build_features 保持一致。
+    """
+    if _anomaly_encoders is None or _anomaly_scaler is None:
+        return None
+
+    cat_parts = []
+    for col in CATEGORICAL_COLS:
+        enc: LabelEncoder = _anomaly_encoders[col]
+        val = record.get(col, "unknown")
+        known = set(enc.classes_)
+        val = val if val in known else "unknown"
+        cat_parts.append(float(enc.transform([val])[0]))
+
+    num_parts = []
+    for col in NUMERIC_COLS:
+        num_parts.append(float(record.get(col, 0)))
+
+    X_raw = np.array(cat_parts + num_parts, dtype=float).reshape(1, -1)
+    X_scaled = _anomaly_scaler.transform(X_raw)
+    return X_scaled
+
+
+def _log_anomaly_event(employee_id: str, department: str, ai_service: str,
+                        anomaly_score: float, is_anomaly: bool, details: Dict) -> None:
+    """将异常事件写入 SQLite 日志表，同时打印 WARNING 日志。"""
+    if is_anomaly:
+        logger.warning(
+            "[Anomaly] 检测到异常行为 | 员工=%s 部门=%s AI=%s 分数=%.4f",
+            employee_id, department, ai_service, anomaly_score,
+        )
+    try:
+        conn = sqlite3.connect(str(_ANOMALY_DB_FILE))
+        conn.execute(
+            """INSERT INTO anomaly_events
+               (employee_id, department, ai_service, anomaly_score, is_anomaly, details)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                employee_id,
+                department,
+                ai_service,
+                round(anomaly_score, 6),
+                1 if is_anomaly else 0,
+                json.dumps(details, ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error("[Anomaly] 写入事件日志失败: %s", e)
+
+
+# 初始化数据库
+_init_anomaly_db()
+
+
+@app.route("/api/anomaly/check", methods=["POST"])
+def anomaly_check():
+    """
+    检测单条员工 AI 使用行为是否异常。
+
+    请求体 JSON 示例：
+    {
+      "employee_id":        "EMP_R0001",
+      "department":         "研发",
+      "ai_service":         "ChatGPT",
+      "hour_of_day":        2,
+      "day_of_week":        1,
+      "message_length":     3500,
+      "topic_code":         0,
+      "session_duration_min": 90,
+      "is_new_service":     0
+    }
+
+    返回 JSON：
+    {
+      "employee_id":    "EMP_R0001",
+      "is_anomaly":     true,
+      "anomaly_score":  -0.12,      # 孤立森林原始分（越负越异常）
+      "risk_level":     "high",
+      "message":        "检测到异常：深夜（2时）发送大量消息（3500字符）",
+      "model_ready":    true
+    }
+    """
+    payload = request.get_json(force=True) or {}
+
+    # ── 模型加载（懒加载）──────────────────────────────────────────────────
+    model_ready = _load_anomaly_model()
+    if not model_ready:
+        return jsonify({
+            "error": "异常检测模型尚未训练，请先运行 python train_anomaly.py",
+            "model_ready": False,
+        }), 503
+
+    # ── 必填字段校验 ───────────────────────────────────────────────────────
+    employee_id = payload.get("employee_id", "unknown")
+    department  = payload.get("department", "unknown")
+    ai_service  = payload.get("ai_service", "unknown")
+
+    # ── 特征构建 ──────────────────────────────────────────────────────────
+    X = _build_anomaly_features(payload)
+    if X is None:
+        return jsonify({"error": "特征构建失败，模型状态异常"}), 500
+
+    # ── 孤立森林推理 ──────────────────────────────────────────────────────
+    # score_samples() 返回原始异常分：越负越异常；predict() 返回 -1（异常）或 1（正常）
+    raw_score = float(_anomaly_model.score_samples(X)[0])
+    prediction = _anomaly_model.predict(X)[0]  # -1 or 1
+    is_anomaly = (prediction == -1)
+
+    # ── 风险等级计算 ──────────────────────────────────────────────────────
+    # IsolationForest score_samples() 返回原始异常分，值域近似 [-0.5, 0.5]：
+    #   > 0     → 非常正常（树路径很长，不易隔离）
+    #   ~ 0     → 边缘情况
+    #   < -0.05 → 可疑，值越低越异常
+    # 阈值 -0.15 / -0.05 基于合成数据集（contamination=0.15）下的分位点标定。
+    # 在生产环境中，建议用真实标注数据微调这两个阈值；
+    # 也可将其配置为环境变量 ANOMALY_HIGH_THRESHOLD / ANOMALY_MEDIUM_THRESHOLD。
+    high_thresh   = float(os.environ.get("ANOMALY_HIGH_THRESHOLD",   "-0.15"))
+    medium_thresh = float(os.environ.get("ANOMALY_MEDIUM_THRESHOLD", "-0.05"))
+    if raw_score < high_thresh:
+        risk_level = "high"
+    elif raw_score < medium_thresh:
+        risk_level = "medium"
+    else:
+        risk_level = "low"
+
+    # ── 人类可读异常描述 ──────────────────────────────────────────────────
+    reasons = []
+    hour        = int(payload.get("hour_of_day", 12))
+    msg_len     = int(payload.get("message_length", 0))
+    is_new_svc  = int(payload.get("is_new_service", 0))
+    day_of_week = int(payload.get("day_of_week", 0))
+
+    # 工作时间定义：6:00–23:00（覆盖弹性工时和加班场景）。
+    # 若企业有不同标准，可通过环境变量 WORK_HOUR_START / WORK_HOUR_END 调整。
+    work_hour_start = int(os.environ.get("WORK_HOUR_START", "6"))
+    work_hour_end   = int(os.environ.get("WORK_HOUR_END", "23"))
+    if hour < work_hour_start or hour >= work_hour_end:
+        reasons.append(f"非工作时间操作（{hour}时）")
+    if msg_len > 1500:
+        reasons.append(f"消息长度异常（{msg_len} 字符，可能粘贴大量数据）")
+    if is_new_svc:
+        reasons.append(f"首次使用新AI服务（{ai_service}）")
+    if day_of_week >= 5:
+        reasons.append(f"周末使用（星期{day_of_week + 1}）")
+
+    message = "检测到以下异常特征：" + "；".join(reasons) if (is_anomaly and reasons) else (
+        "检测到行为异常（基于孤立森林模型判断）" if is_anomaly else "行为正常"
+    )
+
+    # ── 写入事件日志 ──────────────────────────────────────────────────────
+    details = {
+        "raw_score": raw_score,
+        "features": {col: payload.get(col) for col in CATEGORICAL_COLS + NUMERIC_COLS},
+        "reasons": reasons,
+    }
+    _log_anomaly_event(employee_id, department, ai_service, raw_score, is_anomaly, details)
+
+    return jsonify({
+        "employee_id":   employee_id,
+        "is_anomaly":    bool(is_anomaly),    # 显式转换 numpy.bool_ → Python bool
+        "anomaly_score": round(raw_score, 6),
+        "risk_level":    risk_level,
+        "message":       message,
+        "reasons":       reasons,
+        "model_ready":   True,
+    })
+
+
+@app.route("/api/anomaly/events", methods=["GET"])
+def anomaly_events():
+    """
+    查询异常事件日志。
+
+    可选查询参数：
+      ?employee_id=EMP_R0001   按员工过滤
+      ?anomaly_only=true        只返回异常记录
+      ?limit=50                 最多返回条数（默认50）
+    """
+    employee_id  = request.args.get("employee_id")
+    anomaly_only = request.args.get("anomaly_only", "false").lower() == "true"
+    limit        = min(int(request.args.get("limit", 50)), 200)
+
+    try:
+        conn = sqlite3.connect(str(_ANOMALY_DB_FILE))
+        conn.row_factory = sqlite3.Row
+
+        sql    = "SELECT * FROM anomaly_events WHERE 1=1"
+        params: List = []
+        if employee_id:
+            sql += " AND employee_id = ?"
+            params.append(employee_id)
+        if anomaly_only:
+            sql += " AND is_anomaly = 1"
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+        conn.close()
+
+        # details 字段是 JSON 字符串，反序列化
+        for row in rows:
+            try:
+                row["details"] = json.loads(row.get("details") or "{}")
+            except Exception:
+                row["details"] = {}
+
+        return jsonify({"events": rows, "count": len(rows)})
+    except Exception as e:
+        logger.error("[Anomaly] 查询事件日志失败: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/anomaly/status", methods=["GET"])
+def anomaly_status():
+    """返回异常检测模型的当前加载状态和元信息。"""
+    loaded = _load_anomaly_model()
+    return jsonify({
+        "model_ready": loaded,
+        "model_file":  str(_ANOMALY_MODEL_FILE),
+        "meta":        _anomaly_meta or {},
+        "hint": (
+            "模型已就绪，可通过 POST /api/anomaly/check 进行检测。"
+            if loaded else
+            "模型未训练。请先运行: python gen_behavior_data.py && python train_anomaly.py"
+        ),
     })
 
 

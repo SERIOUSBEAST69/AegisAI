@@ -139,6 +139,7 @@ const menuDescriptions = {
   '/model-cost': '使用趋势概览',
   '/desense-preview': '脱敏策略校验',
   '/shadow-ai': '影子AI发现与治理',
+  '/ai/risk-rating': 'AI服务风险评级',
   '/alerts': '高危告警闭环',
   '/audit-log': '证据链与还原',
   '/audit-report': '审计报告输出',

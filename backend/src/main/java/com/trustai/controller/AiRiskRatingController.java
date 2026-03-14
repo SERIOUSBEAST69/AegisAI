@@ -1,0 +1,74 @@
+package com.trustai.controller;
+
+import com.trustai.client.AiInferenceClient;
+import com.trustai.utils.R;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+/**
+ * AI 服务风险评级 API。
+ *
+ * <p>代理至 Python 推理服务（ai_risk_data.json 静态数据库），
+ * 提供各常见 AI 服务的多维度风险评分，供管理后台展示。
+ *
+ * <p>评分维度：
+ * <ul>
+ *   <li>隐私政策（是否默认用数据训练）×30</li>
+ *   <li>数据存储地（境内/境外）×25</li>
+ *   <li>安全认证（ISO 27001 / SOC2 / 等保三级）×20</li>
+ *   <li>历史泄露事件 ×25</li>
+ * </ul>
+ */
+@RestController
+@RequestMapping("/api/ai-risk")
+public class AiRiskRatingController {
+
+    private static final Logger log = LoggerFactory.getLogger(AiRiskRatingController.class);
+
+    @Autowired
+    private AiInferenceClient aiInferenceClient;
+
+    /**
+     * 获取所有已收录 AI 服务的风险评级摘要列表。
+     *
+     * <p>GET /api/ai-risk/list
+     */
+    @GetMapping("/list")
+    public R<Map<String, Object>> listServices() {
+        try {
+            Map<String, Object> result = aiInferenceClient.riskList();
+            return R.ok(result);
+        } catch (Exception e) {
+            log.error("[AiRisk] 获取风险评级列表失败: {}", e.getMessage());
+            return R.fail("AI 风险评级服务暂不可用，请稍后重试");
+        }
+    }
+
+    /**
+     * 查询单个 AI 服务的详细风险评分。
+     *
+     * <p>GET /api/ai-risk/score?service=chatgpt
+     *
+     * @param serviceId 服务 ID（小写，如 chatgpt / wenxin / doubao 等）
+     */
+    @GetMapping("/score")
+    public R<Map<String, Object>> serviceScore(@RequestParam("service") String serviceId) {
+        if (serviceId == null || serviceId.isBlank()) {
+            return R.fail("缺少参数 service");
+        }
+        try {
+            Map<String, Object> result = aiInferenceClient.riskScore(serviceId.toLowerCase().strip());
+            return R.ok(result);
+        } catch (Exception e) {
+            log.error("[AiRisk] 查询服务 {} 风险评分失败: {}", serviceId, e.getMessage());
+            return R.fail("未找到服务或评级服务暂不可用");
+        }
+    }
+}

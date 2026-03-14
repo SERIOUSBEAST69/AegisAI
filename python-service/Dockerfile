@@ -17,14 +17,19 @@ RUN pip install --no-cache-dir --default-timeout=1000 \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     -r requirements.txt
 
-# 复制应用代码
-COPY app.py ./
+# 复制应用代码（包含风险评级数据、行为数据生成和训练脚本）
+COPY app.py gen_behavior_data.py train_anomaly.py ./
+COPY ai_risk_data.json ./
 
-# ========== 注释掉模型复制（后续有模型再打开） ==========
+# 若已构建好的模型文件存在，复制进镜像（可选：也可在容器启动后训练）
 # COPY models/ ./models/
+
+# 若未提供预训练模型，在构建阶段生成合成数据并训练模型
+# 注意：在 CI 环境中可以跳过此步骤，通过 docker-compose 的 command 字段覆盖
+RUN python gen_behavior_data.py && python train_anomaly.py
 
 # 暴露端口
 EXPOSE 5000
 
-# 启动命令
+# 启动命令（模型已在构建时训练，直接启动服务即可）
 CMD ["python", "app.py"]
