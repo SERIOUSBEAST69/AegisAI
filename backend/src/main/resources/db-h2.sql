@@ -355,3 +355,40 @@ INSERT INTO model_call_stat (model_id, user_id, date, call_count, total_latency_
 (5, 1, CURRENT_DATE - 1, 19, 9900, 390),
 (1, 1, CURRENT_DATE, 39, 21400, 1710),
 (3, 1, CURRENT_DATE, 17, 10200, 540);
+
+-- ── 安全事件表（OpenClaw 模拟程序窃取事件） ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS security_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  event_type VARCHAR(64) NOT NULL COMMENT '事件类型',
+  file_path VARCHAR(512) COMMENT '涉及文件路径',
+  target_addr VARCHAR(256) COMMENT '目标地址（模拟远端）',
+  employee_id VARCHAR(128) COMMENT '员工标识',
+  hostname VARCHAR(128) COMMENT '主机名',
+  file_size BIGINT COMMENT '文件大小（字节）',
+  severity VARCHAR(20) DEFAULT 'medium' COMMENT 'critical/high/medium/low',
+  status VARCHAR(20) DEFAULT 'pending' COMMENT 'pending/blocked/ignored/reviewing',
+  source VARCHAR(64) DEFAULT 'agent' COMMENT '上报来源',
+  operator_id BIGINT COMMENT '操作者ID',
+  event_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ── 安全检测规则表 ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS security_detection_rule (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  sensitive_extensions VARCHAR(500) DEFAULT '.docx,.pdf,.xlsx,.pptx,.key,.csv,.sql,.env,.pem,.pfx',
+  sensitive_paths VARCHAR(1000) DEFAULT 'C:/Users,/home,/Documents,/Desktop',
+  alert_threshold_bytes BIGINT DEFAULT 1048576,
+  enabled BOOLEAN DEFAULT TRUE,
+  description VARCHAR(500),
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 默认检测规则
+INSERT INTO security_detection_rule (name, sensitive_extensions, sensitive_paths, alert_threshold_bytes, enabled, description) VALUES
+('默认文件窃取检测规则', '.docx,.pdf,.xlsx,.pptx,.key,.csv,.sql,.env,.pem,.pfx,.db,.bak', 'C:/Users,/home,/Documents,/Desktop,/confidential', 102400, TRUE, '检测常见敏感文档类型的非授权外传行为'),
+('源代码泄露规则', '.java,.py,.go,.ts,.js,.env,.yml,.yaml,.json,.xml,.properties', '/src,/source,/code,/project', 51200, TRUE, '检测源码目录下文件的批量外传'),
+('高价值数据规则', '.sql,.bak,.dump,.tar,.zip', '/backup,/export,/archive', 524288, TRUE, '检测数据库备份、归档文件的异常传输');

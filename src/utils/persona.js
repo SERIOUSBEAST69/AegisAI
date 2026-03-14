@@ -48,6 +48,7 @@ const PERSONAS = {
     ],
     quickActions: [
       { title: '告警闭环', description: '进入告警签收与处理', route: '/alerts' },
+      { title: '实时威胁监控', description: '检测代理窃取行为', route: '/threat-monitor' },
       { title: '审计日志', description: '追踪证据链', route: '/audit-log' },
       { title: '敏感扫描', description: '复核高敏数据暴露面', route: '/sensitive-scan' },
     ],
@@ -210,6 +211,7 @@ const MENU_SECTIONS = [
     title: '安全与闭环',
     items: [
       { path: '/shadow-ai', label: '影子AI发现', icon: 'View', audiences: ['governanceAdmin', 'secops', 'executive'] },
+      { path: '/threat-monitor', label: '实时威胁监控', icon: 'AlarmClock', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/ai/risk-rating', label: 'AI风险评级', icon: 'Histogram', audiences: ['governanceAdmin', 'secops', 'executive', 'dataAdmin'] },
       { path: '/ai/anomaly', label: '行为异常检测', icon: 'AlarmClock', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/alerts', label: '告警闭环', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'executive'] },
@@ -252,6 +254,7 @@ const EXTRA_ROUTE_AUDIENCES = {
   '/ai/risk-rating': ['governanceAdmin', 'secops', 'executive', 'dataAdmin'],
   '/ai/anomaly': ['governanceAdmin', 'secops', 'executive'],
   '/shadow-ai': ['governanceAdmin', 'secops', 'executive'],
+  '/threat-monitor': ['governanceAdmin', 'secops', 'executive'],
 };
 
 function normalizeText(user) {
