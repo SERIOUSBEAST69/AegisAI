@@ -426,7 +426,8 @@ function parseServices(client) {
       return JSON.parse(client.discoveredServices);
     }
     return client.discoveredServices;
-  } catch {
+  } catch (e) {
+    console.warn('[ShadowAI] Failed to parse discoveredServices:', e.message);
     return [];
   }
 }
@@ -568,7 +569,7 @@ async function refresh() {
         rebuildStats();
       }
     } catch (e) {
-      console.warn('[ShadowAI] 无法读取本地客户端信息：', e.message);
+      console.warn('[ShadowAI] Unable to load local client info:', e.message);
     }
   }
 }

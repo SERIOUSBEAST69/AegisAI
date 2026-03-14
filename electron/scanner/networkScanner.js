@@ -99,12 +99,12 @@ function probeLocalPort(host, port, timeoutMs = 800) {
 }
 
 /**
- * 提取服务域名中的本机端口（仅处理 localhost / 127.0.0.1 格式）。
+ * 提取服务域名中的本机端口（仅处理 localhost / 127.0.0.1 / ::1 格式）。
  * @param {string} domain  如 'localhost:11434'
  * @returns {{ host: string, port: number } | null}
  */
 function parseLocalEndpoint(domain) {
-  const m = domain.match(/^(localhost|127\.0\.0\.1):(\d+)$/);
+  const m = domain.match(/^(localhost|127\.0\.0\.1|\[::1\]):(\d+)$/);
   if (!m) return null;
   return { host: '127.0.0.1', port: parseInt(m[2], 10) };
 }
