@@ -88,3 +88,8 @@ risk:
   # 风险等级允许值（修正缩进和语法）
   risk-level:
     allow-values: [LOW, MEDIUM, HIGH]
+
+security:
+  cross-site:
+    guard-enabled: ${CROSS_SITE_GUARD_ENABLED:true}
+    allowed-origins: ${CROSS_SITE_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}

@@ -1,6 +1,7 @@
 package com.trustai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trustai.client.AiInferenceClient;
 import com.trustai.controller.AiGatewayController.ChatReq;
 import com.trustai.controller.AiGatewayController.Message;
 import com.trustai.entity.AiCallLog;
@@ -32,13 +33,32 @@ public class AiGatewayService {
     private final AiCallAuditService aiCallAuditService;
     private final AiModelService aiModelService;
     private final AiModelAccessGuardService aiModelAccessGuardService;
+    private final AiInferenceClient aiInferenceClient;
 
     public AiGatewayService(AiCallAuditService aiCallAuditService,
                             AiModelService aiModelService,
-                            AiModelAccessGuardService aiModelAccessGuardService) {
+                            AiModelAccessGuardService aiModelAccessGuardService,
+                            AiInferenceClient aiInferenceClient) {
         this.aiCallAuditService = aiCallAuditService;
         this.aiModelService = aiModelService;
         this.aiModelAccessGuardService = aiModelAccessGuardService;
+        this.aiInferenceClient = aiInferenceClient;
+    }
+
+    public Map<String, Object> modelMetrics() {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            Map<String, Object> metrics = aiInferenceClient.metrics();
+            result.put("available", true);
+            result.put("fetchedAt", System.currentTimeMillis());
+            result.put("metrics", metrics);
+        } catch (Exception ex) {
+            result.put("available", false);
+            result.put("reason", "PYTHON_SERVICE_UNAVAILABLE");
+            result.put("message", ex.getMessage());
+            result.put("metrics", Map.of());
+        }
+        return result;
     }
 
     public Map<String, Object> chat(ChatReq req) {

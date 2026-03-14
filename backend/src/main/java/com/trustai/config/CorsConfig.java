@@ -1,6 +1,5 @@
 package com.trustai.config;
 
-import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -13,11 +12,18 @@ public class CorsConfig implements WebMvcConfigurer {
     @Autowired
     private RateLimitInterceptor rateLimitInterceptor;
 
+    @Autowired
+    private CrossSiteGuardService crossSiteGuardService;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        String[] allowedOrigins = crossSiteGuardService.getAllowedOrigins().toArray(new String[0]);
+        if (allowedOrigins.length == 0) {
+            allowedOrigins = new String[] {"http://localhost:5173", "http://127.0.0.1:5173"};
+        }
         registry.addMapping("/**")
-            .allowedOriginPatterns("http://localhost:*", "http://127.0.0.1:*")
-            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .allowedOrigins(allowedOrigins)
+            .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("Authorization", "Content-Type", "X-Requested-With", "Accept")
             .exposedHeaders("Authorization")
             .allowCredentials(true)

@@ -2,6 +2,7 @@ package com.trustai.config;
 
 import com.trustai.config.jwt.JwtAuthFilter;
 import java.util.Arrays;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,12 @@ public class SecurityConfig {
 
     @Autowired
     private JwtAuthFilter jwtAuthFilter;
+
+    @Autowired
+    private CrossSiteRequestFilter crossSiteRequestFilter;
+
+    @Autowired
+    private CrossSiteGuardService crossSiteGuardService;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -51,6 +58,7 @@ public class SecurityConfig {
                         "/api/auth/register",
                         "/api/auth/phone-code",
                         "/api/auth/registration-options",
+                        "/api/security/cross-site/status",
                         "/uploads/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
@@ -58,6 +66,7 @@ public class SecurityConfig {
                         "/h2-console/**"
                     ).permitAll()
                         .anyRequest().authenticated());
+        http.addFilterBefore(crossSiteRequestFilter, JwtAuthFilter.class);
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -65,8 +74,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*", "http://127.0.0.1:*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        List<String> allowedOrigins = crossSiteGuardService.getAllowedOrigins();
+        if (allowedOrigins.isEmpty()) {
+            allowedOrigins = Arrays.asList("http://localhost:5173", "http://127.0.0.1:5173");
+        }
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(true);

@@ -261,6 +261,51 @@
           placeholder="访问目的（高风险模型建议填写更具体）"
         />
       </div>
+      <div class="ai-meta-row">
+        <span class="ai-meta-pill" :class="`state-${aiModelLoadState}`">{{ aiModelLoadLabel }}</span>
+        <span v-if="selectedModelLabel" class="ai-meta-pill state-selected">当前模型：{{ selectedModelLabel }}</span>
+      </div>
+      <p v-if="aiModelLoadMessage" class="ai-model-notice">{{ aiModelLoadMessage }}</p>
+
+      <div class="security-surface">
+        <article class="security-card">
+          <div class="security-card-title">跨站拦截状态</div>
+          <div class="security-item-grid">
+            <div class="security-item">
+              <span>防护模式</span>
+              <strong>{{ crossSiteGuard.enabled ? '强制拦截' : '已关闭' }}</strong>
+            </div>
+            <div class="security-item">
+              <span>已拦截请求</span>
+              <strong>{{ crossSiteGuard.blockedCount }}</strong>
+            </div>
+            <div class="security-item security-item-wide">
+              <span>最近一次拦截</span>
+              <strong>{{ crossSiteLastBlockedText }}</strong>
+            </div>
+          </div>
+          <div class="security-origin-row">
+            <span v-for="origin in crossSiteGuard.allowedOrigins.slice(0, 3)" :key="origin" class="origin-chip">{{ origin }}</span>
+            <span v-if="crossSiteGuard.allowedOrigins.length === 0" class="origin-chip muted">未配置来源</span>
+          </div>
+        </article>
+
+        <article class="security-card">
+          <div class="security-card-title">训练模型栈</div>
+          <div v-if="aiModelStack.loading" class="stack-placeholder">正在同步 Python 模型指标...</div>
+          <div v-else-if="!aiModelStack.available" class="stack-placeholder">
+            {{ aiModelStack.message || '训练模型服务暂不可达，请检查 python-service' }}
+          </div>
+          <div v-else class="stack-list">
+            <article v-for="item in aiModelStack.classifierStack.slice(0, 3)" :key="item.name" class="stack-item">
+              <strong>{{ item.name }}</strong>
+              <span>{{ item.trained ? '已训练' : '规则/零样本' }}</span>
+              <em v-if="typeof item.benchmark_accuracy === 'number'">准确率 {{ Math.round(item.benchmark_accuracy * 1000) / 10 }}%</em>
+            </article>
+          </div>
+        </article>
+      </div>
+
       <div class="ai-input-row">
         <textarea
           v-model="aiDraftMessage"
@@ -344,10 +389,28 @@ const privacyBlockReason = ref('');
 const privacyShieldActive = ref(false);
 const aiModelOptions = ref([]);
 const selectedAiModelCode = ref('');
+const aiModelLoadState = ref('idle');
+const aiModelLoadMessage = ref('');
 const aiAccessReason = ref('工作台交互请求');
 const aiResponsePreview = ref('');
 const aiSending = ref(false);
 const forecastRefreshing = ref(false);
+const crossSiteGuard = ref({
+  loading: false,
+  enabled: false,
+  mode: 'disabled',
+  allowedOrigins: [],
+  blockedCount: 0,
+  lastBlockedAt: null,
+  message: ''
+});
+const aiModelStack = ref({
+  loading: false,
+  available: false,
+  classifierStack: [],
+  benchmark: null,
+  message: ''
+});
 
 let privacyCheckDebounceTimer = null;
 function onAiDraftInput() {
@@ -368,6 +431,25 @@ function onAiDraftInput() {
 function selectedModel() {
   return aiModelOptions.value.find(item => item.modelCode === selectedAiModelCode.value) || null;
 }
+
+const selectedModelLabel = computed(() => {
+  const model = selectedModel();
+  if (!model) return '';
+  return `${model.modelName || model.name || '未命名模型'} (${model.modelCode})`;
+});
+
+const aiModelLoadLabel = computed(() => {
+  if (aiModelLoadState.value === 'loading') return '模型列表加载中';
+  if (aiModelLoadState.value === 'ready') return `已加载 ${aiModelOptions.value.length} 个可用模型`;
+  if (aiModelLoadState.value === 'empty') return '未发现可用模型';
+  if (aiModelLoadState.value === 'error') return '模型加载失败';
+  return '等待加载模型';
+});
+
+const crossSiteLastBlockedText = computed(() => {
+  if (!crossSiteGuard.value.lastBlockedAt) return '暂无';
+  return new Date(crossSiteGuard.value.lastBlockedAt).toLocaleString('zh-CN', { hour12: false });
+});
 
 function normalizeAiReply(data) {
   if (!data) return '';
@@ -410,17 +492,96 @@ async function sendAiDraft() {
 }
 
 async function fetchAiModels() {
+  aiModelLoadState.value = 'loading';
+  aiModelLoadMessage.value = '';
   try {
-    const list = await request.get('/ai-model/list');
-    aiModelOptions.value = (Array.isArray(list) ? list : [])
-      .filter(item => String(item.status || '').toLowerCase() === 'enabled');
+    const payload = await request.get('/ai-model/list');
+    const list = normalizeModelListPayload(payload)
+      .filter(isEnabledModel)
+      .map(item => ({
+        ...item,
+        modelName: item.modelName || item.name || item.modelCode || '未命名模型'
+      }));
+    aiModelOptions.value = list;
     if (!selectedAiModelCode.value && aiModelOptions.value.length > 0) {
       selectedAiModelCode.value = aiModelOptions.value[0].modelCode;
+    }
+    if (aiModelOptions.value.length === 0) {
+      aiModelLoadState.value = 'empty';
+      aiModelLoadMessage.value = '当前没有可发送的启用模型，请前往 AI模型管理 将状态设为 enabled。';
+    } else {
+      aiModelLoadState.value = 'ready';
     }
   } catch (error) {
     aiModelOptions.value = [];
     selectedAiModelCode.value = '';
-    ElMessage.warning(error?.message || '模型列表加载失败，请前往 AI 模型管理检查状态');
+    aiModelLoadState.value = 'error';
+    aiModelLoadMessage.value = error?.message || '模型列表加载失败，请前往 AI 模型管理检查状态';
+    ElMessage.warning(aiModelLoadMessage.value);
+  }
+}
+
+function normalizeModelListPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.records)) return payload.records;
+  if (Array.isArray(payload?.list)) return payload.list;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.rows)) return payload.rows;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.records)) return payload.data.records;
+  return [];
+}
+
+function isEnabledModel(item) {
+  const status = String(item?.status ?? '').trim().toLowerCase();
+  return !status || status === 'enabled' || status === 'active' || status === '1' || status === 'true';
+}
+
+async function fetchCrossSiteGuardStatus(silent = true) {
+  crossSiteGuard.value.loading = true;
+  try {
+    const status = await request.get('/security/cross-site/status');
+    crossSiteGuard.value = {
+      loading: false,
+      enabled: Boolean(status?.enabled),
+      mode: status?.mode || 'disabled',
+      allowedOrigins: Array.isArray(status?.allowedOrigins) ? status.allowedOrigins : [],
+      blockedCount: Number(status?.blockedCount || 0),
+      lastBlockedAt: status?.lastBlockedAt || null,
+      message: ''
+    };
+  } catch (error) {
+    crossSiteGuard.value = {
+      ...crossSiteGuard.value,
+      loading: false,
+      message: error?.message || '跨站拦截状态获取失败'
+    };
+    if (!silent) {
+      ElMessage.warning(crossSiteGuard.value.message);
+    }
+  }
+}
+
+async function fetchAiModelStack() {
+  aiModelStack.value.loading = true;
+  try {
+    const data = await request.get('/ai/model-metrics');
+    const metrics = data?.metrics && typeof data.metrics === 'object' ? data.metrics : {};
+    aiModelStack.value = {
+      loading: false,
+      available: Boolean(data?.available),
+      classifierStack: Array.isArray(metrics?.classifier_stack) ? metrics.classifier_stack : [],
+      benchmark: metrics?.benchmark || null,
+      message: data?.available ? '' : (data?.message || '训练模型服务暂不可达')
+    };
+  } catch (error) {
+    aiModelStack.value = {
+      loading: false,
+      available: false,
+      classifierStack: [],
+      benchmark: null,
+      message: error?.message || '训练模型指标拉取失败'
+    };
   }
 }
 
@@ -451,6 +612,7 @@ async function refreshForecastNow() {
 let trendChart;
 let riskChart;
 let resizeHandler;
+let securityStatusTimer;
 
 const metricVisualMap = {
   assets: { icon: 'DataAnalysis', color: 'var(--color-primary)' },
@@ -721,15 +883,23 @@ watch(() => overview.value.trend, async () => {
 onMounted(() => {
   fetchData();
   fetchAiModels();
+  fetchCrossSiteGuardStatus(false);
+  fetchAiModelStack();
   resizeHandler = () => {
     trendChart?.resize();
     riskChart?.resize();
   };
   window.addEventListener('resize', resizeHandler);
+  securityStatusTimer = window.setInterval(() => {
+    fetchCrossSiteGuardStatus(true);
+  }, 15000);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeHandler);
+  if (securityStatusTimer) {
+    clearInterval(securityStatusTimer);
+  }
   trendChart?.dispose();
   riskChart?.dispose();
 });
@@ -1502,6 +1672,162 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 
+.ai-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ai-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.ai-meta-pill.state-idle,
+.ai-meta-pill.state-loading {
+  color: #c0d4f8;
+  background: rgba(73, 126, 233, 0.18);
+  border: 1px solid rgba(106, 166, 255, 0.25);
+}
+
+.ai-meta-pill.state-ready,
+.ai-meta-pill.state-selected {
+  color: #c5f8e8;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.ai-meta-pill.state-empty,
+.ai-meta-pill.state-error {
+  color: #ffd0d0;
+  background: rgba(220, 38, 38, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.24);
+}
+
+.ai-model-notice {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #fca5a5;
+  line-height: 1.5;
+}
+
+.security-surface {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.security-card {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(8, 17, 34, 0.56);
+  padding: 12px;
+}
+
+.security-card-title {
+  color: #dce8ff;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.security-item-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.security-item {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.security-item.security-item-wide {
+  grid-column: 1 / -1;
+}
+
+.security-item span {
+  color: #8ea1c4;
+  font-size: 11px;
+}
+
+.security-item strong {
+  color: #f6f8ff;
+  font-size: 12px;
+}
+
+.security-origin-row {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.origin-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(99, 179, 237, 0.25);
+  background: rgba(59, 130, 246, 0.13);
+  color: #b6d4ff;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.origin-chip.muted {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: rgba(100, 116, 139, 0.18);
+  color: #c0cad7;
+}
+
+.stack-placeholder {
+  font-size: 12px;
+  color: #8ea1c4;
+  line-height: 1.6;
+}
+
+.stack-list {
+  display: grid;
+  gap: 8px;
+}
+
+.stack-item {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.stack-item strong {
+  color: #f5f8ff;
+  font-size: 12px;
+}
+
+.stack-item span {
+  color: #6ee7b7;
+  font-size: 11px;
+}
+
+.stack-item em {
+  color: #fcd34d;
+  font-size: 11px;
+  font-style: normal;
+}
+
 .ai-model-select,
 .ai-reason-input {
   background: rgba(255, 255, 255, 0.06);
@@ -1595,5 +1921,22 @@ onBeforeUnmount(() => {
   color: #d9e8ff;
   font-size: 12px;
   line-height: 1.55;
+}
+
+@media (max-width: 768px) {
+  .ai-config-row,
+  .security-surface {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-input-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .ai-send-btn {
+    width: 100%;
+  }
 }
 </style>

@@ -57,6 +57,13 @@ service.interceptors.response.use(
     if (body && body.code === 40300) {
       return rejectWith(body.msg || '无权限访问当前资源', { code: 40300 });
     }
+    if (body && body.code === 40310) {
+      return rejectWith(body.msg || '跨站请求已被拦截', {
+        code: 40310,
+        crossSiteBlocked: true,
+        detail: body.data || null,
+      });
+    }
     return rejectWith((body && body.msg) || '请求失败', { code: body?.code });
   },
   err => {
@@ -67,6 +74,14 @@ service.interceptors.response.use(
       return handleUnauthorized(err.response.data?.msg || '未登录或会话已失效', err.response.data?.data);
     }
     if (err.response && err.response.status === 403) {
+      if (err.response.data?.code === 40310) {
+        return rejectWith(err.response.data?.msg || '跨站请求已被拦截', {
+          code: 40310,
+          status: 403,
+          crossSiteBlocked: true,
+          detail: err.response.data?.data || null,
+        });
+      }
       return rejectWith(err.response.data?.msg || '无权限访问当前资源', { code: 40300, status: 403 });
     }
     if (!err.response) {

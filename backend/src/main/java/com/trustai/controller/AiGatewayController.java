@@ -30,6 +30,11 @@ public class AiGatewayController {
         return R.ok(aiGatewayService.chat(req));
     }
 
+    @GetMapping("/model-metrics")
+    public R<Map<String, Object>> modelMetrics() {
+        return R.ok(aiGatewayService.modelMetrics());
+    }
+
     /**
      * 隐私盾实时检测接口：前端在用户输入文本后调用此接口，
      * 在数据发送到任何 AI 服务之前检测是否含个人隐私信息。
