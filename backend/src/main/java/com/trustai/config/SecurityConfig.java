@@ -67,6 +67,8 @@ public class SecurityConfig {
                         "/api/client/queue/**",
                         // 客户端下载（提供安装包下载）
                         "/api/download/**",
+                        // 安全事件上报（供 OpenClaw 模拟程序等无 token 上报）
+                        "/api/security/events/report",
                         "/uploads/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
