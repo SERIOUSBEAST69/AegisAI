@@ -13,6 +13,16 @@
       </div>
       <div class="page-header-actions">
         <el-tag v-if="isMock" type="warning" size="large">演示数据</el-tag>
+        <el-tag v-if="isElectron" type="success" size="large">客户端已连接</el-tag>
+        <el-button
+          v-if="isElectron"
+          type="success"
+          :loading="localScanning"
+          @click="runLocalScan"
+        >
+          <el-icon><Monitor /></el-icon>
+          扫描本机
+        </el-button>
         <el-button type="primary" :loading="loading" @click="refresh">
           <el-icon><Refresh /></el-icon>
           刷新扫描结果
@@ -65,6 +75,71 @@
           <span class="stat-tile-hint">客户端上报次数</span>
         </div>
       </article>
+    </div>
+
+    <!-- 本机实时扫描面板（仅在 Electron 客户端中显示） -->
+    <div v-if="isElectron" class="local-scan-panel scene-block card-glass">
+      <div class="local-scan-header">
+        <div>
+          <div class="card-header">📡 本机实时扫描</div>
+          <p class="panel-subtitle">
+            以下为当前设备的真实扫描结果，通过分析进程列表、网络连接和浏览器访问历史获得。
+          </p>
+        </div>
+        <div class="local-scan-status">
+          <span v-if="localScanResult" :class="['risk-badge', localScanResult.riskLevel]">
+            本机风险：{{ riskLabel(localScanResult.riskLevel) }}
+          </span>
+          <el-button
+            type="success"
+            :loading="localScanning"
+            size="small"
+            @click="runLocalScan"
+          >
+            <el-icon><Refresh /></el-icon>
+            立即扫描
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="localScanning" class="local-scan-loading">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>正在扫描本机 AI 服务…（检测进程、网络连接和浏览器历史）</span>
+      </div>
+
+      <div v-else-if="!localScanResult" class="local-scan-empty">
+        <span>尚未执行本机扫描，请点击「立即扫描」或等待定时扫描。</span>
+      </div>
+
+      <div v-else>
+        <div class="local-scan-meta">
+          <span>🕐 扫描时间：{{ formatTime(localScanResult.time) }}</span>
+          <span>🔍 发现影子AI：<strong>{{ localScanResult.shadowAiCount }}</strong> 个</span>
+        </div>
+
+        <div v-if="localScanResult.shadowAiCount === 0" class="local-scan-empty">
+          ✅ 未发现未经授权的AI服务，本机合规。
+        </div>
+
+        <div v-else class="local-services-grid">
+          <div
+            v-for="svc in localScanResult.services"
+            :key="svc.name + svc.source"
+            :class="['local-service-card', svc.riskLevel]"
+          >
+            <div class="local-service-head">
+              <span :class="['risk-badge', svc.riskLevel]">{{ riskLabel(svc.riskLevel) }}</span>
+              <strong>{{ svc.name }}</strong>
+              <el-tag size="small" type="info">{{ categoryLabel(svc.category) }}</el-tag>
+            </div>
+            <div class="local-service-meta">
+              <span>🌐 {{ svc.domain }}</span>
+              <span>📡 {{ sourceLabel(svc.source) }}</span>
+              <span v-if="svc.lastSeen">🕐 {{ formatTime(svc.lastSeen) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 风险分布 + 客户端列表 -->
@@ -122,6 +197,37 @@
               target="_blank"
             >electron/README.md</a>。
           </div>
+        </div>
+
+        <!-- 局域网多机部署指引 -->
+        <div class="lan-guide-section">
+          <div class="card-header" style="margin-top: 28px;">🌐 局域网多机检测部署指引</div>
+          <p class="panel-subtitle" style="margin-bottom: 12px;">
+            将 Aegis 客户端部署到同一局域网内的多台设备，统一汇报至本平台进行集中合规审查。
+          </p>
+          <ol class="lan-guide-steps">
+            <li>
+              <strong>启动 Aegis 服务端</strong>：在本机（或局域网内某台服务器）运行
+              <code>docker-compose up</code>，确保服务端监听在 <code>0.0.0.0:8080</code>。
+            </li>
+            <li>
+              <strong>确认本机 IP</strong>：运行 <code>ipconfig</code>（Windows）或
+              <code>ifconfig</code>（macOS/Linux）获取局域网 IP，如 <code>192.168.1.100</code>。
+            </li>
+            <li>
+              <strong>分发客户端安装包</strong>：将 Windows 安装包或 macOS DMG 分发给需要检测的设备。
+              每台设备安装后，在托盘菜单 → 「服务器设置」中填写服务器地址，例如
+              <code>http://192.168.1.100:8080</code>。
+            </li>
+            <li>
+              <strong>客户端自动扫描上报</strong>：Aegis 客户端将每 30 分钟自动扫描本机 AI 服务，
+              并将结果上报到此平台。在「终端设备清单」中可查看所有已接入设备的扫描报告。
+            </li>
+            <li>
+              <strong>隐私合规声明</strong>：请确保每台设备的使用者已了解并同意 Aegis 的扫描行为。
+              Aegis 仅读取进程列表、活跃网络连接和浏览器历史记录，不上传任何文件内容。
+            </li>
+          </ol>
         </div>
       </el-card>
 
@@ -265,7 +371,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   Refresh, Monitor, Warning, AlarmClock, Document,
@@ -273,14 +379,22 @@ import {
 } from '@element-plus/icons-vue';
 import { shadowAiApi } from '../api/shadowAi';
 
+// ── 检测是否在 Electron 客户端中运行 ──────────────────────────────────────────
+const isElectron = typeof window !== 'undefined' && !!window.aegisClient;
+
 // ── 状态 ──────────────────────────────────────────────────────────────────────
-const loading     = ref(false);
-const isMock      = ref(false);
-const stats       = ref({ totalClients: 0, highRiskClients: 0, totalShadowAi: 0, recentReports: 0, riskDistribution: {} });
-const clients     = ref([]);
+const loading        = ref(false);
+const localScanning  = ref(false);
+const isMock         = ref(false);
+const stats          = ref({ totalClients: 0, highRiskClients: 0, totalShadowAi: 0, recentReports: 0, riskDistribution: {} });
+const clients        = ref([]);
 const searchKeyword  = ref('');
 const drawerVisible  = ref(false);
 const selectedClient = ref(null);
+
+// 本地扫描结果（Electron 客户端专属）
+const localScanResult = ref(null);
+const localClientInfo = ref(null);
 
 // ── 计算属性 ──────────────────────────────────────────────────────────────────
 const filteredClients = computed(() => {
@@ -308,7 +422,10 @@ const riskDistItems = computed(() => {
 function parseServices(client) {
   if (!client?.discoveredServices) return [];
   try {
-    return JSON.parse(client.discoveredServices);
+    if (typeof client.discoveredServices === 'string') {
+      return JSON.parse(client.discoveredServices);
+    }
+    return client.discoveredServices;
   } catch {
     return [];
   }
@@ -349,7 +466,76 @@ function formatTime(t) {
   return d.toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-');
 }
 
-// ── 数据加载 ──────────────────────────────────────────────────────────────────
+// ── 本地 Electron 扫描 ────────────────────────────────────────────────────────
+
+/**
+ * 将本地扫描结果（来自 Electron IPC）转换为客户端卡片格式，
+ * 以便与服务端数据统一展示。
+ */
+function buildLocalClient(info, result) {
+  return {
+    clientId: info?.clientId || 'local',
+    hostname: info?.hostname || '本机',
+    osUsername: info?.osUsername || '',
+    osType: info?.osType || '',
+    clientVersion: '1.0.0',
+    shadowAiCount: result?.shadowAiCount ?? 0,
+    riskLevel: result?.riskLevel ?? 'none',
+    scanTime: result?.time ?? new Date().toISOString(),
+    discoveredServices: result?.services ?? [],
+    _local: true,
+  };
+}
+
+async function runLocalScan() {
+  if (!isElectron) return;
+  localScanning.value = true;
+  try {
+    const result = await window.aegisClient.runScan();
+    localScanResult.value = result;
+    // 同步更新本地客户端条目
+    updateLocalClientEntry(result);
+    ElMessage.success(`本机扫描完成，发现 ${result?.shadowAiCount ?? 0} 个影子AI服务`);
+  } catch (err) {
+    ElMessage.error('本机扫描失败：' + (err.message || '未知错误'));
+  } finally {
+    localScanning.value = false;
+  }
+}
+
+function updateLocalClientEntry(result) {
+  const localClient = buildLocalClient(localClientInfo.value, result);
+  // 替换或插入本地客户端条目（排在最前面）
+  const idx = clients.value.findIndex(c => c._local);
+  if (idx >= 0) {
+    clients.value.splice(idx, 1, localClient);
+  } else {
+    clients.value.unshift(localClient);
+  }
+  // 同步更新统计数据
+  rebuildStats();
+}
+
+function rebuildStats() {
+  const all = clients.value;
+  const dist = { high: 0, medium: 0, low: 0, none: 0 };
+  let totalShadowAi = 0;
+  let highRiskClients = 0;
+  for (const c of all) {
+    dist[c.riskLevel] = (dist[c.riskLevel] || 0) + 1;
+    totalShadowAi += c.shadowAiCount || 0;
+    if (c.riskLevel === 'high') highRiskClients++;
+  }
+  stats.value = {
+    ...stats.value,
+    totalClients: all.length,
+    highRiskClients,
+    totalShadowAi,
+    riskDistribution: dist,
+  };
+}
+
+// ── 服务端数据加载 ────────────────────────────────────────────────────────────
 async function refresh() {
   loading.value = true;
   try {
@@ -365,6 +551,26 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
+
+  // 如果在 Electron 中运行，加载本地扫描历史并附加到列表
+  if (isElectron) {
+    try {
+      localClientInfo.value = await window.aegisClient.getClientInfo();
+      const lastResult = localClientInfo.value?.lastScanResult;
+      if (lastResult) {
+        localScanResult.value = lastResult;
+        updateLocalClientEntry(lastResult);
+      } else {
+        // 无历史结果时添加占位条目，触发首次扫描
+        const placeholder = buildLocalClient(localClientInfo.value, null);
+        const idx = clients.value.findIndex(c => c._local);
+        if (idx < 0) clients.value.unshift(placeholder);
+        rebuildStats();
+      }
+    } catch (e) {
+      console.warn('[ShadowAI] 无法读取本地客户端信息：', e.message);
+    }
+  }
 }
 
 function selectClient(client) {
@@ -372,7 +578,24 @@ function selectClient(client) {
   drawerVisible.value  = true;
 }
 
-onMounted(refresh);
+// 监听 Electron 扫描完成事件（后台定时扫描完成时自动更新）
+function onScanComplete(result) {
+  localScanResult.value = result;
+  updateLocalClientEntry(result);
+}
+
+onMounted(() => {
+  refresh();
+  if (isElectron) {
+    window.aegisClient.onScanComplete(onScanComplete);
+  }
+});
+
+onUnmounted(() => {
+  if (isElectron) {
+    window.aegisClient.offScanComplete(onScanComplete);
+  }
+});
 </script>
 
 <style scoped>
@@ -784,4 +1007,125 @@ onMounted(refresh);
 }
 
 .scan-time { font-size: 11px; }
+
+/* ── 本机实时扫描面板 ─────────────────────────────────────────────────────── */
+.local-scan-panel {
+  padding: 24px 28px;
+  border-radius: var(--radius-lg);
+  background: rgba(8, 28, 18, 0.65);
+  border: 1px solid rgba(27, 217, 180, 0.25);
+}
+
+.local-scan-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.local-scan-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.local-scan-loading,
+.local-scan-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-md);
+}
+
+.local-scan-meta {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+
+.local-scan-meta strong {
+  color: var(--color-text);
+}
+
+.local-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.local-service-card {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(169, 196, 255, 0.08);
+}
+
+.local-service-card.high   { border-left: 3px solid #ff6b6b; }
+.local-service-card.medium { border-left: 3px solid #ffc600; }
+.local-service-card.low    { border-left: 3px solid #64acff; }
+
+.local-service-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.local-service-head strong {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.local-service-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ── 局域网部署指引 ───────────────────────────────────────────────────────── */
+.lan-guide-section {
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(169, 196, 255, 0.08);
+}
+
+.lan-guide-steps {
+  margin: 0;
+  padding-left: 20px;
+  list-style: decimal;
+}
+
+.lan-guide-steps li {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+
+.lan-guide-steps li strong {
+  color: var(--color-text);
+}
+
+.lan-guide-steps li code {
+  background: rgba(100, 172, 255, 0.12);
+  color: #64acff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
 </style>
