@@ -13,17 +13,24 @@ const MOCK_STATS = {
   _mock: true,
 };
 
+/**
+ * 演示用模拟数据。
+ * 当后端服务不可用时（如 404 / 网络故障），展示此数据以演示界面能力。
+ * 所有设备名与用户名均为占位示例，不代表真实人员。
+ * 真实数据来源：已安装 Aegis 客户端的终端通过 /api/client/report 接口上报。
+ */
 const MOCK_CLIENTS = [
   {
     id: 1,
     clientId: 'demo-client-001',
-    hostname: 'DESKTOP-ZHANGSAN',
-    osUsername: 'zhangsan',
+    hostname: 'WIN-WORKSTATION-01',
+    osUsername: 'employee_a',
     osType: 'Windows',
     clientVersion: '1.0.0',
     shadowAiCount: 4,
     riskLevel: 'high',
     scanTime: '2026-03-14T08:30:00',
+    _isMockData: true,  // 标记此为演示数据，UI 可据此展示免责说明
     discoveredServices: JSON.stringify([
       { name: 'ChatGPT', domain: 'chat.openai.com', category: 'chat', source: 'browser_history', riskLevel: 'high', lastSeen: '2026-03-14T08:25:00' },
       { name: 'Claude', domain: 'claude.ai', category: 'chat', source: 'browser_history', riskLevel: 'high', lastSeen: '2026-03-14T07:50:00' },
@@ -34,13 +41,14 @@ const MOCK_CLIENTS = [
   {
     id: 2,
     clientId: 'demo-client-002',
-    hostname: 'LAPTOP-LISI',
-    osUsername: 'lisi',
+    hostname: 'WIN-NOTEBOOK-02',
+    osUsername: 'employee_b',
     osType: 'Windows',
     clientVersion: '1.0.0',
     shadowAiCount: 3,
     riskLevel: 'medium',
     scanTime: '2026-03-14T09:00:00',
+    _isMockData: true,
     discoveredServices: JSON.stringify([
       { name: 'Kimi', domain: 'kimi.moonshot.cn', category: 'chat', source: 'browser_history', riskLevel: 'medium', lastSeen: '2026-03-14T08:55:00' },
       { name: 'Doubao', domain: 'doubao.com', category: 'chat', source: 'browser_history', riskLevel: 'medium', lastSeen: '2026-03-14T09:00:00' },
@@ -50,13 +58,14 @@ const MOCK_CLIENTS = [
   {
     id: 3,
     clientId: 'demo-client-003',
-    hostname: 'MAC-WANGWU',
-    osUsername: 'wangwu',
+    hostname: 'MAC-WORKSTATION-03',
+    osUsername: 'employee_c',
     osType: 'macOS',
     clientVersion: '1.0.0',
     shadowAiCount: 1,
     riskLevel: 'low',
     scanTime: '2026-03-14T07:00:00',
+    _isMockData: true,
     discoveredServices: JSON.stringify([
       { name: 'Gemini', domain: 'gemini.google.com', category: 'chat', source: 'browser_history', riskLevel: 'low', lastSeen: '2026-03-13T20:00:00' },
     ]),
@@ -64,13 +73,14 @@ const MOCK_CLIENTS = [
   {
     id: 4,
     clientId: 'demo-client-004',
-    hostname: 'DESKTOP-ZHAOLIU',
-    osUsername: 'zhaoliu',
+    hostname: 'WIN-WORKSTATION-04',
+    osUsername: 'employee_d',
     osType: 'Windows',
     clientVersion: '1.0.0',
     shadowAiCount: 0,
     riskLevel: 'none',
     scanTime: '2026-03-14T09:10:00',
+    _isMockData: true,
     discoveredServices: JSON.stringify([]),
   },
 ];

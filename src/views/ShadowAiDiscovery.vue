@@ -30,6 +30,24 @@
       </div>
     </div>
 
+    <!-- 演示数据免责提示（仅当后端不可用时显示） -->
+    <el-alert
+      v-if="isMock"
+      type="warning"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 16px;"
+    >
+      <template #title>
+        <strong>当前显示的是演示数据，非真实员工信息</strong>
+      </template>
+      <template #default>
+        设备名称（如 WIN-WORKSTATION-01）和用户标识（如 employee_a）均为占位示例。
+        真实数据需在员工终端上安装 Aegis 客户端（见下方下载区），客户端会将扫描结果上报至本系统。
+        <strong>本系统无法在未安装客户端的情况下监控员工的桌面 AI 应用程序。</strong>
+      </template>
+    </el-alert>
+
     <!-- 统计卡片 -->
     <div class="stats-grid scene-block">
       <article class="stat-tile card-glass">
