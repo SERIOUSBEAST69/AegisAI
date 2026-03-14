@@ -1,6 +1,0 @@
-com/trustai/consumer/AssetRegisterConsumer.class
-com/trustai/controller/AiGatewayController$PrivacyCheckReq.class
-com/trustai/config/RateLimitInterceptor.class
-com/trustai/service/RiskForecastScheduler$ForecastResult.class
-com/trustai/service/AutoScanScheduler.class
-com/trustai/service/RiskForecastScheduler.class
