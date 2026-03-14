@@ -13,6 +13,11 @@
       </div>
       <div class="page-header-actions">
         <el-tag type="info" size="large">{{ services.length }} 个已收录服务</el-tag>
+        <span v-if="updatedAt" class="updated-tag">📅 数据更新：{{ updatedAt }}</span>
+        <el-button type="default" :loading="refreshing" @click="refreshData">
+          <el-icon><RefreshRight /></el-icon>
+          更新数据
+        </el-button>
         <el-button type="primary" :loading="loading" @click="loadList">
           <el-icon><Refresh /></el-icon>
           刷新
@@ -73,6 +78,15 @@
           <el-tag :type="riskTagType(svc.risk_level)" size="small" effect="dark">
             {{ riskLabel(svc.risk_level) }}
           </el-tag>
+          <!-- 星级评分（1–5 星，星数越少风险越高） -->
+          <div class="star-rating" :title="`风险星级 ${scoreToStars(svc.total_risk_score)}/5（★越多代表风险越低）`">
+            <span
+              v-for="n in 5"
+              :key="n"
+              class="star"
+              :class="n <= scoreToStars(svc.total_risk_score) ? 'star-filled' : 'star-empty'"
+            >★</span>
+          </div>
           <span class="svc-category">{{ categoryLabel(svc.category) }}</span>
         </div>
 
@@ -187,15 +201,17 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Refresh } from '@element-plus/icons-vue';
+import { Refresh, RefreshRight } from '@element-plus/icons-vue';
 import request from '../api/request';
 import { shouldUseApiFallback } from '../api/fallback';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const services  = ref([]);
 const loading   = ref(false);
+const refreshing= ref(false);
 const showDetail= ref(false);
 const selected  = ref(null);
+const updatedAt = ref(null);
 
 // ── Mock fallback data ────────────────────────────────────────────────────────
 // 当 Python 推理服务不可用时使用静态 mock，保证演示可用
@@ -217,6 +233,7 @@ async function loadList() {
     // 通过 Java 后端代理调用 Python 推理服务 /api/ai-risk/list
     const data = await request.get('/ai-risk/list');
     services.value = Array.isArray(data?.services) ? data.services : MOCK_SERVICES;
+    updatedAt.value = data?.updated_at || null;
   } catch (err) {
     if (shouldUseApiFallback(err)) {
       services.value = MOCK_SERVICES;
@@ -226,6 +243,19 @@ async function loadList() {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+async function refreshData() {
+  refreshing.value = true;
+  try {
+    await request.post('/ai-risk/refresh', {});
+    ElMessage.success('风险数据已从数据源重新加载');
+    await loadList();
+  } catch (err) {
+    ElMessage.warning('刷新失败，推理服务暂不可用');
+  } finally {
+    refreshing.value = false;
   }
 }
 
@@ -258,6 +288,22 @@ function riskLabel(level) {
 
 function riskColor(level) {
   return { high: '#f53f3f', medium: '#fa8c16', low: '#52c41a' }[level] || '#8297bf';
+}
+
+/**
+ * 将 0–100 的风险分数转换为 1–5 的星级（星数越多表示该服务越"安全"）。
+ * 0–20 → 5 星（极低风险）
+ * 21–40 → 4 星
+ * 41–60 → 3 星
+ * 61–80 → 2 星
+ * 81–100 → 1 星（高风险）
+ */
+function scoreToStars(score) {
+  if (score <= 20) return 5;
+  if (score <= 40) return 4;
+  if (score <= 60) return 3;
+  if (score <= 80) return 2;
+  return 1;
 }
 
 function categoryLabel(cat) {
@@ -337,6 +383,12 @@ onMounted(loadList);
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.updated-tag {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 /* ── Score Legend ────────────────────────────────────────────────────────────── */
@@ -447,6 +499,21 @@ onMounted(loadList);
   gap: 8px;
   margin-bottom: 8px;
 }
+
+/* ── Star Rating ─────────────────────────────────────────────────────────────── */
+.star-rating {
+  display: flex;
+  gap: 1px;
+  cursor: default;
+}
+
+.star {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.star-filled  { color: #faad14; }
+.star-empty   { color: rgba(250, 173, 20, 0.25); }
 
 .svc-category {
   font-size: 11px;

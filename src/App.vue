@@ -140,6 +140,7 @@ const menuDescriptions = {
   '/desense-preview': '脱敏策略校验',
   '/shadow-ai': '影子AI发现与治理',
   '/ai/risk-rating': 'AI服务风险评级',
+  '/ai/anomaly': '员工AI行为异常检测',
   '/alerts': '高危告警闭环',
   '/audit-log': '证据链与还原',
   '/audit-report': '审计报告输出',
