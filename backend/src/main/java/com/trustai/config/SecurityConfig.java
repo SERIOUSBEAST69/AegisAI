@@ -59,6 +59,9 @@ public class SecurityConfig {
                         "/api/auth/phone-code",
                         "/api/auth/registration-options",
                         "/api/security/cross-site/status",
+                        // 轻量级客户端上报接口（无需登录，客户端用 clientId 标识）
+                        "/api/client/register",
+                        "/api/client/report",
                         "/uploads/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
