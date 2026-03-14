@@ -42,7 +42,7 @@
         <div v-for="(color, index) in normalizedColors" :key="`${color}-${index}`" class="sm-prelayer" :style="{ background: color }"></div>
       </div>
 
-      <aside id="staggered-menu-panel" ref="panelRef" class="staggered-menu-panel" :aria-hidden="!open">
+      <aside id="staggered-menu-panel" ref="panelRef" class="staggered-menu-panel" :aria-hidden="!open" :inert="!open || undefined">
         <div class="sm-panel-noise"></div>
         <div class="sm-panel-grid"></div>
         <div class="sm-panel-scroll">
@@ -330,6 +330,16 @@ function onEscape(event) {
 }
 
 watch(open, async value => {
+  if (!value) {
+    // Return focus to the toggle button BEFORE Vue applies aria-hidden/inert to
+    // the DOM, so assistive technology never sees a focused element inside a
+    // hidden ancestor. This prevents the "Blocked aria-hidden on an element
+    // because its descendant retained focus" console error.
+    const panel = panelRef.value;
+    if (panel && panel.contains(document.activeElement)) {
+      toggleBtnRef.value?.focus();
+    }
+  }
   await nextTick();
   if (value) {
     lockViewportScroll();
