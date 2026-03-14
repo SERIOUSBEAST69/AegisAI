@@ -22,12 +22,13 @@ function getActiveConnections() {
 
   try {
     if (platform === 'win32') {
-      output = execSync('netstat -n 2>nul', { timeout: 5000 }).toString();
+      // Only established TCP connections
+      output = execSync('netstat -nt 2>nul', { timeout: 5000 }).toString();
     } else if (platform === 'darwin') {
       output = execSync('netstat -an -p tcp 2>/dev/null', { timeout: 5000 }).toString();
     } else {
-      // Linux
-      output = execSync('ss -tun 2>/dev/null || netstat -tn 2>/dev/null', { timeout: 5000 }).toString();
+      // Linux – prefer ss (faster), fall back to netstat
+      output = execSync('ss -tn state established 2>/dev/null || netstat -tn 2>/dev/null', { timeout: 5000 }).toString();
     }
   } catch (e) {
     // 命令失败时返回空列表

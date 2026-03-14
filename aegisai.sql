@@ -501,7 +501,7 @@ CREATE TABLE `client_report` (
   `os_username` varchar(255) DEFAULT NULL COMMENT '操作系统用户名',
   `os_type` varchar(32) DEFAULT NULL COMMENT '操作系统类型',
   `client_version` varchar(32) DEFAULT NULL COMMENT '客户端版本号',
-  `discovered_services` text DEFAULT NULL COMMENT '发现的AI服务列表（JSON数组）',
+  `discovered_services` json DEFAULT NULL COMMENT '发现的AI服务列表（JSON数组）',
   `shadow_ai_count` int DEFAULT '0' COMMENT '影子AI服务数量',
   `risk_level` varchar(20) DEFAULT 'none' COMMENT '风险等级：none/low/medium/high',
   `scan_time` datetime DEFAULT NULL COMMENT '扫描时间',

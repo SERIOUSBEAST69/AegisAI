@@ -70,8 +70,8 @@ public class ClientReportController {
         report.setCreateTime(LocalDateTime.now());
         report.setUpdateTime(LocalDateTime.now());
 
-        // 计算风险等级
-        report.setRiskLevel(calcRiskLevel(report.getShadowAiCount()));
+    // 计算综合风险等级（优先考虑服务的风险级别，其次考虑数量）
+        report.setRiskLevel(calcRiskLevel(report.getShadowAiCount(), report.getDiscoveredServices()));
 
         clientReportService.save(report);
 
@@ -166,8 +166,21 @@ public class ClientReportController {
 
     // ── 内部工具 ────────────────────────────────────────────────────────────────
 
-    private String calcRiskLevel(Integer count) {
+    /**
+     * 计算综合风险等级。
+     * 优先根据服务的个人 riskLevel 字段判断（单个 high 服务即为 high），
+     * 再按发现数量兜底判断。
+     */
+    private String calcRiskLevel(Integer count, String discoveredServicesJson) {
         if (count == null || count == 0) return "none";
+
+        // 尝试从 JSON 中提取最高风险级别
+        if (discoveredServicesJson != null && !discoveredServicesJson.isBlank()) {
+            if (discoveredServicesJson.contains("\"riskLevel\":\"high\"")) return "high";
+            if (discoveredServicesJson.contains("\"riskLevel\":\"medium\"")) return "medium";
+        }
+
+        // 兜底：按数量判断
         if (count >= 5) return "high";
         if (count >= 2) return "medium";
         return "low";

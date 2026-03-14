@@ -144,9 +144,11 @@ function readChromiumHistory(dbPath) {
     fs.copyFileSync(dbPath, tmpPath);
     const Database = require('better-sqlite3');
     const db = new Database(tmpPath, { readonly: true, fileMustExist: true });
+    // Limit to last 30 days and 1000 entries for performance
+    const thirtyDaysAgo = (Date.now() - 30 * 24 * 60 * 60 * 1000 + 11644473600000) * 1000;
     const rows = db.prepare(
-      'SELECT url, title, last_visit_time FROM urls ORDER BY last_visit_time DESC LIMIT 5000'
-    ).all();
+      'SELECT url, title, last_visit_time FROM urls WHERE last_visit_time > ? ORDER BY last_visit_time DESC LIMIT 1000'
+    ).all(thirtyDaysAgo);
     db.close();
     return rows.map(r => ({
       url: r.url || '',
@@ -172,9 +174,11 @@ function readFirefoxHistory(dbPath) {
     fs.copyFileSync(dbPath, tmpPath);
     const Database = require('better-sqlite3');
     const db = new Database(tmpPath, { readonly: true, fileMustExist: true });
+    // Limit to last 30 days and 1000 entries for performance (Firefox uses microseconds)
+    const thirtyDaysAgoUs = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
     const rows = db.prepare(
-      'SELECT url, title, last_visit_date FROM moz_places WHERE visit_count > 0 ORDER BY last_visit_date DESC LIMIT 5000'
-    ).all();
+      'SELECT url, title, last_visit_date FROM moz_places WHERE visit_count > 0 AND last_visit_date > ? ORDER BY last_visit_date DESC LIMIT 1000'
+    ).all(thirtyDaysAgoUs);
     db.close();
     return rows.map(r => ({
       url: r.url || '',

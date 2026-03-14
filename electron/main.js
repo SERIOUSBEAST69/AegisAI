@@ -206,11 +206,6 @@ function applyAutoStart() {
 // ── 服务器设置 ────────────────────────────────────────────────────────────────
 
 async function showServerSettings() {
-  const result = await dialog.showInputBox
-    ? dialog.showInputBox({ title: '服务器地址', defaultValue: config.serverUrl })
-    : null;
-
-  // Electron 没有 showInputBox，使用自定义窗口
   const win = new BrowserWindow({
     width: 480,
     height: 280,
@@ -220,29 +215,33 @@ async function showServerSettings() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
+      nodeIntegration: false,
     },
     backgroundColor: '#050710',
     resizable: false,
   });
 
+  // Settings page uses the preload's IPC bridge to save the URL safely
   win.loadURL(`data:text/html;charset=utf-8,
-    <html style="background:#050710;color:#cdd9e5;font-family:sans-serif;padding:28px;box-sizing:border-box">
-      <h3 style="margin:0 0 16px;color:#64acff">服务器地址</h3>
+    <html style="background:%23050710;color:%23cdd9e5;font-family:sans-serif;padding:28px;box-sizing:border-box">
+      <h3 style="margin:0 0 16px;color:%2364acff">服务器地址</h3>
       <input id="url" value="${config.serverUrl}"
-        style="width:100%;padding:10px;background:#0a1628;border:1px solid #223355;border-radius:6px;color:#cdd9e5;font-size:14px;box-sizing:border-box"/>
-      <p style="font-size:12px;color:#556;margin:8px 0 20px">例如：http://192.168.1.100:8080</p>
+        style="width:100%;padding:10px;background:%230a1628;border:1px solid %23223355;border-radius:6px;color:%23cdd9e5;font-size:14px;box-sizing:border-box"/>
+      <p style="font-size:12px;color:%23556;margin:8px 0 20px">例如：http://192.168.1.100:8080</p>
       <div style="display:flex;gap:10px;justify-content:flex-end">
         <button onclick="window.close()"
-          style="padding:8px 20px;background:transparent;border:1px solid #334;color:#8ab;border-radius:6px;cursor:pointer">取消</button>
-        <button onclick="save()"
-          style="padding:8px 20px;background:#1a3a7a;border:none;color:#cde;border-radius:6px;cursor:pointer">保存</button>
+          style="padding:8px 20px;background:transparent;border:1px solid %23334;color:%238ab;border-radius:6px;cursor:pointer">取消</button>
+        <button id="saveBtn"
+          style="padding:8px 20px;background:%231a3a7a;border:none;color:%23cde;border-radius:6px;cursor:pointer">保存</button>
       </div>
       <script>
-        function save() {
-          const url = document.getElementById('url').value.trim();
-          if (url) { require('electron').ipcRenderer.send('save-server-url', url); }
+        document.getElementById('saveBtn').onclick = function() {
+          var url = document.getElementById('url').value.trim();
+          if (url && window.aegisClient) {
+            window.aegisClient.saveConfig({ serverUrl: url });
+          }
           window.close();
-        }
+        };
       </script>
     </html>
   `);
@@ -319,9 +318,15 @@ ipcMain.on('save-server-url', (event, url) => {
 
 ipcMain.handle('get-config', () => config);
 ipcMain.handle('save-config', (event, newConfig) => {
+  const prevServerUrl = config.serverUrl;
   config = { ...config, ...newConfig };
   saveConfig(config);
   startScheduledScan();
+  // Reload the workbench if server URL changed
+  if (newConfig.serverUrl && newConfig.serverUrl !== prevServerUrl && mainWindow) {
+    mainWindow.loadURL(newConfig.serverUrl).catch(console.error);
+  }
+  updateTrayMenu();
   return config;
 });
 
