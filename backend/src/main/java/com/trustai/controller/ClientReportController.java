@@ -202,9 +202,6 @@ public class ClientReportController {
         entry.setCreateTime(LocalDateTime.now());
         entry.setUpdateTime(LocalDateTime.now());
         clientScanQueueService.save(entry);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", entry.getId());
-        result.put("status", entry.getStatus());
         return R.ok(entry);
     }
 

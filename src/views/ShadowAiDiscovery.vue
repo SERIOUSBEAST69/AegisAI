@@ -723,8 +723,6 @@ async function downloadClient(platform) {
     try {
       await request.post('/client/queue', {
         platform,
-        hostname: window.location.hostname || '未知主机',
-        osUsername: navigator.platform || '',
       });
       localScanEnabled.value = true;
       await refreshQueue();
