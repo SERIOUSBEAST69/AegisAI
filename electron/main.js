@@ -14,6 +14,7 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, dialog, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
+const os   = require('os');
 const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
 const scanner = require('./scanner/index');
@@ -298,6 +299,14 @@ function startScheduledScan() {
 
 ipcMain.handle('get-client-info', () => ({
   clientId: CLIENT_ID,
+  hostname:  os.hostname(),
+  osUsername: os.userInfo().username,
+  osType:    (() => {
+    const p = process.platform;
+    if (p === 'win32') return 'Windows';
+    if (p === 'darwin') return 'macOS';
+    return 'Linux';
+  })(),
   serverUrl: config.serverUrl,
   scanIntervalMinutes: config.scanIntervalMinutes,
   autoStart: config.autoStart,

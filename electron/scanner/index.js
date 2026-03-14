@@ -89,12 +89,12 @@ async function scan({ clientId, serverUrl }) {
         return [];
       }
     }),
-    Promise.resolve().then(() => {
-      try { return scanNetworkConnections(); } catch (e) {
+    (async () => {
+      try { return await scanNetworkConnections(); } catch (e) {
         console.warn('[Scanner] 网络连接扫描失败：', e.message);
         return [];
       }
-    }),
+    })(),
     Promise.resolve().then(() => {
       try { return scanRunningProcesses(); } catch (e) {
         console.warn('[Scanner] 进程扫描失败：', e.message);
