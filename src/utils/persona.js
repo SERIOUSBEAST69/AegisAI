@@ -209,6 +209,7 @@ const MENU_SECTIONS = [
     key: 'security',
     title: '安全与闭环',
     items: [
+      { path: '/shadow-ai', label: '影子AI发现', icon: 'View', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/alerts', label: '告警闭环', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-log', label: '审计日志', icon: 'Timer', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-report', label: '审计报告', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'executive'] },
@@ -246,6 +247,7 @@ const EXTRA_ROUTE_AUDIENCES = {
   '/data-share': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
   '/ai/models': ['governanceAdmin', 'aiBuilder', 'executive', 'businessOwner'],
   '/ai/monitor': ['governanceAdmin', 'aiBuilder', 'executive', 'secops'],
+  '/shadow-ai': ['governanceAdmin', 'secops', 'executive'],
 };
 
 function normalizeText(user) {

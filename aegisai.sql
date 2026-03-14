@@ -487,6 +487,38 @@ INSERT INTO `user` VALUES (2028091269201293314,'admin','$2a$10$Od5yDqrMgBD/I8ldy
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
+--
+-- Table structure for table `client_report`
+--
+
+DROP TABLE IF EXISTS `client_report`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `client_report` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `client_id` varchar(64) NOT NULL COMMENT '客户端唯一标识（UUID）',
+  `hostname` varchar(255) DEFAULT NULL COMMENT '主机名',
+  `os_username` varchar(255) DEFAULT NULL COMMENT '操作系统用户名',
+  `os_type` varchar(32) DEFAULT NULL COMMENT '操作系统类型',
+  `client_version` varchar(32) DEFAULT NULL COMMENT '客户端版本号',
+  `discovered_services` json DEFAULT NULL COMMENT '发现的AI服务列表（JSON数组）',
+  `shadow_ai_count` int DEFAULT '0' COMMENT '影子AI服务数量',
+  `risk_level` varchar(20) DEFAULT 'none' COMMENT '风险等级：none/low/medium/high',
+  `scan_time` datetime DEFAULT NULL COMMENT '扫描时间',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_client_id` (`client_id`),
+  KEY `idx_scan_time` (`scan_time`),
+  KEY `idx_risk_level` (`risk_level`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='轻量级客户端扫描报告（影子AI发现）';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `client_report` WRITE;
+/*!40000 ALTER TABLE `client_report` DISABLE KEYS */;
+/*!40000 ALTER TABLE `client_report` ENABLE KEYS */;
+UNLOCK TABLES;
+
  /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
  /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
