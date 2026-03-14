@@ -1,5 +1,33 @@
 -- H2 compatible DDL for TrustAI
 
+CREATE TABLE IF NOT EXISTS client_report (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  client_id VARCHAR(64) NOT NULL,
+  hostname VARCHAR(255),
+  os_username VARCHAR(255),
+  os_type VARCHAR(32),
+  client_version VARCHAR(32),
+  discovered_services CLOB,
+  shadow_ai_count INT DEFAULT 0,
+  risk_level VARCHAR(20) DEFAULT 'none',
+  scan_time TIMESTAMP,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS client_scan_queue (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  platform VARCHAR(32) NOT NULL,
+  hostname VARCHAR(255),
+  os_username VARCHAR(255),
+  user_agent VARCHAR(512),
+  status VARCHAR(32) DEFAULT 'queued',
+  scan_result CLOB,
+  download_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS sys_user (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) NOT NULL UNIQUE,
