@@ -362,10 +362,9 @@ function riskLabel(level) {
 
 function formatTime(ts) {
   if (!ts) return '—';
-  return new Date(ts.replace(' ', 'T') + 'Z').toLocaleString('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    hour12: false,
-  });
+  // SQLite stores timestamps as "YYYY-MM-DD HH:MM:SS" in local time;
+  // replace space with T so Date constructor parses it as local time.
+  return new Date(ts.replace(' ', 'T')).toLocaleString('zh-CN', { hour12: false });
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────

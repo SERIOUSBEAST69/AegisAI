@@ -886,7 +886,7 @@ def risk_refresh():
         # 合并更新模式：只更新请求中指定的字段，保留其余字段不变
         updated_ids = []
         for svc_patch in new_services:
-            svc_id = svc_patch.get("id", "").lower().strip()
+            svc_id = str(svc_patch.get("id", "") or "").lower().strip()
             if not svc_id:
                 continue
             if svc_id in _risk_db:
@@ -903,7 +903,7 @@ def risk_refresh():
                 with open(_RISK_DATA_FILE, encoding="utf-8") as f:
                     existing_meta = json.load(f)
             existing_meta["services"] = list(_risk_db.values())
-            existing_meta["updated"] = _dt.date.today().isoformat()
+            existing_meta["updated"] = _dt.datetime.now().isoformat()
             with open(_RISK_DATA_FILE, "w", encoding="utf-8") as f:
                 json.dump(existing_meta, f, ensure_ascii=False, indent=2)
             logger.info("[RiskRating] 数据已更新并持久化，影响服务: %s", updated_ids)

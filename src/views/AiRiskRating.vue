@@ -79,7 +79,7 @@
             {{ riskLabel(svc.risk_level) }}
           </el-tag>
           <!-- 星级评分（1–5 星，星数越少风险越高） -->
-          <div class="star-rating" :title="`风险星级 ${scoreToStars(svc.total_risk_score)}/5（星数越少风险越高）`">
+          <div class="star-rating" :title="`风险星级 ${scoreToStars(svc.total_risk_score)}/5（★越多代表风险越低）`">
             <span
               v-for="n in 5"
               :key="n"
