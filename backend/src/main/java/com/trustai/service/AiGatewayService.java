@@ -69,11 +69,13 @@ public class AiGatewayService {
             cfg.authApplier.apply(builder, cfg.apiKey);
             HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build();
             HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            // ── 响应泄露扫描：检测 AI 是否将用户隐私原样回传 ───────────────────
+            String rawBody = aiModelAccessGuardService.scanResponseForExfiltration(resp.body(), req.getModel());
             Map<String, Object> map = new HashMap<>();
             map.put("provider", provider);
             map.put("model", req.getModel());
             map.put("status", resp.statusCode());
-            map.put("raw", resp.body());
+            map.put("raw", rawBody);
             statusFlag = resp.statusCode() >= 200 && resp.statusCode() < 300 ? "success" : "fail";
             persistLog(req, model, provider, map, begin, statusFlag);
             return map;

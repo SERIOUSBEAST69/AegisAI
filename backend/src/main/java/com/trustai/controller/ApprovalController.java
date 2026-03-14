@@ -52,7 +52,25 @@ public class ApprovalController {
         return R.okMsg("提交成功");
     }
 
-    @PostMapping("/approve")
+    @PostMapping("/reject")
+    public R<?> reject(@RequestBody ApproveReq req) {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN");
+        User currentUser = currentUserService.requireCurrentUser();
+        ApprovalRequest before = approvalRequestService.getById(req.getRequestId());
+        if (before == null) return R.error(40000, "申请不存在");
+        String prevStatus = before.getStatus();
+        // 驳回并回退
+        approvalRequestService.approve(req.getRequestId(), currentUser.getId(), "拒绝");
+        ApprovalRequest after = approvalRequestService.getById(req.getRequestId());
+        java.util.Map<String, Object> detail = new java.util.HashMap<>();
+        detail.put("requestId", req.getRequestId());
+        detail.put("previousStatus", prevStatus);
+        detail.put("currentStatus", after == null ? "驳回" : after.getStatus());
+        detail.put("approverId", currentUser.getId());
+        detail.put("message", "审批已驳回，状态已从「" + prevStatus + "」回退至「驳回」。");
+        return R.ok(detail);
+    }
+
     public R<?> approve(@RequestBody ApproveReq req) {
         if (!APPROVE_STATUS.contains(req.getStatus())) return R.error(40000, "不支持的状态");
         currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN");

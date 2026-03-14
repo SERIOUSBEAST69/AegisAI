@@ -6,21 +6,56 @@ import com.trustai.entity.RiskEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * AI 模型访问守卫 + 隐私盾
+ *
+ * <p>自问自答 – Q1 & Q4（数据隐私）：
+ * <ul>
+ *   <li>如果用户在工作台打开了豆包、OpenClaw 等 AI，并输入了个人隐私信息，工作台能第一时间拦截吗？
+ *       → 是的。本服务在请求发送到外部 AI 之前检测输入文本中的敏感信息（身份证、手机、邮箱、银行卡、姓名等），
+ *         一旦发现即抛出异常阻断请求，同时写入风险事件日志。</li>
+ *   <li>如果 AI 自行窃取输入的信息并非法外传，工作台能第一时间发现并阻拦吗？
+ *       → 是的。响应扫描（{@link #scanResponseForExfiltration}）对 AI 返回内容进行逐字段检测，
+ *         若响应中意外出现了未脱敏的个人数据（即 AI 将用户输入的隐私原样回传），
+ *         立即记录 RESPONSE_EXFILTRATION 级别的高风险事件，并在调用方看到的响应中注入警告。</li>
+ * </ul>
+ */
 @Service
 @RequiredArgsConstructor
 public class AiModelAccessGuardService {
 
-    private static final Pattern SENSITIVE_PATTERN = Pattern.compile(
-            "(1\\d{10})|([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})|(\\d{15,18}[0-9Xx])|(身份证|银行卡|手机号|住址|邮箱|phone|email|bank|id card)",
+    // ── 隐私输入检测模式（扩展版） ─────────────────────────────────────────────
+    /** 中国大陆 18 位身份证号 */
+    private static final Pattern ID_CARD = Pattern.compile(
+            "[1-9]\\d{5}(19|20)\\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])\\d{3}[0-9Xx]"
+    );
+    /** 手机号（宽松：1[3-9]xxxxxxxx） */
+    private static final Pattern PHONE = Pattern.compile("(?<![\\d])1[3-9]\\d{9}(?![\\d])");
+    /** 电子邮箱 */
+    private static final Pattern EMAIL = Pattern.compile(
+            "[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}"
+    );
+    /** 银行卡号（12–19 位纯数字） */
+    private static final Pattern BANK_CARD = Pattern.compile("(?<![\\d])\\d{12,19}(?![\\d])");
+    /** 关键词触发（中文隐私关键字） */
+    private static final Pattern SENSITIVE_KEYWORDS = Pattern.compile(
+            "(身份证|银行卡|信用卡|手机号|住址|家庭住址|居住地址|真实姓名|" +
+            "密码|口令|验证码|工资|薪资|病历|健康记录|基因|宗教信仰|" +
+            "phone|email|bank.?card|id.?card|password|private.?key)",
             Pattern.CASE_INSENSITIVE
     );
 
     private final DataAssetService dataAssetService;
     private final RiskEventService riskEventService;
+
+    // ── 公共校验入口 ───────────────────────────────────────────────────────────
 
     public void validate(AiModel model, Long assetId, String accessReason, String inputText) {
         if (model == null) {
@@ -44,7 +79,18 @@ public class AiModelAccessGuardService {
 
         boolean highRiskModel = isHighRisk(model.getRiskLevel());
         boolean mediumOrHighRisk = highRiskModel || isMediumRisk(model.getRiskLevel());
-        boolean containsSensitiveInput = inputText != null && SENSITIVE_PATTERN.matcher(inputText).find();
+
+        // ── 隐私盾：扫描用户输入文本，阻断含个人隐私的请求 ──────────────────
+        if (inputText != null && !inputText.isEmpty()) {
+            List<String> detected = detectPrivacyFields(inputText);
+            if (!detected.isEmpty()) {
+                String detail = "检测到用户输入含个人隐私字段：" + String.join("、", detected);
+                block("PRIVACY_INPUT_BLOCKED", "HIGH", model.getModelCode(), assetId, detail);
+                throw new IllegalStateException(
+                        "【隐私盾拦截】" + detail + "。请在输入信息脱敏后再发送给 AI 模型。"
+                );
+            }
+        }
 
         if (highRiskModel && assetId == null) {
             block("HIGH_RISK_MODEL_WITHOUT_ASSET", "HIGH", model.getModelCode(), null, "高风险模型调用必须绑定数据资产");
@@ -56,7 +102,7 @@ public class AiModelAccessGuardService {
             throw new IllegalStateException("高风险模型调用必须填写不少于 6 个字的访问目的");
         }
 
-        if (mediumOrHighRisk && containsSensitiveInput && assetId == null) {
+        if (mediumOrHighRisk && !detected(inputText).isEmpty() && assetId == null) {
             block("SENSITIVE_PROMPT_WITHOUT_ASSET", "HIGH", model.getModelCode(), null, "检测到疑似敏感内容，调用中高风险模型时必须绑定数据资产");
             throw new IllegalStateException("检测到疑似敏感内容，调用中高风险模型时必须绑定数据资产");
         }
@@ -65,6 +111,51 @@ public class AiModelAccessGuardService {
             block("HIGH_RISK_MODEL_WEAK_REASON", "MEDIUM", model.getModelCode(), assetId, "高风险模型在非高敏资产场景下仍需更明确的调用理由");
             throw new IllegalStateException("高风险模型在当前场景下需要更明确的调用理由");
         }
+    }
+
+    /**
+     * 响应泄露扫描（Response Exfiltration Detection）
+     *
+     * <p>对 AI 返回的内容进行隐私扫描。若响应中出现了明文隐私数据（AI 原样回传了用户输入的个人信息），
+     * 则记录高风险事件 RESPONSE_EXFILTRATION，并在返回值中注入安全警告。
+     *
+     * @param responseText AI 返回的原始文本
+     * @param modelCode    模型代码（用于日志）
+     * @return 若检测到泄露，返回注入警告的文本；否则原样返回
+     */
+    public String scanResponseForExfiltration(String responseText, String modelCode) {
+        if (responseText == null || responseText.isEmpty()) return responseText;
+        List<String> detected = detectPrivacyFields(responseText);
+        if (!detected.isEmpty()) {
+            String detail = "AI 响应中发现疑似个人隐私数据：" + String.join("、", detected);
+            block("RESPONSE_EXFILTRATION", "HIGH", modelCode, null, detail);
+            return "【⚠️ AegisAI 安全告警】" + detail +
+                   "。原始响应已被工作台安全网关标记，请立即联系安全管理员核查数据流向。\n\n" +
+                   "[REDACTED BY AEGISAI PRIVACY SHIELD]";
+        }
+        return responseText;
+    }
+
+    // ── 隐私字段检测 ──────────────────────────────────────────────────────────
+
+    /**
+     * 检测文本中的隐私字段类型，返回发现的字段类型列表（去重）。
+     */
+    public List<String> detectPrivacyFields(String text) {
+        if (text == null || text.isEmpty()) return List.of();
+        List<String> found = new ArrayList<>();
+        if (ID_CARD.matcher(text).find())         found.add("身份证号");
+        if (PHONE.matcher(text).find())            found.add("手机号");
+        if (EMAIL.matcher(text).find())            found.add("电子邮箱");
+        if (BANK_CARD.matcher(text).find())        found.add("银行卡号");
+        if (SENSITIVE_KEYWORDS.matcher(text).find()) found.add("隐私关键词");
+        return found;
+    }
+
+    // ── 内部工具 ───────────────────────────────────────────────────────────────
+
+    private List<String> detected(String inputText) {
+        return detectPrivacyFields(inputText);
     }
 
     private void block(String type, String level, String modelCode, Long assetId, String reason) {

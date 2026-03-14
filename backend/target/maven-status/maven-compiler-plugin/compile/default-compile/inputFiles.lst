@@ -1,8 +1,10 @@
+/home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/service/RiskForecastScheduler.java
 /home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/service/DataAssetService.java
 /home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/entity/DesensitizeRule.java
 /home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/config/jwt/JwtAuthFilter.java
 /home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/service/impl/AuditLogServiceImpl.java
 /home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/service/SystemConfigService.java
+/home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/service/AutoScanScheduler.java
 /home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/exception/BizException.java
 /home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/service/impl/DataShareRequestServiceImpl.java
 /home/runner/work/AegisAI/AegisAI/backend/src/main/java/com/trustai/mapper/DesensitizeRuleMapper.java
