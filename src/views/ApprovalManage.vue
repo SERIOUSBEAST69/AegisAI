@@ -10,6 +10,7 @@
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :loading="loading" @click="fetchApprovals">查询</el-button>
+        <el-button :loading="loading" @click="fetchTodo">我的待办</el-button>
         <el-button @click="openAdd">新建申请</el-button>
       </el-form-item>
     </el-form>
@@ -67,6 +68,17 @@ async function fetchApprovals() {
     loading.value = false;
   }
 }
+
+async function fetchTodo() {
+  loading.value = true;
+  try {
+    approvals.value = await request.get('/approval/todo');
+  } catch (err) {
+    ElMessage.error(err?.message || '加载待办失败');
+  } finally {
+    loading.value = false;
+  }
+}
 function openAdd() {
   addForm.value = { assetId: '', reason: '' };
   showAdd.value = true;
@@ -90,7 +102,8 @@ async function addApproval() {
 }
 async function approve(row, status) {
   try {
-    await request.post('/approval/approve', { requestId: row.id, status });
+    const endpoint = status === '拒绝' ? '/approval/reject' : '/approval/approve';
+    await request.post(endpoint, { requestId: row.id, status });
     ElMessage.success('处理成功');
     fetchApprovals();
   } catch (err) {

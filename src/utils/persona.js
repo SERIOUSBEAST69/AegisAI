@@ -211,6 +211,7 @@ const MENU_SECTIONS = [
     items: [
       { path: '/alerts', label: '告警闭环', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-log', label: '审计日志', icon: 'Timer', audiences: ['governanceAdmin', 'secops', 'executive'] },
+      { path: '/audit-report', label: '审计报告', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/sensitive-scan', label: '敏感扫描', icon: 'Search', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'schoolAdmin'] },
     ],
   },
@@ -218,6 +219,9 @@ const MENU_SECTIONS = [
     key: 'process',
     title: '流转与履约',
     items: [
+      { path: '/approval-manage', label: '审批管理', icon: 'Finished', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'] },
+      { path: '/data-share', label: '数据共享', icon: 'Share', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'] },
+      { path: '/risk-event-manage', label: '风险事件', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'] },
       { path: '/subject-request', label: '主体权利', icon: 'UserFilled', audiences: ['governanceAdmin', 'dataAdmin', 'schoolAdmin', 'secops'] },
       { path: '/policy-manage', label: '策略管理', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'dataAdmin'] },
     ],

@@ -163,7 +163,12 @@
           <div class="card-header">治理脉冲趋势</div>
           <p class="panel-subtitle">风险事件、审计留痕、AI 调用量与成本全部来自数据库聚合结果。</p>
         </div>
-        <div class="panel-badge">T+1 预测 {{ overview.trend.forecastNextDay }}</div>
+        <div class="panel-actions">
+          <button class="mini-refresh-btn" :disabled="forecastRefreshing" @click="refreshForecastNow">
+            {{ forecastRefreshing ? '刷新中...' : '刷新预测' }}
+          </button>
+          <div class="panel-badge">T+1 预测 {{ overview.trend.forecastNextDay }}</div>
+        </div>
       </div>
       <div ref="trendChartRef" class="chart-canvas trend-canvas"></div>
     </el-card>
@@ -243,6 +248,19 @@
           {{ privacyShieldActive ? '🛡️ 隐私盾已激活' : '⚪ 隐私盾待机' }}
         </div>
       </div>
+      <div class="ai-config-row">
+        <select v-model="selectedAiModelCode" class="ai-model-select">
+          <option value="" disabled>请选择已注册模型</option>
+          <option v-for="model in aiModelOptions" :key="model.id" :value="model.modelCode">
+            {{ model.modelName }} ({{ model.modelCode }})
+          </option>
+        </select>
+        <input
+          v-model="aiAccessReason"
+          class="ai-reason-input"
+          placeholder="访问目的（高风险模型建议填写更具体）"
+        />
+      </div>
       <div class="ai-input-row">
         <textarea
           v-model="aiDraftMessage"
@@ -251,12 +269,16 @@
           placeholder="在此输入您想发给 AI 的消息…（自动检测个人隐私信息）"
           @input="onAiDraftInput"
         ></textarea>
-        <button class="ai-send-btn" :disabled="!!privacyBlockReason" @click="sendAiDraft">
-          {{ privacyBlockReason ? '⛔ 已拦截' : '发送' }}
+        <button class="ai-send-btn" :disabled="!!privacyBlockReason || aiSending || !selectedAiModelCode" @click="sendAiDraft">
+          {{ privacyBlockReason ? '⛔ 已拦截' : (aiSending ? '发送中...' : '发送') }}
         </button>
       </div>
       <p v-if="privacyBlockReason" class="ai-block-notice">{{ privacyBlockReason }}</p>
       <p v-else-if="aiDraftMessage.length > 3" class="ai-safe-notice">✅ 未检测到隐私信息，可安全发送。</p>
+      <div v-if="aiResponsePreview" class="ai-response-panel">
+        <div class="ai-response-title">模型响应</div>
+        <pre class="ai-response-content">{{ aiResponsePreview }}</pre>
+      </div>
     </el-card>
 
     <!-- 浮动隐私盾组件（全局） -->
@@ -270,6 +292,7 @@ import * as echarts from 'echarts';
 import gsap from 'gsap';
 import { ElMessage } from 'element-plus';
 import { dashboardApi } from '../api/dashboard';
+import request from '../api/request';
 import GovernanceInsightPanel from '../components/GovernanceInsightPanel.vue';
 import StatCard from '../components/StatCard.vue';
 import AIPrivacyShield from '../components/AIPrivacyShield.vue';
@@ -319,6 +342,12 @@ const privacyShieldRef = ref(null);
 const aiDraftMessage = ref('');
 const privacyBlockReason = ref('');
 const privacyShieldActive = ref(false);
+const aiModelOptions = ref([]);
+const selectedAiModelCode = ref('');
+const aiAccessReason = ref('工作台交互请求');
+const aiResponsePreview = ref('');
+const aiSending = ref(false);
+const forecastRefreshing = ref(false);
 
 let privacyCheckDebounceTimer = null;
 function onAiDraftInput() {
@@ -336,14 +365,87 @@ function onAiDraftInput() {
   }, 300);
 }
 
-function sendAiDraft() {
+function selectedModel() {
+  return aiModelOptions.value.find(item => item.modelCode === selectedAiModelCode.value) || null;
+}
+
+function normalizeAiReply(data) {
+  if (!data) return '';
+  if (typeof data.reply === 'string' && data.reply.trim()) return data.reply;
+  if (typeof data.raw === 'string' && data.raw.trim()) return data.raw;
+  return JSON.stringify(data, null, 2);
+}
+
+async function sendAiDraft() {
   if (privacyBlockReason.value) {
     ElMessage.error(privacyBlockReason.value);
     return;
   }
-  ElMessage.success('消息已通过隐私检测，正在发送…（实际发送已对接 /api/ai/chat）');
-  aiDraftMessage.value = '';
-  privacyShieldActive.value = false;
+  if (!aiDraftMessage.value.trim()) {
+    ElMessage.warning('请输入要发送给 AI 的内容');
+    return;
+  }
+  const model = selectedModel();
+  if (!model) {
+    ElMessage.warning('请先选择一个可用模型');
+    return;
+  }
+  aiSending.value = true;
+  try {
+    const res = await request.post('/ai/chat', {
+      provider: model.provider || 'qwen',
+      model: model.modelCode,
+      accessReason: aiAccessReason.value,
+      messages: [{ role: 'user', content: aiDraftMessage.value.trim() }],
+    });
+    aiResponsePreview.value = normalizeAiReply(res);
+    ElMessage.success('消息已发送，已收到网关响应');
+    aiDraftMessage.value = '';
+    privacyShieldActive.value = false;
+  } catch (error) {
+    ElMessage.error(error?.message || 'AI 请求失败');
+  } finally {
+    aiSending.value = false;
+  }
+}
+
+async function fetchAiModels() {
+  try {
+    const list = await request.get('/ai-model/list');
+    aiModelOptions.value = (Array.isArray(list) ? list : [])
+      .filter(item => String(item.status || '').toLowerCase() === 'enabled');
+    if (!selectedAiModelCode.value && aiModelOptions.value.length > 0) {
+      selectedAiModelCode.value = aiModelOptions.value[0].modelCode;
+    }
+  } catch (error) {
+    aiModelOptions.value = [];
+    selectedAiModelCode.value = '';
+    ElMessage.warning(error?.message || '模型列表加载失败，请前往 AI 模型管理检查状态');
+  }
+}
+
+async function refreshForecastNow() {
+  forecastRefreshing.value = true;
+  try {
+    const forecastData = await request.post('/risk/forecast/refresh');
+    if (forecastData?.forecast?.length) {
+      const series = forecastData.forecast.map(v => Math.round(v * 10) / 10);
+      overview.value = {
+        ...overview.value,
+        trend: {
+          ...overview.value.trend,
+          forecastSeries: series,
+          forecastNextDay: Math.round(series[0] ?? overview.value.trend.forecastNextDay),
+        }
+      };
+      forecastDataSource.value = forecastData._dataSource || 'real_db';
+      ElMessage.success('预测已刷新');
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '预测刷新失败');
+  } finally {
+    forecastRefreshing.value = false;
+  }
 }
 
 let trendChart;
@@ -618,6 +720,7 @@ watch(() => overview.value.trend, async () => {
 
 onMounted(() => {
   fetchData();
+  fetchAiModels();
   resizeHandler = () => {
     trendChart?.resize();
     riskChart?.resize();
@@ -1134,6 +1237,27 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mini-refresh-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 188, 255, 0.32);
+  background: rgba(82, 157, 255, 0.12);
+  color: #d6e8ff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mini-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .chart-canvas {
   width: 100%;
 }
@@ -1371,6 +1495,33 @@ onBeforeUnmount(() => {
   margin-top: 14px;
 }
 
+.ai-config-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.15fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ai-model-select,
+.ai-reason-input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #e2e8f0;
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+.ai-model-select:focus,
+.ai-reason-input:focus {
+  outline: none;
+  border-color: rgba(99, 179, 237, 0.5);
+}
+
+.ai-model-select option {
+  color: #111827;
+}
+
 .ai-draft-input {
   flex: 1;
   background: rgba(255, 255, 255, 0.06);
@@ -1420,5 +1571,29 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #34d399;
   font-weight: 600;
+}
+
+.ai-response-panel {
+  margin-top: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(10, 20, 38, 0.65);
+  padding: 12px;
+}
+
+.ai-response-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #bfd7ff;
+  margin-bottom: 8px;
+}
+
+.ai-response-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #d9e8ff;
+  font-size: 12px;
+  line-height: 1.55;
 }
 </style>

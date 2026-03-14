@@ -745,7 +745,8 @@ function submitRisk() {
 
 function approveRequest(id, status) {
   return withAction(`approval-${id}-${status}`, async () => {
-    await request.post('/approval/approve', { requestId: id, status });
+    const endpoint = status === '拒绝' ? '/approval/reject' : '/approval/approve';
+    await request.post(endpoint, { requestId: id, status });
     ElMessage.success('审批流已更新');
   });
 }

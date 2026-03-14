@@ -71,6 +71,7 @@ public class ApprovalController {
         return R.ok(detail);
     }
 
+    @PostMapping("/approve")
     public R<?> approve(@RequestBody ApproveReq req) {
         if (!APPROVE_STATUS.contains(req.getStatus())) return R.error(40000, "不支持的状态");
         currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN");

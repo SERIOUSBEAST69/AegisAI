@@ -13,6 +13,13 @@
         <div class="metric">今日调用：{{ item.total }}</div>
         <div class="metric">成功率：{{ successRate(item) }}%</div>
         <div class="metric">平均耗时：{{ item.avgDuration }} ms</div>
+        <el-button
+          size="small"
+          type="warning"
+          style="margin-top: 10px"
+          :loading="resettingModelCode === item.modelCode"
+          @click="resetQuota(item.modelCode)"
+        >重置今日配额</el-button>
       </el-card>
     </div>
     <div ref="chartRef" class="chart"></div>
@@ -22,11 +29,13 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue';
 import * as echarts from 'echarts';
+import { ElMessage } from 'element-plus';
 import request from '../../api/request';
 
 const summary = ref([]);
 const trend = ref([]);
 const chartRef = ref();
+const resettingModelCode = ref('');
 let chart;
 
 function successRate(item) {
@@ -37,6 +46,19 @@ function successRate(item) {
 async function fetchData() {
   summary.value = await request.get('/ai/monitor/summary');
   trend.value = await request.get('/ai/monitor/trend');
+}
+
+async function resetQuota(modelCode) {
+  if (!modelCode) return;
+  resettingModelCode.value = modelCode;
+  try {
+    await request.post(`/ai/quota/reset/${encodeURIComponent(modelCode)}`);
+    ElMessage.success(`模型 ${modelCode} 今日配额已重置`);
+  } catch (error) {
+    ElMessage.error(error?.message || '配额重置失败');
+  } finally {
+    resettingModelCode.value = '';
+  }
 }
 
 function renderChart() {

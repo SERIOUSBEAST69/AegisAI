@@ -9,6 +9,14 @@
         <el-button type="primary" @click="preview">预览</el-button>
         <el-button @click="loadRules">加载规则</el-button>
       </el-form>
+      <el-divider />
+      <el-form :inline="true" @submit.prevent>
+        <el-form-item label="规则名"><el-input v-model="newRule.name" style="width:140px" /></el-form-item>
+        <el-form-item label="匹配表达式"><el-input v-model="newRule.pattern" style="width:220px" /></el-form-item>
+        <el-form-item label="掩码"><el-input v-model="newRule.mask" style="width:90px" /></el-form-item>
+        <el-form-item label="示例"><el-input v-model="newRule.example" style="width:180px" /></el-form-item>
+        <el-button type="primary" :loading="savingRule" @click="saveRule">保存规则</el-button>
+      </el-form>
       <el-alert v-if="result" type="success" show-icon :closable="false" style="margin-top:10px;">
         <template #title>脱敏结果</template>
         <div>原文：{{ result.raw }}</div>
@@ -19,6 +27,11 @@
         <el-table-column prop="pattern" label="匹配" />
         <el-table-column prop="mask" label="掩码" />
         <el-table-column prop="example" label="示例" />
+        <el-table-column label="操作" width="100">
+          <template #default="scope">
+            <el-button size="small" type="danger" @click="removeRule(scope.row)">删除</el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </el-card>
 
@@ -72,7 +85,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { desenseApi } from '../api/desense';
 
 const CATEGORIES = [
@@ -105,6 +118,8 @@ const mask = ref('*');
 const result = ref(null);
 const rules = ref([]);
 const loading = ref(false);
+const savingRule = ref(false);
+const newRule = ref({ name: '', pattern: '', mask: '***', example: '' });
 
 // 推荐相关状态
 const recCategory = ref('phone');
@@ -130,6 +145,41 @@ async function loadRules() {
     ElMessage.error(err?.message || '加载规则失败');
   } finally {
     loading.value = false;
+  }
+}
+
+async function saveRule() {
+  if (!newRule.value.name || !newRule.value.pattern) {
+    ElMessage.warning('规则名和匹配表达式不能为空');
+    return;
+  }
+  savingRule.value = true;
+  try {
+    await desenseApi.saveRule({ ...newRule.value });
+    ElMessage.success('规则已保存');
+    newRule.value = { name: '', pattern: '', mask: '***', example: '' };
+    await loadRules();
+  } catch (err) {
+    ElMessage.error(err?.message || '规则保存失败');
+  } finally {
+    savingRule.value = false;
+  }
+}
+
+async function removeRule(row) {
+  if (!row?.id) {
+    ElMessage.warning('该规则缺少 ID，无法删除');
+    return;
+  }
+  try {
+    await ElMessageBox.confirm('确认删除该脱敏规则吗？', '提示', { type: 'warning' });
+    await desenseApi.deleteRule(row.id);
+    ElMessage.success('规则已删除');
+    await loadRules();
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error(err?.message || '规则删除失败');
+    }
   }
 }
 

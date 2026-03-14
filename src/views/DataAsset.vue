@@ -85,8 +85,9 @@
           <el-table-column prop="description" label="治理摘要" min-width="260" show-overflow-tooltip />
           <el-table-column prop="location" label="位置 / 来源" min-width="220" show-overflow-tooltip />
           <el-table-column prop="createTime" label="创建时间" min-width="170" />
-          <el-table-column label="操作" width="180" fixed="right">
+          <el-table-column label="操作" width="240" fixed="right">
             <template #default="scope">
+              <el-button size="small" type="primary" plain @click="viewAssetDetail(scope.row.id)">详情</el-button>
               <el-button size="small" @click="editAsset(scope.row)">编辑</el-button>
               <el-button size="small" type="danger" @click="deleteAsset(scope.row.id)">删除</el-button>
             </template>
@@ -122,6 +123,26 @@
         <el-button type="primary" :loading="saving" @click="updateAsset">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showDetail" title="资产详情" width="680px">
+      <el-skeleton :loading="detailLoading" :rows="6" animated>
+        <div v-if="detailData" class="detail-grid">
+          <div><strong>ID：</strong>{{ detailData.id }}</div>
+          <div><strong>名称：</strong>{{ detailData.name }}</div>
+          <div><strong>类型：</strong>{{ detailData.type }}</div>
+          <div><strong>敏感等级：</strong>{{ detailData.sensitivityLevel }}</div>
+          <div><strong>位置：</strong>{{ detailData.location }}</div>
+          <div><strong>负责人：</strong>{{ detailData.ownerId }}</div>
+          <div><strong>创建时间：</strong>{{ detailData.createTime }}</div>
+          <div><strong>更新时间：</strong>{{ detailData.updateTime }}</div>
+          <div class="detail-span"><strong>治理摘要：</strong>{{ detailData.description || '—' }}</div>
+          <div class="detail-span"><strong>调用次数：</strong>{{ detailData.callCount ?? 0 }}</div>
+        </div>
+      </el-skeleton>
+      <template #footer>
+        <el-button @click="showDetail = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -137,8 +158,11 @@ const loading = ref(false);
 const uploading = ref(false);
 const showAdd = ref(false);
 const showEdit = ref(false);
+const showDetail = ref(false);
 const saving = ref(false);
 const selectedFile = ref(null);
+const detailData = ref(null);
+const detailLoading = ref(false);
 
 const query = ref({ name: '' });
 const addForm = ref({ name: '', type: '', sensitivityLevel: 'medium', location: '', description: '' });
@@ -261,6 +285,20 @@ async function deleteAsset(id) {
   }
 }
 
+async function viewAssetDetail(id) {
+  detailLoading.value = true;
+  detailData.value = null;
+  showDetail.value = true;
+  try {
+    detailData.value = await request.get(`/data-asset/${id}`);
+  } catch (err) {
+    ElMessage.error(err?.message || '加载资产详情失败');
+    showDetail.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
 fetchAssets();
 </script>
 
@@ -378,6 +416,19 @@ fetchAssets();
   margin-top: 8px;
   color: var(--color-text-muted);
   font-size: 13px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.detail-span {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 1100px) {

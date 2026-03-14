@@ -47,6 +47,28 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <el-divider />
+
+      <div class="access-panel">
+        <div class="access-title">共享令牌访问验证</div>
+        <p class="access-subtitle">输入已签发的共享令牌，验证后端 data-share access 能力是否可用。</p>
+        <div class="access-row">
+          <el-input v-model="accessToken" placeholder="粘贴 shareToken" clearable />
+          <el-button type="primary" :loading="accessLoading" @click="accessByToken">验证访问</el-button>
+        </div>
+        <el-alert
+          v-if="accessResult"
+          type="success"
+          :closable="false"
+          show-icon
+          style="margin-top: 10px"
+        >
+          <template #title>资产 {{ accessResult.assetId }} · {{ accessResult.name }}</template>
+          <div>类型：{{ accessResult.type }} | 敏感等级：{{ accessResult.sensitivityLevel }}</div>
+          <div>脱敏位置：{{ accessResult.location }}</div>
+        </el-alert>
+      </div>
     </el-card>
   </div>
 </template>
@@ -62,6 +84,9 @@ const loading = ref(false);
 const saving = ref(false);
 const actionId = ref(null);
 const actionType = ref('');
+const accessToken = ref('');
+const accessLoading = ref(false);
+const accessResult = ref(null);
 const applyFormRef = ref();
 const rules = {
   assetId: [{ required: true, message: '资产ID不能为空', trigger: 'blur' }],
@@ -144,6 +169,25 @@ async function copyToken(token) {
   }
 }
 
+async function accessByToken() {
+  if (!accessToken.value.trim()) {
+    ElMessage.warning('请输入共享令牌');
+    return;
+  }
+  accessLoading.value = true;
+  accessResult.value = null;
+  try {
+    accessResult.value = await request.get('/data-share/access', {
+      params: { token: accessToken.value.trim() }
+    });
+    ElMessage.success('访问验证成功');
+  } catch (err) {
+    ElMessage.error(err?.message || '访问验证失败');
+  } finally {
+    accessLoading.value = false;
+  }
+}
+
 load();
 </script>
 
@@ -180,6 +224,27 @@ load();
 .token-none {
   color: var(--color-text-muted);
   font-size: 13px;
+}
+
+.access-panel {
+  margin-top: 8px;
+}
+
+.access-title {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.access-subtitle {
+  margin: 6px 0 10px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.access-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
 }
 </style>
 

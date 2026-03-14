@@ -256,9 +256,15 @@ async function remove(id) {
   }
 }
 
-function viewReport(row) {
+async function viewReport(row) {
   try {
-    const data = row.reportData ? JSON.parse(row.reportData) : null;
+    let reportRaw = row.reportData || null;
+    if (!reportRaw && row.id && !usingDemoData.value) {
+      reportRaw = await request.get(`/sensitive-scan/${row.id}/report`);
+    }
+    const data = typeof reportRaw === 'string'
+      ? JSON.parse(reportRaw)
+      : reportRaw;
     if (!data) {
       ElMessage.info('暂无报告数据，请先执行扫描任务');
       return;

@@ -69,16 +69,29 @@ export const desenseApi = {
 
   /** 预览脱敏效果 */
   async preview(payload) {
+    const raw = payload?.text || '';
+    const maskChar = (payload?.mask || '*').charAt(0) || '*';
+    const masked = raw.replace(/./g, maskChar);
     if (isMockSession()) {
-      return { result: payload?.text?.replace(/./g, '*') || '' };
+      return { raw, masked };
     }
     try {
       return await request.post('/desense/preview', payload);
     } catch (error) {
       if (shouldUseApiFallback(error)) {
-        return { result: payload?.text?.replace(/./g, '*') || '' };
+        return { raw, masked };
       }
       throw error;
     }
+  },
+
+  /** 保存或更新脱敏规则 */
+  async saveRule(rule) {
+    return request.post('/desense/save', rule);
+  },
+
+  /** 删除脱敏规则 */
+  async deleteRule(id) {
+    return request.post('/desense/delete', { id });
   }
 };
