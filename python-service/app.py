@@ -845,7 +845,85 @@ def risk_list():
         })
     # 按风险分数从高到低排序
     summaries.sort(key=lambda x: x["total_risk_score"], reverse=True)
-    return jsonify({"services": summaries, "total": len(summaries)})
+    # 附加最后更新时间（从 JSON 文件元信息读取）
+    updated_at = None
+    if _RISK_DATA_FILE.exists():
+        try:
+            with open(_RISK_DATA_FILE, encoding="utf-8") as f:
+                meta = json.load(f)
+            updated_at = meta.get("updated")
+        except Exception:
+            pass
+    return jsonify({"services": summaries, "total": len(summaries), "updated_at": updated_at})
+
+
+@app.route("/api/risk/refresh", methods=["POST"])
+def risk_refresh():
+    """
+    动态刷新 AI 风险评级数据库。
+
+    支持两种模式：
+      1. 空请求体 / { "reload_file": true } ：重新从 ai_risk_data.json 加载。
+      2. 请求体带 "services" 数组：将新数据合并/更新到内存缓存，
+         同时持久化到 ai_risk_data.json，实现动态维护。
+
+    示例（更新单个服务分数）：
+    POST /api/risk/refresh
+    {
+      "services": [{
+        "id": "chatgpt",
+        "total_risk_score": 58,
+        "risk_level": "medium",
+        "tags": ["境外存储", "默认训练", "SOC2认证", "2024新规"]
+      }]
+    }
+    """
+    global _risk_db
+    payload = request.get_json(force=True) or {}
+
+    new_services: list = payload.get("services", [])
+    if new_services:
+        # 合并更新模式：只更新请求中指定的字段，保留其余字段不变
+        updated_ids = []
+        for svc_patch in new_services:
+            svc_id = svc_patch.get("id", "").lower().strip()
+            if not svc_id:
+                continue
+            if svc_id in _risk_db:
+                _risk_db[svc_id].update(svc_patch)
+            else:
+                _risk_db[svc_id] = svc_patch
+            updated_ids.append(svc_id)
+
+        # 持久化到 JSON 文件
+        import datetime as _dt
+        try:
+            existing_meta: dict = {}
+            if _RISK_DATA_FILE.exists():
+                with open(_RISK_DATA_FILE, encoding="utf-8") as f:
+                    existing_meta = json.load(f)
+            existing_meta["services"] = list(_risk_db.values())
+            existing_meta["updated"] = _dt.date.today().isoformat()
+            with open(_RISK_DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(existing_meta, f, ensure_ascii=False, indent=2)
+            logger.info("[RiskRating] 数据已更新并持久化，影响服务: %s", updated_ids)
+        except Exception as e:
+            logger.error("[RiskRating] 持久化失败: %s", e)
+            return jsonify({"error": f"内存已更新但持久化失败: {e}"}), 500
+
+        return jsonify({
+            "status": "ok",
+            "updated": updated_ids,
+            "total": len(_risk_db),
+        })
+
+    # 默认：从文件重新加载
+    _load_risk_db()
+    return jsonify({
+        "status": "ok",
+        "message": "已从 ai_risk_data.json 重新加载",
+        "total": len(_risk_db),
+    })
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

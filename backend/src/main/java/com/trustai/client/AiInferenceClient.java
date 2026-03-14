@@ -38,6 +38,10 @@ public interface AiInferenceClient {
     @GetMapping("/api/risk/score")
     Map<String, Object> riskScore(@RequestParam("service") String serviceId);
 
+    /** 动态刷新 AI 风险评级数据（从文件重载或接受新数据）。 */
+    @PostMapping("/api/risk/refresh")
+    Map<String, Object> riskRefresh(@RequestBody Map<String, Object> payload);
+
     // ── 员工行为异常检测 API ──────────────────────────────────────────────────
 
     /** 检测单条行为记录是否异常。 */
