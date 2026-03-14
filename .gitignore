@@ -3,3 +3,7 @@ python-service/__pycache__
 python-service/models/
 *.pyc
 *.pyo
+dist/
+backend/target/
+*.class
+yarn.lock

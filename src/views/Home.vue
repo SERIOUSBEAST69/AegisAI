@@ -24,7 +24,10 @@
           <strong>{{ overview.trend.forecastNextDay }}</strong>
           <span class="tower-unit">起重点事件</span>
           <div class="tower-divider"></div>
-          <div class="tower-footnote">来自近 7 日风险事件数据库聚合预测</div>
+          <div class="tower-footnote">
+            {{ forecastDataSource === 'real_db' ? '🟢 真实历史 DB · LSTM 预测' : '⚪ 演示数据' }}
+            · 来自近 7 日风险事件数据库聚合
+          </div>
         </div>
 
         <div class="tower-grid">
@@ -228,6 +231,36 @@
         </article>
       </div>
     </el-card>
+
+    <!-- ── AI 工作台开放面板 ──────────────────────────────────────────── -->
+    <el-card class="ai-workbench-card card-glass scene-block" style="grid-column: 1 / -1">
+      <div class="panel-head">
+        <div>
+          <div class="card-header">AI 工作台 · 隐私盾守护</div>
+          <p class="panel-subtitle">在此处向 AI 发送消息前，AegisAI 将实时扫描您的输入，阻断含个人隐私信息的请求并检测 AI 响应中的数据外泄风险。</p>
+        </div>
+        <div class="ps-status-badge" :class="privacyShieldActive ? 'badge-on' : 'badge-off'">
+          {{ privacyShieldActive ? '🛡️ 隐私盾已激活' : '⚪ 隐私盾待机' }}
+        </div>
+      </div>
+      <div class="ai-input-row">
+        <textarea
+          v-model="aiDraftMessage"
+          class="ai-draft-input"
+          rows="3"
+          placeholder="在此输入您想发给 AI 的消息…（自动检测个人隐私信息）"
+          @input="onAiDraftInput"
+        ></textarea>
+        <button class="ai-send-btn" :disabled="!!privacyBlockReason" @click="sendAiDraft">
+          {{ privacyBlockReason ? '⛔ 已拦截' : '发送' }}
+        </button>
+      </div>
+      <p v-if="privacyBlockReason" class="ai-block-notice">{{ privacyBlockReason }}</p>
+      <p v-else-if="aiDraftMessage.length > 3" class="ai-safe-notice">✅ 未检测到隐私信息，可安全发送。</p>
+    </el-card>
+
+    <!-- 浮动隐私盾组件（全局） -->
+    <AIPrivacyShield ref="privacyShieldRef" />
   </div>
 </template>
 
@@ -239,8 +272,10 @@ import { ElMessage } from 'element-plus';
 import { dashboardApi } from '../api/dashboard';
 import GovernanceInsightPanel from '../components/GovernanceInsightPanel.vue';
 import StatCard from '../components/StatCard.vue';
+import AIPrivacyShield from '../components/AIPrivacyShield.vue';
 import { useUserStore } from '../store/user';
 import { getPersonaExperience, personalizeWorkbench } from '../utils/persona';
+import { quickPrivacyCheck } from '../utils/privacyPatterns';
 
 function createEmptyOverview() {
   return {
@@ -277,6 +312,39 @@ const overview = ref(createEmptyOverview());
 const insights = ref({ postureScore: 0, summary: {}, highlights: [], recommendations: [] });
 const trustPulse = ref({ score: 0, pulseLevel: '', mission: '', innovationLabel: '', dimensions: [], signals: [] });
 const loading = ref(true);
+const forecastDataSource = ref('real_db');
+
+// ── AI Privacy Shield ────────────────────────────────────────────────────────
+const privacyShieldRef = ref(null);
+const aiDraftMessage = ref('');
+const privacyBlockReason = ref('');
+const privacyShieldActive = ref(false);
+
+let privacyCheckDebounceTimer = null;
+function onAiDraftInput() {
+  if (privacyCheckDebounceTimer) clearTimeout(privacyCheckDebounceTimer);
+  privacyBlockReason.value = '';
+  privacyShieldActive.value = true;
+  privacyShieldRef.value?.check(aiDraftMessage.value);
+  privacyCheckDebounceTimer = setTimeout(async () => {
+    const detected = quickPrivacyCheck(aiDraftMessage.value);
+    if (detected.length > 0) {
+      privacyBlockReason.value = '⚠️ 检测到隐私信息（' + detected.join('、') + '），禁止发送给 AI。';
+    } else {
+      privacyBlockReason.value = '';
+    }
+  }, 300);
+}
+
+function sendAiDraft() {
+  if (privacyBlockReason.value) {
+    ElMessage.error(privacyBlockReason.value);
+    return;
+  }
+  ElMessage.success('消息已通过隐私检测，正在发送…（实际发送已对接 /api/ai/chat）');
+  aiDraftMessage.value = '';
+  privacyShieldActive.value = false;
+}
 
 let trendChart;
 let riskChart;
@@ -524,6 +592,8 @@ async function fetchData() {
         forecastSeries: series,
         forecastNextDay: Math.round(series[0] ?? personalized.trend.forecastNextDay),
       };
+      // 标记数据来源（real_db = 实际 LSTM 输出；mock = 降级均值）
+      forecastDataSource.value = forecastData._dataSource || (forecastData.method === 'lstm' ? 'real_db' : 'mock');
     }
 
     overview.value = personalized;
@@ -1267,5 +1337,88 @@ onBeforeUnmount(() => {
   .todo-metric {
     text-align: left;
   }
+}
+
+/* ── AI 工作台隐私盾面板 ─────────────────────────────────────────────────── */
+.ai-workbench-card {
+  grid-column: 1 / -1;
+}
+
+.ps-status-badge {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ps-status-badge.badge-on {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+.ps-status-badge.badge-off {
+  background: rgba(100, 116, 139, 0.14);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.ai-input-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 14px;
+}
+
+.ai-draft-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #e2e8f0;
+  font-size: 13px;
+  padding: 10px 14px;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.55;
+  transition: border-color 0.2s;
+}
+.ai-draft-input:focus {
+  outline: none;
+  border-color: rgba(99, 179, 237, 0.5);
+}
+.ai-draft-input::placeholder { color: rgba(255,255,255,0.28); }
+
+.ai-send-btn {
+  padding: 10px 22px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.2s;
+  white-space: nowrap;
+}
+.ai-send-btn:hover:not(:disabled) { opacity: 0.88; }
+.ai-send-btn:disabled {
+  background: linear-gradient(135deg, #7f1d1d, #991b1b);
+  cursor: not-allowed;
+}
+
+.ai-block-notice {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #f87171;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.ai-safe-notice {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #34d399;
+  font-weight: 600;
 }
 </style>
