@@ -23,6 +23,7 @@ import Settings from '../views/Settings.vue';
 import ModelList from '../views/ai/ModelList.vue';
 import ModelMonitor from '../views/ai/ModelMonitor.vue';
 import ShadowAiDiscovery from '../views/ShadowAiDiscovery.vue';
+import AiRiskRating from '../views/AiRiskRating.vue';
 import { getSession, hasActiveSession } from '../utils/auth';
 import { canAccessPath } from '../utils/persona';
 
@@ -49,6 +50,7 @@ const routes = [
   { path: '/global-search', name: 'GlobalSearch', component: GlobalSearch, meta: { depth: 2 } },
   { path: '/ai/models', name: 'ModelList', component: ModelList, meta: { depth: 3 } },
   { path: '/ai/monitor', name: 'ModelMonitor', component: ModelMonitor, meta: { depth: 3 } },
+  { path: '/ai/risk-rating', name: 'AiRiskRating', component: AiRiskRating, meta: { depth: 3 } },
   { path: '/shadow-ai', name: 'ShadowAiDiscovery', component: ShadowAiDiscovery, meta: { depth: 2 } },
   { path: '/profile', name: 'Profile', component: Profile, meta: { depth: 2 } },
   { path: '/settings', name: 'Settings', component: Settings, meta: { depth: 2 } }
