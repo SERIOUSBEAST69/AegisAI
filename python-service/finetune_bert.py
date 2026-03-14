@@ -64,10 +64,14 @@ LEARNING_RATE = 2e-5
 WARMUP_RATIO = 0.1
 WEIGHT_DECAY = 0.01
 
-# ── Synthetic seed data (≥ 200 samples/class for production training) ──────────
+# ── Synthetic seed data ──────────────────────────────────────────────────────
+# These are seed samples for bootstrapping/testing the fine-tuning pipeline.
+# Production training requires ≥ 200 samples/class. To expand:
+#   1. Add real annotated data to each _*_samples list below, OR
+#   2. Pass a CSV/JSONL file via --data_path argument to this script.
 _SEED_SAMPLES: List[Tuple[str, str]] = []
 
-# id_card: 30 synthetic samples
+# id_card: 30 seed samples (expand to ≥ 200 for production)
 _id_card_samples = [
     "身份证号：410101199001011234",
     "证件号码 350203198807160079",
@@ -103,7 +107,7 @@ _id_card_samples = [
 for s in _id_card_samples:
     _SEED_SAMPLES.append((s, "id_card"))
 
-# bank_card: 30 samples
+# bank_card: 30 seed samples (expand to ≥ 200 for production)
 _bank_card_samples = [
     "6222026200000832021",
     "银行卡号 6228480033800000000",
@@ -139,7 +143,7 @@ _bank_card_samples = [
 for s in _bank_card_samples:
     _SEED_SAMPLES.append((s, "bank_card"))
 
-# phone: 30 samples
+# phone: 30 seed samples (expand to ≥ 200 for production)
 _phone_samples = [
     "13800138000",
     "联系方式：15912345678",
@@ -175,7 +179,7 @@ _phone_samples = [
 for s in _phone_samples:
     _SEED_SAMPLES.append((s, "phone"))
 
-# email: 30 samples
+# email: 30 seed samples (expand to ≥ 200 for production)
 _email_samples = [
     "user@example.com",
     "邮箱：zhangsan@company.org",
@@ -211,7 +215,7 @@ _email_samples = [
 for s in _email_samples:
     _SEED_SAMPLES.append((s, "email"))
 
-# address: 30 samples
+# address: 30 seed samples (expand to ≥ 200 for production)
 _address_samples = [
     "北京市朝阳区建国路88号",
     "上海市浦东新区陆家嘴金融贸易区1号",

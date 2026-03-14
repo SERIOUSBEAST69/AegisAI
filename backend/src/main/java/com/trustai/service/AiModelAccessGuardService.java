@@ -81,15 +81,13 @@ public class AiModelAccessGuardService {
         boolean mediumOrHighRisk = highRiskModel || isMediumRisk(model.getRiskLevel());
 
         // ── 隐私盾：扫描用户输入文本，阻断含个人隐私的请求 ──────────────────
-        if (inputText != null && !inputText.isEmpty()) {
-            List<String> detected = detectPrivacyFields(inputText);
-            if (!detected.isEmpty()) {
-                String detail = "检测到用户输入含个人隐私字段：" + String.join("、", detected);
-                block("PRIVACY_INPUT_BLOCKED", "HIGH", model.getModelCode(), assetId, detail);
-                throw new IllegalStateException(
-                        "【隐私盾拦截】" + detail + "。请在输入信息脱敏后再发送给 AI 模型。"
-                );
-            }
+        List<String> inputDetected = detectPrivacyFields(inputText);
+        if (!inputDetected.isEmpty()) {
+            String detail = "检测到用户输入含个人隐私字段：" + String.join("、", inputDetected);
+            block("PRIVACY_INPUT_BLOCKED", "HIGH", model.getModelCode(), assetId, detail);
+            throw new IllegalStateException(
+                    "【隐私盾拦截】" + detail + "。请在输入信息脱敏后再发送给 AI 模型。"
+            );
         }
 
         if (highRiskModel && assetId == null) {
@@ -102,7 +100,7 @@ public class AiModelAccessGuardService {
             throw new IllegalStateException("高风险模型调用必须填写不少于 6 个字的访问目的");
         }
 
-        if (mediumOrHighRisk && !detected(inputText).isEmpty() && assetId == null) {
+        if (mediumOrHighRisk && !inputDetected.isEmpty() && assetId == null) {
             block("SENSITIVE_PROMPT_WITHOUT_ASSET", "HIGH", model.getModelCode(), null, "检测到疑似敏感内容，调用中高风险模型时必须绑定数据资产");
             throw new IllegalStateException("检测到疑似敏感内容，调用中高风险模型时必须绑定数据资产");
         }
@@ -153,10 +151,6 @@ public class AiModelAccessGuardService {
     }
 
     // ── 内部工具 ───────────────────────────────────────────────────────────────
-
-    private List<String> detected(String inputText) {
-        return detectPrivacyFields(inputText);
-    }
 
     private void block(String type, String level, String modelCode, Long assetId, String reason) {
         RiskEvent event = new RiskEvent();

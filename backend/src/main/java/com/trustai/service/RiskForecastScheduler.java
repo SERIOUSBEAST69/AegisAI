@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class RiskForecastScheduler {
 
-    /** 最近 N 天的历史数据窗口（建议 ≥ 15 天获得有效 LSTM 验证集） */
+    /** 最近 N 天的历史数据窗口（90 天可提供足够的季节性样本，LSTM 最低要求约 15 天） */
     private static final int HISTORY_DAYS = 90;
 
     /** 预测未来天数 */

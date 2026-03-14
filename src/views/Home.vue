@@ -275,6 +275,7 @@ import StatCard from '../components/StatCard.vue';
 import AIPrivacyShield from '../components/AIPrivacyShield.vue';
 import { useUserStore } from '../store/user';
 import { getPersonaExperience, personalizeWorkbench } from '../utils/persona';
+import { quickPrivacyCheck } from '../utils/privacyPatterns';
 
 function createEmptyOverview() {
   return {
@@ -319,14 +320,14 @@ const aiDraftMessage = ref('');
 const privacyBlockReason = ref('');
 const privacyShieldActive = ref(false);
 
-let _privacyDebounce = null;
+let privacyCheckDebounceTimer = null;
 function onAiDraftInput() {
-  if (_privacyDebounce) clearTimeout(_privacyDebounce);
+  if (privacyCheckDebounceTimer) clearTimeout(privacyCheckDebounceTimer);
   privacyBlockReason.value = '';
   privacyShieldActive.value = true;
   privacyShieldRef.value?.check(aiDraftMessage.value);
-  _privacyDebounce = setTimeout(async () => {
-    const detected = _quickPrivacyCheck(aiDraftMessage.value);
+  privacyCheckDebounceTimer = setTimeout(async () => {
+    const detected = quickPrivacyCheck(aiDraftMessage.value);
     if (detected.length > 0) {
       privacyBlockReason.value = '⚠️ 检测到隐私信息（' + detected.join('、') + '），禁止发送给 AI。';
     } else {
@@ -343,22 +344,6 @@ function sendAiDraft() {
   ElMessage.success('消息已通过隐私检测，正在发送…（实际发送已对接 /api/ai/chat）');
   aiDraftMessage.value = '';
   privacyShieldActive.value = false;
-}
-
-const _ID_CARD_RE = /[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[0-9Xx]/;
-const _PHONE_RE   = /(?<!\d)1[3-9]\d{9}(?!\d)/;
-const _EMAIL_RE   = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/;
-const _BANK_RE    = /(?<!\d)\d{12,19}(?!\d)/;
-const _KW_RE      = /(身份证|银行卡|信用卡|手机号|住址|真实姓名|密码|验证码)/;
-function _quickPrivacyCheck(text) {
-  if (!text) return [];
-  const found = [];
-  if (_ID_CARD_RE.test(text)) found.push('身份证号');
-  if (_PHONE_RE.test(text))   found.push('手机号');
-  if (_EMAIL_RE.test(text))   found.push('电子邮箱');
-  if (_BANK_RE.test(text))    found.push('银行卡号');
-  if (_KW_RE.test(text))      found.push('隐私关键词');
-  return found;
 }
 
 let trendChart;

@@ -46,6 +46,7 @@
  */
 import { ref, computed } from 'vue';
 import request from '../api/request';
+import { quickPrivacyCheck, PRIVACY_CHECK_DEBOUNCE_MS } from '../utils/privacyPatterns';
 
 // ── State ───────────────────────────────────────────────────────────────────
 const visible  = ref(false);
@@ -75,7 +76,7 @@ function check(text) {
     hide();
     return;
   }
-  _debounceTimer = setTimeout(() => _doCheck(text), 500);
+  _debounceTimer = setTimeout(() => _doCheck(text), PRIVACY_CHECK_DEBOUNCE_MS);
 }
 
 function dismiss() {
@@ -91,7 +92,7 @@ function hide() {
 async function _doCheck(text) {
   try {
     // 客户端快速正则预检（减少不必要的网络请求）
-    const localDetected = _localQuickCheck(text);
+    const localDetected = quickPrivacyCheck(text);
     if (localDetected.length > 0) {
       _showBlocked(localDetected, '检测到输入中含个人隐私信息：' + localDetected.join('、'));
       emit('block');
@@ -109,7 +110,7 @@ async function _doCheck(text) {
     }
   } catch {
     // 网络不可用时降级到本地检测
-    const localDetected = _localQuickCheck(text);
+    const localDetected = quickPrivacyCheck(text);
     if (localDetected.length > 0) {
       _showBlocked(localDetected, '（离线模式）检测到输入中含个人隐私信息：' + localDetected.join('、'));
       emit('block');
@@ -133,23 +134,6 @@ function _showSafe() {
   if (visible.value) {
     setTimeout(() => { visible.value = false; }, 2000);
   }
-}
-
-// ── Client-side quick check patterns ────────────────────────────────────────
-const _ID_CARD_RE = /[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[0-9Xx]/;
-const _PHONE_RE   = /(?<!\d)1[3-9]\d{9}(?!\d)/;
-const _EMAIL_RE   = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/;
-const _BANK_RE    = /(?<!\d)\d{12,19}(?!\d)/;
-const _KW_RE      = /(身份证|银行卡|信用卡|手机号|住址|真实姓名|密码|验证码)/;
-
-function _localQuickCheck(text) {
-  const found = [];
-  if (_ID_CARD_RE.test(text)) found.push('身份证号');
-  if (_PHONE_RE.test(text))   found.push('手机号');
-  if (_EMAIL_RE.test(text))   found.push('电子邮箱');
-  if (_BANK_RE.test(text))    found.push('银行卡号');
-  if (_KW_RE.test(text))      found.push('隐私关键词');
-  return found;
 }
 
 defineExpose({ check, dismiss, hide });
