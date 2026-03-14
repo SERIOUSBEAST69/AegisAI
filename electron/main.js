@@ -1,0 +1,363 @@
+/**
+ * Aegis 轻量级客户端 – 主进程
+ *
+ * 功能：
+ * 1. 以 Electron 框架加载 Aegis Workbench 前端（支持连接本地或远程服务端）
+ * 2. 托盘图标：常驻后台，一键唤起主窗口
+ * 3. 自动启动：写入系统开机自启
+ * 4. 后台扫描：每隔 N 分钟执行一次影子AI扫描，将结果上报给服务端
+ * 5. IPC 通道：渲染进程通过 preload.js 向主进程发指令（扫描、状态查询等）
+ */
+
+'use strict';
+
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, dialog, shell } = require('electron');
+const path = require('path');
+const fs   = require('fs');
+const cron = require('node-cron');
+const { v4: uuidv4 } = require('uuid');
+const scanner = require('./scanner/index');
+
+// ── 配置 ────────────────────────────────────────────────────────────────────
+
+/** 服务端地址，优先读取环境变量或本地配置文件 */
+const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
+
+function loadConfig() {
+  const defaults = {
+    serverUrl: 'http://localhost:8080',
+    scanIntervalMinutes: 30,
+    autoStart: true,
+    minimizeToTray: true,
+  };
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      return { ...defaults, ...JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) };
+    }
+  } catch { /* ignore */ }
+  return defaults;
+}
+
+function saveConfig(cfg) {
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2));
+  } catch { /* ignore */ }
+}
+
+/** 客户端唯一 ID，持久化在 userData 目录 */
+const CLIENT_ID_PATH = path.join(app.getPath('userData'), 'client-id.txt');
+
+function getOrCreateClientId() {
+  try {
+    if (fs.existsSync(CLIENT_ID_PATH)) {
+      return fs.readFileSync(CLIENT_ID_PATH, 'utf-8').trim();
+    }
+  } catch { /* ignore */ }
+  const id = uuidv4();
+  try { fs.writeFileSync(CLIENT_ID_PATH, id); } catch { /* ignore */ }
+  return id;
+}
+
+// ── 全局状态 ─────────────────────────────────────────────────────────────────
+
+let mainWindow   = null;
+let tray         = null;
+let config       = loadConfig();
+const CLIENT_ID  = getOrCreateClientId();
+let lastScanResult = null;
+let scanJob      = null;
+
+// ── 主窗口 ──────────────────────────────────────────────────────────────────
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width:  1280,
+    height: 800,
+    minWidth:  900,
+    minHeight: 600,
+    title: 'Aegis 守护客户端',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+    backgroundColor: '#050710',
+    show: false, // 先隐藏，等内容加载好再显示
+  });
+
+  // 加载工作台
+  const workbenchUrl = process.env.AEGIS_DEV_URL || config.serverUrl;
+  mainWindow.loadURL(workbenchUrl).catch(() => {
+    // 如果无法连接服务端，展示一个简单的离线提示页
+    mainWindow.loadURL(`data:text/html;charset=utf-8,
+      <html style="background:#050710;color:#8ab4d4;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center">
+          <h2 style="color:#64acff">Aegis 客户端</h2>
+          <p>无法连接到服务端：${workbenchUrl}</p>
+          <p style="font-size:12px;color:#555">请检查服务端是否运行，或在托盘菜单中修改服务器地址。</p>
+        </div>
+      </html>
+    `);
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
+
+  mainWindow.on('close', (event) => {
+    if (config.minimizeToTray) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+}
+
+// ── 托盘 ─────────────────────────────────────────────────────────────────────
+
+function createTray() {
+  const iconPath = path.join(__dirname, 'assets', 'tray.png');
+  // 如果没有图标文件则使用空图标
+  const icon = fs.existsSync(iconPath)
+    ? nativeImage.createFromPath(iconPath)
+    : nativeImage.createEmpty();
+
+  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  tray.setToolTip('Aegis 守护客户端 – 正在保护您的数据');
+  updateTrayMenu();
+
+  tray.on('double-click', showWindow);
+}
+
+function updateTrayMenu() {
+  const lastScan = lastScanResult
+    ? `上次扫描：${new Date(lastScanResult.time).toLocaleTimeString('zh-CN')}`
+    : '尚未扫描';
+
+  const shadowCount = lastScanResult
+    ? `发现影子AI：${lastScanResult.shadowAiCount} 个`
+    : '';
+
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Aegis 守护客户端', enabled: false },
+    { label: `客户端 ID：${CLIENT_ID.slice(0, 8)}…`, enabled: false },
+    { type: 'separator' },
+    { label: lastScan, enabled: false },
+    ...(shadowCount ? [{ label: shadowCount, enabled: false }] : []),
+    { type: 'separator' },
+    { label: '打开工作台', click: showWindow },
+    {
+      label: '立即扫描',
+      click: () => runScan().catch(console.error),
+    },
+    {
+      label: '开机自启',
+      type: 'checkbox',
+      checked: config.autoStart,
+      click: (menuItem) => toggleAutoStart(menuItem.checked),
+    },
+    { type: 'separator' },
+    {
+      label: '服务器设置',
+      click: () => showServerSettings(),
+    },
+    { type: 'separator' },
+    {
+      label: '退出',
+      click: () => {
+        app.isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+  tray.setContextMenu(contextMenu);
+}
+
+function showWindow() {
+  if (!mainWindow) createWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+// ── 开机自启 ─────────────────────────────────────────────────────────────────
+
+function toggleAutoStart(enable) {
+  config.autoStart = enable;
+  saveConfig(config);
+
+  app.setLoginItemSettings({
+    openAtLogin: enable,
+    name: 'Aegis 守护客户端',
+    args: ['--hidden'],
+  });
+}
+
+function applyAutoStart() {
+  if (config.autoStart) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      name: 'Aegis 守护客户端',
+      args: ['--hidden'],
+    });
+  }
+}
+
+// ── 服务器设置 ────────────────────────────────────────────────────────────────
+
+async function showServerSettings() {
+  const result = await dialog.showInputBox
+    ? dialog.showInputBox({ title: '服务器地址', defaultValue: config.serverUrl })
+    : null;
+
+  // Electron 没有 showInputBox，使用自定义窗口
+  const win = new BrowserWindow({
+    width: 480,
+    height: 280,
+    parent: mainWindow,
+    modal: true,
+    title: '服务器设置',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+    },
+    backgroundColor: '#050710',
+    resizable: false,
+  });
+
+  win.loadURL(`data:text/html;charset=utf-8,
+    <html style="background:#050710;color:#cdd9e5;font-family:sans-serif;padding:28px;box-sizing:border-box">
+      <h3 style="margin:0 0 16px;color:#64acff">服务器地址</h3>
+      <input id="url" value="${config.serverUrl}"
+        style="width:100%;padding:10px;background:#0a1628;border:1px solid #223355;border-radius:6px;color:#cdd9e5;font-size:14px;box-sizing:border-box"/>
+      <p style="font-size:12px;color:#556;margin:8px 0 20px">例如：http://192.168.1.100:8080</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="window.close()"
+          style="padding:8px 20px;background:transparent;border:1px solid #334;color:#8ab;border-radius:6px;cursor:pointer">取消</button>
+        <button onclick="save()"
+          style="padding:8px 20px;background:#1a3a7a;border:none;color:#cde;border-radius:6px;cursor:pointer">保存</button>
+      </div>
+      <script>
+        function save() {
+          const url = document.getElementById('url').value.trim();
+          if (url) { require('electron').ipcRenderer.send('save-server-url', url); }
+          window.close();
+        }
+      </script>
+    </html>
+  `);
+}
+
+// ── 后台扫描 ─────────────────────────────────────────────────────────────────
+
+async function runScan() {
+  console.log('[Aegis] 开始影子AI扫描…');
+  try {
+    const result = await scanner.scan({
+      clientId: CLIENT_ID,
+      serverUrl: config.serverUrl,
+    });
+    lastScanResult = result;
+    console.log(`[Aegis] 扫描完成，发现影子AI：${result.shadowAiCount} 个，风险等级：${result.riskLevel}`);
+
+    // 通知渲染进程刷新
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('scan-complete', result);
+    }
+
+    updateTrayMenu();
+
+    // 高风险时在托盘显示通知
+    if (result.riskLevel === 'high' && tray) {
+      const { Notification } = require('electron');
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Aegis 发现高风险影子AI',
+          body: `在本机发现 ${result.shadowAiCount} 个未授权AI服务，请及时处理。`,
+          icon: path.join(__dirname, 'assets', 'icon.png'),
+        }).show();
+      }
+    }
+  } catch (err) {
+    console.error('[Aegis] 扫描失败：', err.message);
+  }
+}
+
+function startScheduledScan() {
+  if (scanJob) {
+    scanJob.stop();
+    scanJob = null;
+  }
+  const interval = Math.max(1, config.scanIntervalMinutes);
+  // cron: 每 N 分钟执行一次
+  const cronExpr = `*/${interval} * * * *`;
+  scanJob = cron.schedule(cronExpr, () => runScan().catch(console.error));
+  console.log(`[Aegis] 定时扫描已启动，间隔：${interval} 分钟`);
+}
+
+// ── IPC 处理 ─────────────────────────────────────────────────────────────────
+
+ipcMain.handle('get-client-info', () => ({
+  clientId: CLIENT_ID,
+  serverUrl: config.serverUrl,
+  scanIntervalMinutes: config.scanIntervalMinutes,
+  autoStart: config.autoStart,
+  lastScanResult,
+}));
+
+ipcMain.handle('run-scan', async () => {
+  await runScan();
+  return lastScanResult;
+});
+
+ipcMain.on('save-server-url', (event, url) => {
+  config.serverUrl = url;
+  saveConfig(config);
+  if (mainWindow) mainWindow.loadURL(url).catch(console.error);
+  updateTrayMenu();
+});
+
+ipcMain.handle('get-config', () => config);
+ipcMain.handle('save-config', (event, newConfig) => {
+  config = { ...config, ...newConfig };
+  saveConfig(config);
+  startScheduledScan();
+  return config;
+});
+
+// ── 应用生命周期 ──────────────────────────────────────────────────────────────
+
+app.whenReady().then(async () => {
+  applyAutoStart();
+
+  // 如果以 --hidden 启动（开机自启时），不显示主窗口
+  const startHidden = process.argv.includes('--hidden');
+  if (!startHidden) {
+    createWindow();
+  }
+
+  createTray();
+  startScheduledScan();
+
+  // 首次启动立即扫描一次（延迟 5 秒，等窗口就绪）
+  setTimeout(() => runScan().catch(console.error), 5000);
+});
+
+app.on('window-all-closed', () => {
+  // 不退出应用，继续在托盘运行
+  if (process.platform !== 'darwin') {
+    // 在 macOS 上保持活跃直到用户明确退出
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  } else {
+    showWindow();
+  }
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
+});
