@@ -6,10 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -47,7 +50,7 @@ public class AiRiskRatingController {
             return R.ok(result);
         } catch (Exception e) {
             log.error("[AiRisk] 获取风险评级列表失败: {}", e.getMessage());
-            return R.fail("AI 风险评级服务暂不可用，请稍后重试");
+            return R.error("AI 风险评级服务暂不可用，请稍后重试");
         }
     }
 
@@ -61,14 +64,34 @@ public class AiRiskRatingController {
     @GetMapping("/score")
     public R<Map<String, Object>> serviceScore(@RequestParam("service") String serviceId) {
         if (serviceId == null || serviceId.isBlank()) {
-            return R.fail("缺少参数 service");
+            return R.error("缺少参数 service");
         }
         try {
             Map<String, Object> result = aiInferenceClient.riskScore(serviceId.toLowerCase().strip());
             return R.ok(result);
         } catch (Exception e) {
             log.error("[AiRisk] 查询服务 {} 风险评分失败: {}", serviceId, e.getMessage());
-            return R.fail("未找到服务或评级服务暂不可用");
+            return R.error("未找到服务或评级服务暂不可用");
+        }
+    }
+
+    /**
+     * 动态刷新风险评级数据。
+     *
+     * <p>POST /api/ai-risk/refresh
+     *
+     * <p>空请求体：重新从 ai_risk_data.json 加载数据。
+     * <p>带 services 数组：合并更新指定服务的评分数据并持久化。
+     */
+    @PostMapping("/refresh")
+    public R<Map<String, Object>> refresh(@RequestBody(required = false) Map<String, Object> payload) {
+        try {
+            Map<String, Object> body = payload != null ? payload : Collections.emptyMap();
+            Map<String, Object> result = aiInferenceClient.riskRefresh(body);
+            return R.ok(result);
+        } catch (Exception e) {
+            log.error("[AiRisk] 刷新风险评级数据失败: {}", e.getMessage());
+            return R.error("刷新失败，请检查 Python 推理服务是否正常");
         }
     }
 }

@@ -66,14 +66,14 @@ public class AnomalyController {
     @PostMapping("/check")
     public R<Map<String, Object>> check(@RequestBody Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) {
-            return R.fail("请求体不能为空");
+            return R.error("请求体不能为空");
         }
         try {
             Map<String, Object> result = aiInferenceClient.anomalyCheck(payload);
             return R.ok(result);
         } catch (Exception e) {
             log.error("[Anomaly] 异常检测失败: {}", e.getMessage());
-            return R.fail("异常检测服务暂不可用，请先运行 train_anomaly.py 训练模型");
+            return R.error("异常检测服务暂不可用，请先运行 train_anomaly.py 训练模型");
         }
     }
 
@@ -89,7 +89,7 @@ public class AnomalyController {
             return R.ok(result);
         } catch (Exception e) {
             log.error("[Anomaly] 查询事件日志失败: {}", e.getMessage());
-            return R.fail("查询异常事件失败");
+            return R.error("查询异常事件失败");
         }
     }
 
@@ -105,7 +105,7 @@ public class AnomalyController {
             return R.ok(result);
         } catch (Exception e) {
             log.error("[Anomaly] 查询模型状态失败: {}", e.getMessage());
-            return R.fail("模型状态查询失败，请检查 Python 推理服务是否启动");
+            return R.error("模型状态查询失败，请检查 Python 推理服务是否启动");
         }
     }
 }

@@ -211,6 +211,7 @@ const MENU_SECTIONS = [
     items: [
       { path: '/shadow-ai', label: '影子AI发现', icon: 'View', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/ai/risk-rating', label: 'AI风险评级', icon: 'Histogram', audiences: ['governanceAdmin', 'secops', 'executive', 'dataAdmin'] },
+      { path: '/ai/anomaly', label: '行为异常检测', icon: 'AlarmClock', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/alerts', label: '告警闭环', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-log', label: '审计日志', icon: 'Timer', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-report', label: '审计报告', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'executive'] },
@@ -249,6 +250,7 @@ const EXTRA_ROUTE_AUDIENCES = {
   '/ai/models': ['governanceAdmin', 'aiBuilder', 'executive', 'businessOwner'],
   '/ai/monitor': ['governanceAdmin', 'aiBuilder', 'executive', 'secops'],
   '/ai/risk-rating': ['governanceAdmin', 'secops', 'executive', 'dataAdmin'],
+  '/ai/anomaly': ['governanceAdmin', 'secops', 'executive'],
   '/shadow-ai': ['governanceAdmin', 'secops', 'executive'],
 };
 
