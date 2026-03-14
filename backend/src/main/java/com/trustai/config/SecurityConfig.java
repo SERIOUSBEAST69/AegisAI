@@ -62,6 +62,11 @@ public class SecurityConfig {
                         // 轻量级客户端上报接口（无需登录，客户端用 clientId 标识）
                         "/api/client/register",
                         "/api/client/report",
+                        // 云端扫描队列（下载触发时写入，前端查询）
+                        "/api/client/queue",
+                        "/api/client/queue/**",
+                        // 客户端下载（提供安装包下载）
+                        "/api/download/**",
                         "/uploads/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",

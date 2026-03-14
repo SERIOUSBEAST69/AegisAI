@@ -2,8 +2,11 @@ package com.trustai.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.entity.ClientReport;
+import com.trustai.entity.ClientScanQueue;
 import com.trustai.service.ClientReportService;
+import com.trustai.service.ClientScanQueueService;
 import com.trustai.utils.R;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +31,7 @@ import java.util.stream.Collectors;
 public class ClientReportController {
 
     private final ClientReportService clientReportService;
+    private final ClientScanQueueService clientScanQueueService;
 
     // ── 客户端注册（幂等） ──────────────────────────────────────────────────────
 
@@ -164,6 +168,60 @@ public class ClientReportController {
         return R.ok(result);
     }
 
+    // ── 云端扫描队列 ─────────────────────────────────────────────────────────────
+
+    /**
+     * 查询云端扫描队列（最新 50 条，按下载时间倒序）。
+     * 当用户通过Web界面下载客户端并开启本地扫描时，相应记录将出现在此队列中。
+     */
+    @GetMapping("/queue")
+    public R<List<ClientScanQueue>> queue() {
+        List<ClientScanQueue> items = clientScanQueueService.list(
+                new QueryWrapper<ClientScanQueue>()
+                        .orderByDesc("download_time")
+                        .last("LIMIT 50")
+        );
+        return R.ok(items);
+    }
+
+    /**
+     * 将一次客户端下载事件加入云端扫描队列。
+     * 前端在用户点击下载按钮且本地扫描已开启时调用此接口。
+     *
+     * @param req 平台信息及发起下载的设备信息
+     */
+    @PostMapping("/queue")
+    public R<ClientScanQueue> enqueue(@RequestBody QueueReq req, HttpServletRequest servletReq) {
+        ClientScanQueue entry = new ClientScanQueue();
+        entry.setPlatform(req.getPlatform() != null ? req.getPlatform() : "unknown");
+        entry.setHostname(req.getHostname());
+        entry.setOsUsername(req.getOsUsername());
+        entry.setUserAgent(servletReq.getHeader("User-Agent"));
+        entry.setStatus("queued");
+        entry.setDownloadTime(LocalDateTime.now());
+        entry.setCreateTime(LocalDateTime.now());
+        entry.setUpdateTime(LocalDateTime.now());
+        clientScanQueueService.save(entry);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", entry.getId());
+        result.put("status", entry.getStatus());
+        return R.ok(entry);
+    }
+
+    /**
+     * 更新队列中某条记录的扫描状态（由安装后的客户端或调度任务调用）。
+     */
+    @PostMapping("/queue/{id}/status")
+    public R<?> updateQueueStatus(@PathVariable Long id, @RequestBody QueueStatusReq req) {
+        ClientScanQueue entry = clientScanQueueService.getById(id);
+        if (entry == null) return R.error(40000, "队列记录不存在");
+        entry.setStatus(req.getStatus());
+        if (req.getScanResult() != null) entry.setScanResult(req.getScanResult());
+        entry.setUpdateTime(LocalDateTime.now());
+        clientScanQueueService.updateById(entry);
+        return R.okMsg("状态已更新");
+    }
+
     // ── 内部工具 ────────────────────────────────────────────────────────────────
 
     /**
@@ -205,5 +263,28 @@ public class ClientReportController {
         public void setOsType(String osType) { this.osType = osType; }
         public String getClientVersion() { return clientVersion; }
         public void setClientVersion(String clientVersion) { this.clientVersion = clientVersion; }
+    }
+
+    public static class QueueReq {
+        private String platform;
+        private String hostname;
+        private String osUsername;
+
+        public String getPlatform() { return platform; }
+        public void setPlatform(String platform) { this.platform = platform; }
+        public String getHostname() { return hostname; }
+        public void setHostname(String hostname) { this.hostname = hostname; }
+        public String getOsUsername() { return osUsername; }
+        public void setOsUsername(String osUsername) { this.osUsername = osUsername; }
+    }
+
+    public static class QueueStatusReq {
+        private String status;
+        private String scanResult;
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+        public String getScanResult() { return scanResult; }
+        public void setScanResult(String scanResult) { this.scanResult = scanResult; }
     }
 }

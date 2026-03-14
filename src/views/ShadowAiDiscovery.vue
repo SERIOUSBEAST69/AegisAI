@@ -14,8 +14,8 @@
       <div class="page-header-actions">
         <el-tag v-if="isMock" type="warning" size="large">演示数据</el-tag>
         <el-tag v-if="isElectron" type="success" size="large">客户端已连接</el-tag>
+        <el-tag v-else type="info" size="large">Web 模式</el-tag>
         <el-button
-          v-if="isElectron"
           type="success"
           :loading="localScanning"
           @click="runLocalScan"
@@ -77,13 +77,19 @@
       </article>
     </div>
 
-    <!-- 本机实时扫描面板（仅在 Electron 客户端中显示） -->
-    <div v-if="isElectron" class="local-scan-panel scene-block card-glass">
+    <!-- 本机实时扫描面板（Web 和 Electron 均可使用） -->
+    <div class="local-scan-panel scene-block card-glass">
       <div class="local-scan-header">
         <div>
           <div class="card-header">📡 本机实时扫描</div>
           <p class="panel-subtitle">
-            以下为当前设备的真实扫描结果，通过分析进程列表、网络连接和浏览器访问历史获得。
+            <template v-if="isElectron">
+              以下为当前设备的真实扫描结果，通过分析进程列表、网络连接和浏览器访问历史获得。
+            </template>
+            <template v-else>
+              Web 模式下通过服务端 API 触发扫描，获取当前已注册客户端的最新状态汇总。
+              如需扫描本机真实进程，请安装下方的 Aegis 客户端。
+            </template>
           </p>
         </div>
         <div class="local-scan-status">
@@ -176,15 +182,32 @@
             部署 Aegis 轻量客户端到员工电脑，实现持续监控。
           </p>
           <div class="download-btns">
-            <el-button type="primary" plain size="small">
+            <el-button
+              type="primary"
+              plain
+              size="small"
+              :loading="downloading === 'windows'"
+              @click="downloadClient('windows')"
+            >
               <el-icon><Download /></el-icon>
               Windows 安装包
             </el-button>
-            <el-button type="primary" plain size="small">
+            <el-button
+              type="primary"
+              plain
+              size="small"
+              :loading="downloading === 'macos'"
+              @click="downloadClient('macos')"
+            >
               <el-icon><Download /></el-icon>
               macOS DMG
             </el-button>
-            <el-button plain size="small">
+            <el-button
+              plain
+              size="small"
+              :loading="downloading === 'linux'"
+              @click="downloadClient('linux')"
+            >
               <el-icon><Download /></el-icon>
               Linux DEB/RPM
             </el-button>
@@ -310,6 +333,62 @@
       </el-card>
     </div>
 
+    <!-- 云端扫描队列（下载触发时自动入队） -->
+    <div v-if="scanQueue.length > 0 || localScanEnabled" class="cloud-queue-panel scene-block card-glass">
+      <div class="cloud-queue-header">
+        <div>
+          <div class="card-header">☁️ 云端扫描队列</div>
+          <p class="panel-subtitle">
+            每次下载客户端安装包时自动入队；客户端安装完成并执行首次扫描后，状态将更新为"已完成"。
+          </p>
+        </div>
+        <div class="cloud-queue-actions">
+          <el-tag v-if="localScanEnabled" type="success" size="small">本地扫描已开启</el-tag>
+          <el-button size="small" :loading="queueLoading" @click="refreshQueue">
+            <el-icon><Refresh /></el-icon>
+            刷新队列
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="queueLoading" class="loading-state">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>加载队列中…</span>
+      </div>
+      <div v-else-if="scanQueue.length === 0" class="empty-state">
+        <el-icon><Document /></el-icon>
+        <span>暂无下载记录。点击上方客户端下载按钮后，任务将自动出现在此队列中。</span>
+      </div>
+      <div v-else class="cloud-queue-list">
+        <div
+          v-for="item in scanQueue"
+          :key="item.id"
+          :class="['cloud-queue-item', 'card-glass', item.status]"
+        >
+          <div class="cloud-queue-item-head">
+            <span :class="['queue-platform-badge', item.platform]">
+              {{ platformLabel(item.platform) }}
+            </span>
+            <span :class="['queue-status-badge', item.status]">
+              {{ queueStatusLabel(item.status) }}
+            </span>
+            <span class="queue-hostname" v-if="item.hostname">{{ item.hostname }}</span>
+          </div>
+          <div class="cloud-queue-item-meta">
+            <span>⬇️ 下载时间：{{ formatTime(item.downloadTime) }}</span>
+            <span v-if="item.osUsername">👤 {{ item.osUsername }}</span>
+            <span v-if="item.userAgent" class="ua-hint" :title="item.userAgent">
+              🌐 {{ shortenUA(item.userAgent) }}
+            </span>
+          </div>
+          <div v-if="item.scanResult" class="cloud-queue-scan-result">
+            <el-icon><Document /></el-icon>
+            <span>扫描结果已就绪</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 详情抽屉 -->
     <el-drawer
       v-model="drawerVisible"
@@ -378,6 +457,7 @@ import {
   Download, Search, Loading,
 } from '@element-plus/icons-vue';
 import { shadowAiApi } from '../api/shadowAi';
+import request from '../api/request';
 
 // ── 检测是否在 Electron 客户端中运行 ──────────────────────────────────────────
 const isElectron = typeof window !== 'undefined' && !!window.aegisClient;
@@ -392,9 +472,19 @@ const searchKeyword  = ref('');
 const drawerVisible  = ref(false);
 const selectedClient = ref(null);
 
-// 本地扫描结果（Electron 客户端专属）
+// 本地扫描结果（Electron 客户端专属或 Web 模式下使用服务端摘要）
 const localScanResult = ref(null);
 const localClientInfo = ref(null);
+
+// 本地扫描是否已开启（用于决定下载时是否入云端队列）
+const localScanEnabled = ref(false);
+
+// 下载状态（按平台跟踪）
+const downloading = ref(null);
+
+// 云端扫描队列
+const scanQueue   = ref([]);
+const queueLoading = ref(false);
 
 // ── 计算属性 ──────────────────────────────────────────────────────────────────
 const filteredClients = computed(() => {
@@ -489,16 +579,46 @@ function buildLocalClient(info, result) {
 }
 
 async function runLocalScan() {
-  if (!isElectron) return;
   localScanning.value = true;
+  localScanEnabled.value = true;
   try {
-    const result = await window.aegisClient.runScan();
-    localScanResult.value = result;
-    // 同步更新本地客户端条目
-    updateLocalClientEntry(result);
-    ElMessage.success(`本机扫描完成，发现 ${result?.shadowAiCount ?? 0} 个影子AI服务`);
+    if (isElectron) {
+      // Electron 客户端模式：直接调用本机扫描 IPC
+      const result = await window.aegisClient.runScan();
+      localScanResult.value = result;
+      updateLocalClientEntry(result);
+      ElMessage.success(`本机扫描完成，发现 ${result?.shadowAiCount ?? 0} 个影子AI服务`);
+    } else {
+      // Web 模式：从服务端拉取最新扫描摘要作为"本机"结果展示
+      const [s, c] = await Promise.all([
+        shadowAiApi.getStats(),
+        shadowAiApi.getClients(),
+      ]);
+      stats.value   = s;
+      clients.value = c;
+      isMock.value  = !!(s?._mock || c?.[0]?._mock);
+      // 构造一个汇总结果显示在本地扫描面板
+      const totalShadow = Number(s?.totalShadowAi ?? 0);
+      const riskLevel   = s?.highRiskClients > 0 ? 'high' : totalShadow > 0 ? 'medium' : 'none';
+      localScanResult.value = {
+        time: new Date().toISOString(),
+        shadowAiCount: totalShadow,
+        riskLevel,
+        services: (c ?? []).flatMap(client => {
+          try {
+            const svcs = typeof client.discoveredServices === 'string'
+              ? JSON.parse(client.discoveredServices)
+              : (client.discoveredServices ?? []);
+            return Array.isArray(svcs) ? svcs : [];
+          } catch { return []; }
+        }).slice(0, 20),
+      };
+      ElMessage.success(`扫描完成（Web 模式），发现 ${totalShadow} 个影子AI服务`);
+      // 同时刷新云端队列
+      await refreshQueue();
+    }
   } catch (err) {
-    ElMessage.error('本机扫描失败：' + (err.message || '未知错误'));
+    ElMessage.error('扫描失败：' + (err.message || '未知错误'));
   } finally {
     localScanning.value = false;
   }
@@ -579,6 +699,80 @@ function selectClient(client) {
   drawerVisible.value  = true;
 }
 
+// ── 客户端下载 ────────────────────────────────────────────────────────────────
+
+/**
+ * 触发客户端安装包下载。
+ * 1. 通过 <a> 标签向 /api/download/client/{platform} 发起下载请求。
+ * 2. 若本地扫描已开启，同时向云端队列提交一条入队记录。
+ */
+async function downloadClient(platform) {
+  downloading.value = platform;
+  try {
+    // 使用隐藏 <a> 标签触发真实文件下载
+    const link = document.createElement('a');
+    link.href  = `/api/download/client/${platform}`;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    ElMessage.success(`${platformLabel(platform)} 安装包已开始下载`);
+
+    // 无论本地扫描是否开启，都将此次下载记录加入云端队列（以便追踪部署情况）
+    try {
+      await request.post('/client/queue', {
+        platform,
+        hostname: window.location.hostname || '未知主机',
+        osUsername: navigator.platform || '',
+      });
+      localScanEnabled.value = true;
+      await refreshQueue();
+      ElMessage.info('下载任务已加入云端扫描队列');
+    } catch (qErr) {
+      console.warn('[ShadowAI] 队列入队失败:', qErr?.message);
+    }
+  } catch (err) {
+    ElMessage.error(`下载失败：${err.message || '未知错误'}`);
+  } finally {
+    downloading.value = null;
+  }
+}
+
+// ── 云端扫描队列 ──────────────────────────────────────────────────────────────
+
+async function refreshQueue() {
+  queueLoading.value = true;
+  try {
+    const data = await request.get('/client/queue');
+    scanQueue.value = Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn('[ShadowAI] 队列加载失败:', err?.message);
+    scanQueue.value = [];
+  } finally {
+    queueLoading.value = false;
+  }
+}
+
+// ── 辅助标签函数 ──────────────────────────────────────────────────────────────
+
+function platformLabel(platform) {
+  const map = { windows: '🪟 Windows', macos: '🍎 macOS', linux: '🐧 Linux' };
+  return map[platform] || platform || '未知平台';
+}
+
+function queueStatusLabel(status) {
+  const map = { queued: '等待安装', scanning: '扫描中', done: '已完成', failed: '失败' };
+  return map[status] || status || '未知';
+}
+
+function shortenUA(ua) {
+  if (!ua) return '';
+  // 提取浏览器和OS的简短描述
+  const match = ua.match(/(Chrome|Firefox|Safari|Edge|Opera)[/\s][\d.]+/i);
+  return match ? match[0] : ua.slice(0, 40);
+}
+
 // 监听 Electron 扫描完成事件（后台定时扫描完成时自动更新）
 function onScanComplete(result) {
   localScanResult.value = result;
@@ -587,6 +781,7 @@ function onScanComplete(result) {
 
 onMounted(() => {
   refresh();
+  refreshQueue();
   if (isElectron) {
     window.aegisClient.onScanComplete(onScanComplete);
   }
@@ -1128,5 +1323,116 @@ onUnmounted(() => {
   border-radius: 4px;
   font-size: 12px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── 云端扫描队列 ─────────────────────────────────────────────────────────── */
+.cloud-queue-panel {
+  padding: 24px 28px;
+  border-radius: var(--radius-lg);
+  background: rgba(8, 16, 28, 0.6);
+  border: 1px solid rgba(169, 196, 255, 0.1);
+}
+
+.cloud-queue-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.cloud-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cloud-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cloud-queue-item {
+  padding: 14px 18px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid rgba(169, 196, 255, 0.08);
+  transition: border-color 0.2s;
+}
+
+.cloud-queue-item.queued   { border-left: 3px solid #64acff; }
+.cloud-queue-item.scanning { border-left: 3px solid #ffc600; }
+.cloud-queue-item.done     { border-left: 3px solid #1bd9b4; }
+.cloud-queue-item.failed   { border-left: 3px solid #ff6b6b; }
+
+.cloud-queue-item-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.queue-platform-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(100, 172, 255, 0.15);
+  color: #64acff;
+}
+
+.queue-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.queue-status-badge.queued   { background: rgba(100,172,255,0.15); color: #64acff; }
+.queue-status-badge.scanning { background: rgba(255,198,0,0.15);   color: #ffc600; }
+.queue-status-badge.done     { background: rgba(27,217,180,0.15);  color: #1bd9b4; }
+.queue-status-badge.failed   { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+
+.queue-hostname {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cloud-queue-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.ua-hint {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cloud-queue-scan-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #1bd9b4;
+}
+
+.loading-state,
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--color-text-muted);
+  font-size: 13px;
 }
 </style>
