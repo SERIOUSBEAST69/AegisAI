@@ -233,14 +233,15 @@ const AI_SERVICES = [
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────────
-const modelStatus  = ref(null);
-const modelMeta    = ref({});
-const statusLoading= ref(false);
-const events       = ref([]);
-const eventsLoading= ref(false);
-const anomalyOnly  = ref(false);
-const checking     = ref(false);
-const checkResult  = ref(null);
+const modelStatus = ref(null);
+const modelMeta = ref({});
+const statusLoading = ref(false);
+const serviceOffline = ref(false);
+const events = ref([]);
+const eventsLoading = ref(false);
+const anomalyOnly = ref(false);
+const checking = ref(false);
+const checkResult = ref(null);
 
 const checkForm = ref({
   employee_id: 'EMP_R0001',
@@ -257,12 +258,14 @@ const checkForm = ref({
 // ── Computed ──────────────────────────────────────────────────────────────────
 const modelReady = computed(() => modelStatus.value?.model_ready === true);
 
-const statusTagType = computed(() =>
-  modelReady.value ? 'success' : 'warning'
-);
-const modelStatusLabel = computed(() =>
-  modelReady.value ? '✅ 模型已就绪' : '⚠️ 模型未训练'
-);
+const statusTagType = computed(() => {
+  if (serviceOffline.value) return 'danger';
+  return modelReady.value ? 'success' : 'warning';
+});
+const modelStatusLabel = computed(() => {
+  if (serviceOffline.value) return '❌ 推理服务不可用';
+  return modelReady.value ? '✅ 模型已就绪' : '⚠️ 模型未训练';
+});
 
 const recentAnomalyCount = computed(() =>
   events.value.filter(e => e.is_anomaly).length
@@ -273,10 +276,12 @@ async function loadStatus() {
   statusLoading.value = true;
   try {
     const data = await request.get('/anomaly/status');
-    modelStatus.value = data;
-    modelMeta.value   = data?.meta || {};
+    modelStatus.value  = data;
+    modelMeta.value    = data?.meta || {};
+    serviceOffline.value = false;
   } catch (e) {
-    ElMessage.warning('无法获取模型状态，请确认 Python 推理服务已启动');
+    serviceOffline.value = true;
+    ElMessage.warning('推理服务不可用，请确认 Python 推理服务已启动（cd python-service && python app.py）');
   } finally {
     statusLoading.value = false;
   }

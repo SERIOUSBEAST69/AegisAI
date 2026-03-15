@@ -35,6 +35,7 @@ spring:
       simple:
         acknowledge-mode: manual  # 手动确认消息
         missing-queues-fatal: false  # 队列不存在时不终止应用启动
+        auto-startup: false  # 不在启动时自动连接 Broker；RabbitMQ 不可用时应用仍能正常启动
         retry:
           enabled: true
           initial-interval: 3000
