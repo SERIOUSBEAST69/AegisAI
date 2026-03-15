@@ -1,50 +1,53 @@
 server:
   port: 8080
 
-# Spring 核心配置（所有子节点必须正确缩进）
 spring:
-  # H2 数据库配置（适配内存库+控制台）
+  # 数据源配置（MySQL，使用环境变量）
   datasource:
-    url: jdbc:h2:mem:aegisai;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL;NON_KEYWORDS=USER
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-  # H2 控制台配置（必须归属于spring节点）
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/aegisai?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 10
+
+  # H2 控制台（可选，但仅用于开发，数据源仍是 MySQL）
   h2:
     console:
       enabled: true
       path: /h2-console
-  # SQL 初始化配置
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:db-h2.sql
+      settings:
+        web-allow-others: false
+
   # Jackson 日期格式化
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
-  # RabbitMQ 配置（支持环境变量 RABBITMQ_HOST 覆盖，本地开发默认 localhost，Docker 使用容器名）
+
+  # RabbitMQ 配置
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}  # Docker Compose 中设置 RABBITMQ_HOST=rabbitmq
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:admin}       # 和Docker Compose中的配置一致
-    password: ${RABBITMQ_PASS:123456}
-    virtual-host: /aegisai
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:admin}
+    password: ${SPRING_RABBITMQ_PASSWORD:123456}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/aegisai}
     connection-timeout: 3000
     listener:
       simple:
-        acknowledge-mode: manual  # 手动确认消息
-        missing-queues-fatal: false  # 队列不存在时不终止应用启动
-        auto-startup: false  # 不在启动时自动连接 Broker；RabbitMQ 不可用时应用仍能正常启动
+        acknowledge-mode: manual
+        missing-queues-fatal: false
+        auto-startup: false
         retry:
           enabled: true
           initial-interval: 3000
           max-attempts: 3
-  # Redis 配置（支持环境变量覆盖，本地开发默认 localhost，Docker 使用容器名）
+
+  # Redis 配置
   redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASS:}
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:}
     timeout: 3000ms
     lettuce:
       pool:
@@ -52,6 +55,7 @@ spring:
         max-idle: 8
         min-idle: 0
         max-wait: 3000ms
+
   cloud:
     openfeign:
       client:
@@ -59,11 +63,12 @@ spring:
           aiInferenceClient:
             connect-timeout: 2000
             read-timeout: 5000
-  # Elasticsearch 配置（支持环境变量 ELASTICSEARCH_URIS 覆盖，本地开发默认 localhost，Docker 使用容器名）
-  elasticsearch:
-    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}  # Docker Compose 中设置 ELASTICSEARCH_URIS=http://elasticsearch:9200
 
-# Flowable 配置（和spring同级，正确缩进）
+  # Elasticsearch 配置
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
+
+# Flowable 配置
 flowable:
   check-process-definitions: true
   database-schema-update: true
@@ -83,7 +88,7 @@ logging:
   level:
     com.trustai: debug
 
-# 自定义配置（修复risk层级错误）
+# 自定义配置
 ai:
   security:
     aes-key: ${AI_AES_KEY:12345678901234567890123456789012}
@@ -92,24 +97,23 @@ ai:
   inference:
     base-url: ${AI_INFERENCE_URL:http://localhost:5000}
 
-# 风险规则配置（修复层级+语法错误）
+# 风险规则配置
 risk:
   login:
     fail:
-      threshold: 5        # 登录失败阈值
-      window: 10          # 时间窗口（分钟）
+      threshold: 5
+      window: 10
   sensitive:
     access:
-      threshold: 20       # 敏感数据访问阈值
+      threshold: 20
   model:
     fail:
-      rate: 0.3           # 模型调用失败率阈值
-  # 风险等级允许值（修正缩进和语法）
+      rate: 0.3
   risk-level:
     allow-values: [LOW, MEDIUM, HIGH]
 
+# 安全跨域配置
 security:
   cross-site:
     guard-enabled: ${CROSS_SITE_GUARD_ENABLED:true}
-    # 5173/5174 – Vite 开发服务器; 8080 – Spring Boot 生产模式(Vue SPA 由 Spring Boot 服务)
-    allowed-origins: ${CROSS_SITE_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:8080,http://127.0.0.1:8080}
+    allowed-origins: ${CROSS_SITE_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080}
