@@ -19,7 +19,10 @@ public class CorsConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         String[] allowedOrigins = crossSiteGuardService.getAllowedOrigins().toArray(new String[0]);
         if (allowedOrigins.length == 0) {
-            allowedOrigins = new String[] {"http://localhost:5173", "http://127.0.0.1:5173"};
+            allowedOrigins = new String[] {
+                "http://localhost:5173", "http://127.0.0.1:5173",
+                "http://localhost:8080", "http://127.0.0.1:8080"
+            };
         }
         registry.addMapping("/**")
             .allowedOrigins(allowedOrigins)
