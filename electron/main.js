@@ -107,7 +107,7 @@ function createWindow() {
   });
 
   mainWindow.on('close', (event) => {
-    if (config.minimizeToTray) {
+    if (!app.isQuitting && config.minimizeToTray) {
       event.preventDefault();
       mainWindow.hide();
     }
@@ -117,8 +117,11 @@ function createWindow() {
 // ── 托盘 ─────────────────────────────────────────────────────────────────────
 
 function createTray() {
-  const iconPath = path.join(__dirname, 'assets', 'tray.png');
-  // 如果没有图标文件则使用空图标
+  // 优先使用专用托盘图标 tray.png，如不存在则回退到应用图标 icon.png
+  let iconPath = path.join(__dirname, 'assets', 'tray.png');
+  if (!fs.existsSync(iconPath)) {
+    iconPath = path.join(__dirname, 'assets', 'icon.png');
+  }
   const icon = fs.existsSync(iconPath)
     ? nativeImage.createFromPath(iconPath)
     : nativeImage.createEmpty();

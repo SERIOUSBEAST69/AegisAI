@@ -22,21 +22,18 @@ function redirectToLogin() {
 }
 
 function handleUnauthorized(message, data) {
-  const session = getSession();
-  const hasRealSession = Boolean(session?.token && session.mode !== 'mock');
+  // The backend explicitly rejected the request — always clear the local session
+  // (including stale mock sessions) and redirect to the login page so the user
+  // can re-authenticate with real credentials.
+  clearSession('expired');
   const error = createClientError(message || '未登录或会话已失效', {
     code: 40100,
-    sessionExpired: hasRealSession,
+    sessionExpired: true,
     detail: data || null,
   });
-
-  if (hasRealSession) {
-    clearSession('expired');
-    if (window.location.pathname !== '/login') {
-      redirectToLogin();
-    }
+  if (window.location.pathname !== '/login') {
+    redirectToLogin();
   }
-
   return Promise.reject(error);
 }
 
