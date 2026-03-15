@@ -27,6 +27,7 @@ const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
 function loadConfig() {
   const defaults = {
     serverUrl: 'http://localhost:5173',
+    backendUrl: 'http://localhost:8080',
     scanIntervalMinutes: 30,
     autoStart: true,
     minimizeToTray: true,
@@ -107,7 +108,7 @@ function createWindow() {
   });
 
   mainWindow.on('close', (event) => {
-    if (config.minimizeToTray) {
+    if (config.minimizeToTray && !app.isQuitting) {
       event.preventDefault();
       mainWindow.hide();
     }
@@ -117,7 +118,7 @@ function createWindow() {
 // ── 托盘 ─────────────────────────────────────────────────────────────────────
 
 function createTray() {
-  const iconPath = path.join(__dirname, 'assets', 'tray.png');
+  const iconPath = path.join(__dirname, 'assets', 'icon.png');
   // 如果没有图标文件则使用空图标
   const icon = fs.existsSync(iconPath)
     ? nativeImage.createFromPath(iconPath)
@@ -208,8 +209,8 @@ function applyAutoStart() {
 
 async function showServerSettings() {
   const win = new BrowserWindow({
-    width: 480,
-    height: 280,
+    width: 520,
+    height: 360,
     parent: mainWindow,
     modal: true,
     title: '服务器设置',
@@ -222,14 +223,23 @@ async function showServerSettings() {
     resizable: false,
   });
 
+  const inputStyle = 'width:100%;padding:10px;background:%230a1628;border:1px solid %23223355;border-radius:6px;color:%23cdd9e5;font-size:14px;box-sizing:border-box;margin-bottom:4px';
+  const labelStyle = 'font-size:12px;color:%23889;margin:0 0 4px;display:block';
+  const hintStyle  = 'font-size:11px;color:%23556;margin:0 0 14px';
+
   // Settings page uses the preload's IPC bridge to save the URL safely
   win.loadURL(`data:text/html;charset=utf-8,
-    <html style="background:%23050710;color:%23cdd9e5;font-family:sans-serif;padding:28px;box-sizing:border-box">
-      <h3 style="margin:0 0 16px;color:%2364acff">服务器地址</h3>
-      <input id="url" value="${config.serverUrl}"
-        style="width:100%;padding:10px;background:%230a1628;border:1px solid %23223355;border-radius:6px;color:%23cdd9e5;font-size:14px;box-sizing:border-box"/>
-      <p style="font-size:12px;color:%23556;margin:8px 0 20px">例如：http://192.168.1.100:8080</p>
-      <div style="display:flex;gap:10px;justify-content:flex-end">
+    <html style="background:%23050710;color:%23cdd9e5;font-family:sans-serif;padding:24px;box-sizing:border-box">
+      <h3 style="margin:0 0 16px;color:%2364acff">服务器设置</h3>
+      <label style="${labelStyle}">前端工作台地址（Workbench URL）</label>
+      <input id="serverUrl" value="${config.serverUrl}"
+        style="${inputStyle}"/>
+      <p style="${hintStyle}">Vue 前端地址，如 http://localhost:5173（开发模式）</p>
+      <label style="${labelStyle}">后端 API 地址（Backend API URL）</label>
+      <input id="backendUrl" value="${config.backendUrl || 'http://localhost:8080'}"
+        style="${inputStyle}"/>
+      <p style="${hintStyle}">Spring Boot 后端地址，如 http://localhost:8080（客户端扫描上报使用）</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
         <button onclick="window.close()"
           style="padding:8px 20px;background:transparent;border:1px solid %23334;color:%238ab;border-radius:6px;cursor:pointer">取消</button>
         <button id="saveBtn"
@@ -237,9 +247,10 @@ async function showServerSettings() {
       </div>
       <script>
         document.getElementById('saveBtn').onclick = function() {
-          var url = document.getElementById('url').value.trim();
-          if (url && window.aegisClient) {
-            window.aegisClient.saveConfig({ serverUrl: url });
+          var serverUrl = document.getElementById('serverUrl').value.trim();
+          var backendUrl = document.getElementById('backendUrl').value.trim();
+          if (window.aegisClient) {
+            window.aegisClient.saveConfig({ serverUrl: serverUrl, backendUrl: backendUrl });
           }
           window.close();
         };
@@ -255,7 +266,7 @@ async function runScan() {
   try {
     const result = await scanner.scan({
       clientId: CLIENT_ID,
-      serverUrl: config.serverUrl,
+      backendUrl: config.backendUrl || config.serverUrl,
     });
     lastScanResult = result;
     console.log(`[Aegis] 扫描完成，发现影子AI：${result.shadowAiCount} 个，风险等级：${result.riskLevel}`);
@@ -308,6 +319,7 @@ ipcMain.handle('get-client-info', () => ({
     return 'Linux';
   })(),
   serverUrl: config.serverUrl,
+  backendUrl: config.backendUrl || 'http://localhost:8080',
   scanIntervalMinutes: config.scanIntervalMinutes,
   autoStart: config.autoStart,
   lastScanResult,

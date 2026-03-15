@@ -1,5 +1,6 @@
 # 核心基础依赖
 flask==2.3.3
+flask-cors==4.0.0
 requests==2.31.0
 numpy==1.24.3
 pandas==2.0.3

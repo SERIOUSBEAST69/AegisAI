@@ -15,6 +15,7 @@ import joblib
 import numpy as np
 import torch
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from sklearn.ensemble import IsolationForest
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
@@ -24,6 +25,15 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
 
 app = Flask(__name__)
+# CORS：读取环境变量 CORS_ORIGINS（逗号分隔），默认仅允许本地开发地址。
+# 生产环境中请将 CORS_ORIGINS 设置为实际前端地址，例如：
+#   export CORS_ORIGINS="https://your-domain.com,https://workbench.your-domain.com"
+_cors_origins_raw = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080",
+)
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
+CORS(app, resources={r"/*": {"origins": _cors_origins}})
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
