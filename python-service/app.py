@@ -339,114 +339,135 @@ _ml_clf = _MLClassifier()
 # ── BERT model loader: fine-tuned first, then zero-shot, then mock ────────────
 _FINETUNED_DIR: str = os.path.join(MODEL_DIR, "bert_finetuned")
 _BERT_IS_FINETUNED: bool = False
+# Tracks whether BERT (zero-shot or fine-tuned) was loaded successfully.
+# When False the service falls back to the ML classifier only, which is
+# still fully functional – the BERT layer is an optional quality boost.
+_BERT_AVAILABLE: bool = False
 
 if not MOCK_MODE:
-    from transformers import AutoModel, AutoModelForSequenceClassification, AutoTokenizer
+    try:
+        from transformers import AutoModel, AutoModelForSequenceClassification, AutoTokenizer
 
-    # ── Try to load fine-tuned sequence-classification model ──────────────────
-    if os.path.isdir(_FINETUNED_DIR) and os.path.exists(os.path.join(_FINETUNED_DIR, "config.json")):
-        try:
-            _ft_tokenizer = AutoTokenizer.from_pretrained(_FINETUNED_DIR)
-            _ft_model = AutoModelForSequenceClassification.from_pretrained(_FINETUNED_DIR)
-            _ft_model.eval()
-            _BERT_IS_FINETUNED = True
-            print(f"[BERT] Loaded fine-tuned model from {_FINETUNED_DIR}")
+        # ── Try to load fine-tuned sequence-classification model ──────────────────
+        if os.path.isdir(_FINETUNED_DIR) and os.path.exists(os.path.join(_FINETUNED_DIR, "config.json")):
+            try:
+                _ft_tokenizer = AutoTokenizer.from_pretrained(_FINETUNED_DIR)
+                _ft_model = AutoModelForSequenceClassification.from_pretrained(_FINETUNED_DIR)
+                _ft_model.eval()
+                _BERT_IS_FINETUNED = True
+                _BERT_AVAILABLE = True
+                print(f"[BERT] Loaded fine-tuned model from {_FINETUNED_DIR}")
 
-            _ft_id2label: Dict[int, str] = _ft_model.config.id2label  # type: ignore[attr-defined]
+                _ft_id2label: Dict[int, str] = _ft_model.config.id2label  # type: ignore[attr-defined]
 
-            def _bert_finetuned(text: str) -> Dict:
-                """Fine-tuned BERT sequence classifier (AutoModelForSequenceClassification)."""
-                if not text:
-                    return {"label": "unknown", "score": 0.0, "method": "bert_finetuned", "labelScores": []}
-                inputs = _ft_tokenizer(text, return_tensors="pt", truncation=True,
-                                       padding=True, max_length=128)
+                def _bert_finetuned(text: str) -> Dict:
+                    """Fine-tuned BERT sequence classifier (AutoModelForSequenceClassification)."""
+                    if not text:
+                        return {"label": "unknown", "score": 0.0, "method": "bert_finetuned", "labelScores": []}
+                    inputs = _ft_tokenizer(text, return_tensors="pt", truncation=True,
+                                           padding=True, max_length=128)
+                    with torch.no_grad():
+                        logits = _ft_model(**inputs).logits
+                    probs = torch.softmax(logits, dim=-1)[0].tolist()
+                    ranked = sorted(
+                        [(_ft_id2label.get(i, str(i)), p) for i, p in enumerate(probs)],
+                        key=lambda kv: kv[1], reverse=True,
+                    )
+                    best_label, best_score = ranked[0]
+                    return {
+                        "label": best_label,
+                        "score": round(best_score, 4),
+                        "method": "bert_finetuned",
+                        "labelScores": [{"label": l, "score": round(s, 4)} for l, s in ranked],
+                    }
+            except Exception as _ft_err:
+                print(f"[BERT] Fine-tuned model load failed ({_ft_err}), falling back to zero-shot")
+                _BERT_IS_FINETUNED = False
+
+        # ── Zero-shot fallback (original bert-base-chinese CLS similarity) ────────
+        if not _BERT_IS_FINETUNED:
+            _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+            _bert_model = AutoModel.from_pretrained(MODEL_NAME)
+            _bert_model.eval()
+            _BERT_AVAILABLE = True
+
+            def _cls_embedding(text: str) -> torch.Tensor:
+                inputs = _tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
                 with torch.no_grad():
-                    logits = _ft_model(**inputs).logits
-                probs = torch.softmax(logits, dim=-1)[0].tolist()
-                ranked = sorted(
-                    [(_ft_id2label.get(i, str(i)), p) for i, p in enumerate(probs)],
-                    key=lambda kv: kv[1], reverse=True,
-                )
+                    outputs = _bert_model(**inputs)
+                return outputs.last_hidden_state[:, 0, :]  # CLS token (1, hidden_size)
+
+            # Pre-compute label anchor embeddings once at startup
+            _label_embeddings: Dict[str, torch.Tensor] = {
+                lbl: _cls_embedding(prompt) for lbl, prompt in LABEL_PROMPTS.items()
+            }
+
+            def _bert_zero_shot(text: str) -> Dict:
+                """
+                Zero-shot classification via cosine similarity between the CLS token
+                of the input text and pre-computed CLS tokens of label description strings.
+
+                This is NOT a fine-tuned model. It uses bert-base-chinese as-is.
+                Advantage over regex: handles paraphrased text and mixed Chinese/English.
+                Limitation: lower precision on purely structured fields than regex.
+                For production fine-tuning guidance, see TRAINING.md.
+                Run finetune_bert.py to upgrade to a fine-tuned model.
+                """
+                if not text:
+                    return {"label": "unknown", "score": 0.0, "method": "bert_zero_shot", "labelScores": []}
+                text_emb = _cls_embedding(text)
+                sims = {}
+                for lbl, emb in _label_embeddings.items():
+                    num = torch.sum(text_emb * emb, dim=1)
+                    denom = torch.norm(text_emb, dim=1) * torch.norm(emb, dim=1)
+                    sims[lbl] = (num / (denom + 1e-8)).item()
+                ranked = sorted(sims.items(), key=lambda kv: kv[1], reverse=True)
                 best_label, best_score = ranked[0]
+                label_scores = [{"label": l, "score": round(s, 4)} for l, s in ranked]
                 return {
                     "label": best_label,
                     "score": round(best_score, 4),
-                    "method": "bert_finetuned",
-                    "labelScores": [{"label": l, "score": round(s, 4)} for l, s in ranked],
+                    "method": "bert_zero_shot",
+                    "labelScores": label_scores,
                 }
-        except Exception as _ft_err:
-            print(f"[BERT] Fine-tuned model load failed ({_ft_err}), falling back to zero-shot")
-            _BERT_IS_FINETUNED = False
 
-    # ── Zero-shot fallback (original bert-base-chinese CLS similarity) ────────
-    if not _BERT_IS_FINETUNED:
-        _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-        _bert_model = AutoModel.from_pretrained(MODEL_NAME)
-        _bert_model.eval()
+    except Exception as _bert_load_err:
+        # BERT model download/load failed (e.g. no network, HuggingFace unreachable).
+        # The service continues in ML-only mode; all API endpoints remain available.
+        print(
+            f"[BERT] WARNING: Failed to load BERT model ({_bert_load_err}). "
+            "Falling back to ML-only classification. "
+            "Set BERT_MOCK=true to suppress this message."
+        )
+        _BERT_AVAILABLE = False
+        _BERT_IS_FINETUNED = False
 
-        def _cls_embedding(text: str) -> torch.Tensor:
-            inputs = _tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
-            with torch.no_grad():
-                outputs = _bert_model(**inputs)
-            return outputs.last_hidden_state[:, 0, :]  # CLS token (1, hidden_size)
 
-        # Pre-compute label anchor embeddings once at startup
-        _label_embeddings: Dict[str, torch.Tensor] = {
-            lbl: _cls_embedding(prompt) for lbl, prompt in LABEL_PROMPTS.items()
-        }
+def classify_text(text: str) -> Dict:
+    """
+    Classify text using the best available model stack.
 
-        def _bert_zero_shot(text: str) -> Dict:
-            """
-            Zero-shot classification via cosine similarity between the CLS token
-            of the input text and pre-computed CLS tokens of label description strings.
-
-            This is NOT a fine-tuned model. It uses bert-base-chinese as-is.
-            Advantage over regex: handles paraphrased text and mixed Chinese/English.
-            Limitation: lower precision on purely structured fields than regex.
-            For production fine-tuning guidance, see TRAINING.md.
-            Run finetune_bert.py to upgrade to a fine-tuned model.
-            """
-            if not text:
-                return {"label": "unknown", "score": 0.0, "method": "bert_zero_shot", "labelScores": []}
-            text_emb = _cls_embedding(text)
-            sims = {}
-            for lbl, emb in _label_embeddings.items():
-                num = torch.sum(text_emb * emb, dim=1)
-                denom = torch.norm(text_emb, dim=1) * torch.norm(emb, dim=1)
-                sims[lbl] = (num / (denom + 1e-8)).item()
-            ranked = sorted(sims.items(), key=lambda kv: kv[1], reverse=True)
-            best_label, best_score = ranked[0]
-            label_scores = [{"label": l, "score": round(s, 4)} for l, s in ranked]
-            return {
-                "label": best_label,
-                "score": round(best_score, 4),
-                "method": "bert_zero_shot",
-                "labelScores": label_scores,
-            }
-
-    def classify_text(text: str) -> Dict:
-        """
-        Ensemble: ML classifier (primary) + BERT (fine-tuned or zero-shot) re-ranking.
-        When both agree the confidence is boosted. When they disagree, regex
-        match signals break the tie; unresolved cases defer to BERT.
-        """
-        ml_result = _ml_clf.predict(text)
-        if _BERT_IS_FINETUNED:
-            bert_result = _bert_finetuned(text)  # type: ignore[name-defined]
-        else:
-            bert_result = _bert_zero_shot(text)  # type: ignore[name-defined]
-        if ml_result["label"] == bert_result["label"]:
-            score = min(1.0, round((ml_result["score"] + bert_result["score"]) / 2 + 0.05, 4))
-            method = "ensemble_finetuned" if _BERT_IS_FINETUNED else "ensemble"
-            return {**ml_result, "score": score, "method": method, "bert_score": bert_result["score"]}
-        regex_result = _regex_classify(text)
-        if regex_result["label"] != "unknown":
-            return {**ml_result, "method": "ensemble_ml_primary", "bert_score": bert_result["score"]}
-        return {**bert_result, "method": "ensemble_bert_primary", "ml_score": ml_result["score"]}
-
-else:
-    def classify_text(text: str) -> Dict:  # type: ignore[misc]
+    Priority order:
+    1. Ensemble: ML + BERT fine-tuned (if fine-tuned model loaded)
+    2. Ensemble: ML + BERT zero-shot  (if zero-shot model loaded)
+    3. ML classifier only            (if BERT unavailable / MOCK_MODE=true)
+    """
+    if not _BERT_AVAILABLE or MOCK_MODE:
         return _ml_clf.predict(text)
+
+    ml_result = _ml_clf.predict(text)
+    if _BERT_IS_FINETUNED:
+        bert_result = _bert_finetuned(text)  # type: ignore[name-defined]
+    else:
+        bert_result = _bert_zero_shot(text)  # type: ignore[name-defined]
+    if ml_result["label"] == bert_result["label"]:
+        score = min(1.0, round((ml_result["score"] + bert_result["score"]) / 2 + 0.05, 4))
+        method = "ensemble_finetuned" if _BERT_IS_FINETUNED else "ensemble"
+        return {**ml_result, "score": score, "method": method, "bert_score": bert_result["score"]}
+    regex_result = _regex_classify(text)
+    if regex_result["label"] != "unknown":
+        return {**ml_result, "method": "ensemble_ml_primary", "bert_score": bert_result["score"]}
+    return {**bert_result, "method": "ensemble_bert_primary", "ml_score": ml_result["score"]}
 
 
 # ── LSTM risk forecaster ───────────────────────────────────────────────────────
@@ -735,23 +756,23 @@ def metrics():
             ml_info,
             {
                 "name": (
-                    "bert_finetuned" if (not MOCK_MODE and _BERT_IS_FINETUNED)
-                    else ("bert_zero_shot" if not MOCK_MODE else "bert_not_loaded")
+                    "bert_finetuned" if (_BERT_AVAILABLE and _BERT_IS_FINETUNED)
+                    else ("bert_zero_shot" if _BERT_AVAILABLE else "bert_not_loaded")
                 ),
-                "trained": not MOCK_MODE and _BERT_IS_FINETUNED,
-                "fine_tuned": not MOCK_MODE and _BERT_IS_FINETUNED,
-                "fine_tuned_dir": _FINETUNED_DIR if (not MOCK_MODE and _BERT_IS_FINETUNED) else None,
+                "trained": _BERT_AVAILABLE and _BERT_IS_FINETUNED,
+                "fine_tuned": _BERT_AVAILABLE and _BERT_IS_FINETUNED,
+                "fine_tuned_dir": _FINETUNED_DIR if (_BERT_AVAILABLE and _BERT_IS_FINETUNED) else None,
                 "description": (
                     "bert-base-chinese GPU 微调序列分类模型（AutoModelForSequenceClassification）。"
                     "每类 ≥ 30 合成样本微调，支持通过 finetune_bert.py 追加真实标注数据（建议 200 条/类）。"
                     "精度显著优于零样本 CLS 余弦相似度方法。"
-                ) if (not MOCK_MODE and _BERT_IS_FINETUNED) else (
+                ) if (_BERT_AVAILABLE and _BERT_IS_FINETUNED) else (
                     "bert-base-chinese CLS 向量与标签描述向量的余弦相似度零样本分类。"
                     "未经微调——这是一个已知局限。"
                     "优点：无需标注数据，能处理语义模糊的文本。"
                     "缺点：结构化字段精度低于正则；置信度分数意义有限。"
                     "运行 python finetune_bert.py --mode seed 可一键升级到微调模型（需 GPU 环境）。"
-                ) if not MOCK_MODE else "MOCK_MODE=true，BERT 模型未加载，使用 ML 分类器。",
+                ) if _BERT_AVAILABLE else "BERT 模型未加载（网络不可用或 BERT_MOCK=true），使用纯 ML 分类器。",
             },
         ],
         "lstm_forecaster": {
@@ -771,6 +792,8 @@ def health():
         "status": "ok",
         "model": MODEL_NAME,
         "mock": MOCK_MODE,
+        "bert_available": _BERT_AVAILABLE,
+        "bert_fine_tuned": _BERT_IS_FINETUNED,
         "ml_classifier_ready": _ml_clf.pipeline is not None,
     })
 
