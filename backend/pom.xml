@@ -58,7 +58,7 @@
         <!-- Flowable 工作流（适配 Spring Boot 3.x） -->
         <dependency>
             <groupId>org.flowable</groupId>
-            <artifactId>flowable-spring-boot-starter</artifactId>
+            <artifactId>flowable-spring-boot-starter-process</artifactId>
             <version>${flowable.version}</version>
         </dependency>
         <!-- WebFlux（不用可删除） -->
