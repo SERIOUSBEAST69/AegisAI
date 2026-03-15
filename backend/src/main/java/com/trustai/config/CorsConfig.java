@@ -2,33 +2,22 @@ package com.trustai.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Web MVC 配置。
+ *
+ * <p>CORS 策略已由 {@link com.trustai.config.SecurityConfig#corsConfigurationSource()} 统一配置，
+ * 通过 Spring Security 的 CORS 过滤器在安全过滤链最前端处理。
+ * 此处不再重复注册 {@code addCorsMappings}，避免双重配置导致响应中出现
+ * 重复的 {@code Access-Control-Allow-Origin} 头而引发浏览器 CORS 拒绝。
+ */
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 
     @Autowired
     private RateLimitInterceptor rateLimitInterceptor;
-
-    @Autowired
-    private CrossSiteGuardService crossSiteGuardService;
-
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        String[] allowedOrigins = crossSiteGuardService.getAllowedOrigins().toArray(new String[0]);
-        if (allowedOrigins.length == 0) {
-            allowedOrigins = new String[] {"http://localhost:5173", "http://127.0.0.1:5173"};
-        }
-        registry.addMapping("/**")
-            .allowedOrigins(allowedOrigins)
-            .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-            .allowedHeaders("Authorization", "Content-Type", "X-Requested-With", "Accept")
-            .exposedHeaders("Authorization")
-            .allowCredentials(true)
-            .maxAge(3600);
-    }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {

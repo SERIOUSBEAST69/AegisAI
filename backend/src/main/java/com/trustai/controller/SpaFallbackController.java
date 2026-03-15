@@ -1,6 +1,7 @@
 package com.trustai.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,12 +44,15 @@ public class SpaFallbackController {
             "/{p1:[^\\.]*}/{p2:[^\\.]*}/{p3:[^\\.]*}/{p4:[^\\.]*}",
             "/{p1:[^\\.]*}/{p2:[^\\.]*}/{p3:[^\\.]*}/{p4:[^\\.]*}/{p5:[^\\.]*}"
     })
-    public String forward(HttpServletRequest request) {
+    public String forward(HttpServletRequest request, HttpServletResponse response) throws Exception {
         String uri = request.getRequestURI();
         // API 路径、上传文件、H2 控制台、Swagger 由各自处理器接管，不做转发
         if (uri.startsWith("/api/") || uri.startsWith("/uploads/")
                 || uri.startsWith("/h2-console") || uri.startsWith("/swagger-ui")
                 || uri.startsWith("/v3/api-docs")) {
+            // 显式返回 404，避免 Spring MVC 因 return null 尝试解析视图而产生
+            // "No static resource ..." 日志噪音或意外 500 响应
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
             return null;
         }
         return "forward:/index.html";

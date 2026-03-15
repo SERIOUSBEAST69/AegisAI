@@ -26,17 +26,21 @@ npm run dev
 ```bash
 cd python-service
 pip install -r requirements.txt
-python app.py
+
+# 推荐：开发环境设置 BERT_MOCK=true 跳过 BERT 模型下载（~1.3 GB），使用轻量 ML 分类器
+BERT_MOCK=true python app.py
 ```
-- 首次启动时若无模型文件，会自动运行 `gen_behavior_data.py` 和 `train_anomaly.py` 完成训练（约需 30–120 秒）。
+- 首次启动时若无异常检测模型文件，会自动运行 `gen_behavior_data.py` 和 `train_anomaly.py` 完成训练（约需 30–120 秒）。
 - 如果自动训练失败，手动执行：
   ```bash
   python gen_behavior_data.py
   python train_anomaly.py
-  python app.py
+  BERT_MOCK=true python app.py
   ```
 - 服务地址：http://localhost:5000
 - 健康检查：http://localhost:5000/health
+
+> **注意**：不设置 `BERT_MOCK=true` 时，服务将尝试从 HuggingFace 下载 BERT 模型（约 1.3 GB）。若网络不可用，服务仍会启动并自动降级为纯 ML 分类器，但会有警告日志。
 
 ### 4. 启动 Electron 客户端（可选）
 ```bash
@@ -44,7 +48,9 @@ cd electron
 npm install
 npm start
 ```
-- 客户端默认连接 `http://localhost:5173`（Vue 开发服务器），打包后需手动配置服务端地址。
+- 客户端默认连接 `http://localhost:5173`（Vue 开发服务器）。
+- **首次使用必须先登录**：客户端加载 Vue 前端后，如未登录（或存在已过期的 mock 会话），会自动跳转到登录页面。请使用账号 `admin` / `admin123` 登录。
+- 打包后需手动配置服务端地址（托盘菜单 → 服务器设置）。
 
 ---
 
@@ -71,6 +77,7 @@ Docker Compose 会自动启动：MySQL、Redis、Elasticsearch、RabbitMQ、Spri
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `AI_INFERENCE_URL` | `http://localhost:5000` | Python 推理服务地址 |
+| `BERT_MOCK` | `false` | 设为 `true` 跳过 BERT 模型下载，使用轻量 ML 分类器 |
 | `ELASTICSEARCH_URIS` | `http://localhost:9200` | Elasticsearch 地址 |
 | `REDIS_HOST` | `localhost` | Redis 主机 |
 | `REDIS_PORT` | `6379` | Redis 端口 |
