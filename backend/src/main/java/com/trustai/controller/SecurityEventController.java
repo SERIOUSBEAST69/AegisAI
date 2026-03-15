@@ -166,7 +166,8 @@ public class SecurityEventController {
         event.setCreateTime(new Date());
         event.setUpdateTime(new Date());
         securityEventService.save(event);
-        return R.ok(Map.of("id", event.getId()));
+        Long newId = event.getId();
+        return R.ok(newId != null ? Map.of("id", newId) : Map.of());
     }
 
     // ── 检测规则 ────────────────────────────────────────────────────────────────

@@ -29,7 +29,7 @@ import random
 import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 import urllib.request
 import urllib.error
 
@@ -158,7 +158,7 @@ def generate_event(offset_seconds: Optional[int] = None) -> dict:
     }
 
 
-def report_events(backend_url: str, events: list) -> tuple[int, int]:
+def report_events(backend_url: str, events: list) -> Tuple[int, int]:
     """将事件列表逐条上报至后端，返回 (成功数, 失败数)"""
     success = 0
     failure = 0
