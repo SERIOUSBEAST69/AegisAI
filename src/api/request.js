@@ -30,11 +30,11 @@ function handleUnauthorized(message, data) {
     detail: data || null,
   });
 
-  if (hasRealSession) {
-    clearSession('expired');
-    if (window.location.pathname !== '/login') {
-      redirectToLogin();
-    }
+  // Always clear the stale session and redirect to the login page so that
+  // the user is never stuck seeing raw JSON error responses.
+  clearSession('expired');
+  if (window.location.pathname !== '/login') {
+    redirectToLogin();
   }
 
   return Promise.reject(error);

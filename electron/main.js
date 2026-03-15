@@ -24,16 +24,34 @@ const scanner = require('./scanner/index');
 /** 服务端地址，优先读取环境变量或本地配置文件 */
 const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
 
+const DEFAULT_SERVER_URL = 'http://localhost:5173'; // Vue 前端地址（供 BrowserWindow 加载）
+const DEFAULT_API_URL    = 'http://localhost:8080'; // Spring Boot 后端 API 地址（供扫描器上报）
+
 function loadConfig() {
   const defaults = {
-    serverUrl: 'http://localhost:5173',
+    serverUrl: DEFAULT_SERVER_URL,
+    apiUrl:    DEFAULT_API_URL,
     scanIntervalMinutes: 30,
     autoStart: true,
     minimizeToTray: true,
   };
   try {
     if (fs.existsSync(CONFIG_PATH)) {
-      return { ...defaults, ...JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) };
+      const saved = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+      // ── 向后兼容迁移 ────────────────────────────────────────────────────
+      // 旧版本将 Spring Boot 后端地址（:8080）存在 serverUrl 中，
+      // 迁移时将其移入 apiUrl，并把 serverUrl 重置为 Vue 前端默认地址。
+      // 只迁移确定是后端端口 8080 的情况，避免误判用户的自定义前端端口。
+      if (saved.serverUrl && !saved.apiUrl) {
+        try {
+          const u = new URL(saved.serverUrl);
+          if (u.port === '8080') {
+            saved.apiUrl    = saved.serverUrl;
+            saved.serverUrl = defaults.serverUrl;
+          }
+        } catch { /* invalid URL, use defaults */ }
+      }
+      return { ...defaults, ...saved };
     }
   } catch { /* ignore */ }
   return defaults;
@@ -107,7 +125,10 @@ function createWindow() {
   });
 
   mainWindow.on('close', (event) => {
-    if (config.minimizeToTray) {
+    // Only minimise to tray when the user closes the window normally.
+    // When the app is quitting (e.g. via "退出" tray menu item) let the
+    // window close so the process can actually exit.
+    if (config.minimizeToTray && !app.isQuitting) {
       event.preventDefault();
       mainWindow.hide();
     }
@@ -117,13 +138,17 @@ function createWindow() {
 // ── 托盘 ─────────────────────────────────────────────────────────────────────
 
 function createTray() {
-  const iconPath = path.join(__dirname, 'assets', 'tray.png');
-  // 如果没有图标文件则使用空图标
-  const icon = fs.existsSync(iconPath)
-    ? nativeImage.createFromPath(iconPath)
+  const trayIconPath = path.join(__dirname, 'assets', 'tray.png');
+  const fallbackIconPath = path.join(__dirname, 'assets', 'icon.png');
+  const iconPath = fs.existsSync(trayIconPath)
+    ? trayIconPath
+    : (fs.existsSync(fallbackIconPath) ? fallbackIconPath : null);
+  // Use a 16×16 copy of the icon when available, otherwise an empty image.
+  const icon = iconPath
+    ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
     : nativeImage.createEmpty();
 
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  tray = new Tray(icon);
   tray.setToolTip('Aegis 守护客户端 – 正在保护您的数据');
   updateTrayMenu();
 
@@ -208,8 +233,8 @@ function applyAutoStart() {
 
 async function showServerSettings() {
   const win = new BrowserWindow({
-    width: 480,
-    height: 280,
+    width: 520,
+    height: 340,
     parent: mainWindow,
     modal: true,
     title: '服务器设置',
@@ -222,13 +247,19 @@ async function showServerSettings() {
     resizable: false,
   });
 
-  // Settings page uses the preload's IPC bridge to save the URL safely
+  // Settings page uses the preload's IPC bridge to save the URLs safely.
+  // serverUrl  = Vue 前端地址 (BrowserWindow 加载的 URL)
+  // apiUrl     = Spring Boot 后端地址 (扫描器上报 / API 调用)
   win.loadURL(`data:text/html;charset=utf-8,
-    <html style="background:%23050710;color:%23cdd9e5;font-family:sans-serif;padding:28px;box-sizing:border-box">
-      <h3 style="margin:0 0 16px;color:%2364acff">服务器地址</h3>
-      <input id="url" value="${config.serverUrl}"
-        style="width:100%;padding:10px;background:%230a1628;border:1px solid %23223355;border-radius:6px;color:%23cdd9e5;font-size:14px;box-sizing:border-box"/>
-      <p style="font-size:12px;color:%23556;margin:8px 0 20px">例如：http://192.168.1.100:8080</p>
+    <html style="background:%23050710;color:%23cdd9e5;font-family:sans-serif;padding:24px;box-sizing:border-box">
+      <h3 style="margin:0 0 14px;color:%2364acff">服务器设置</h3>
+      <label style="font-size:12px;color:%2388aacc">前端界面地址（BrowserWindow 加载）</label>
+      <input id="serverUrl" value="${config.serverUrl}"
+        style="width:100%;padding:9px;margin:4px 0 10px;background:%230a1628;border:1px solid %23223355;border-radius:6px;color:%23cdd9e5;font-size:13px;box-sizing:border-box"/>
+      <label style="font-size:12px;color:%2388aacc">后端 API 地址（扫描上报 / Java 后端）</label>
+      <input id="apiUrl" value="${config.apiUrl || DEFAULT_API_URL}"
+        style="width:100%;padding:9px;margin:4px 0 6px;background:%230a1628;border:1px solid %23223355;border-radius:6px;color:%23cdd9e5;font-size:13px;box-sizing:border-box"/>
+      <p style="font-size:11px;color:%23556;margin:2px 0 16px">前端默认 ${DEFAULT_SERVER_URL}（开发），后端默认 ${DEFAULT_API_URL}</p>
       <div style="display:flex;gap:10px;justify-content:flex-end">
         <button onclick="window.close()"
           style="padding:8px 20px;background:transparent;border:1px solid %23334;color:%238ab;border-radius:6px;cursor:pointer">取消</button>
@@ -237,9 +268,17 @@ async function showServerSettings() {
       </div>
       <script>
         document.getElementById('saveBtn').onclick = function() {
-          var url = document.getElementById('url').value.trim();
-          if (url && window.aegisClient) {
-            window.aegisClient.saveConfig({ serverUrl: url });
+          var serverUrl = document.getElementById('serverUrl').value.trim();
+          var apiUrl    = document.getElementById('apiUrl').value.trim();
+          if (!serverUrl) {
+            alert('前端界面地址不能为空');
+            return;
+          }
+          if (window.aegisClient) {
+            window.aegisClient.saveConfig({
+              serverUrl: serverUrl,
+              apiUrl:    apiUrl || '${DEFAULT_API_URL}'
+            });
           }
           window.close();
         };
@@ -255,7 +294,7 @@ async function runScan() {
   try {
     const result = await scanner.scan({
       clientId: CLIENT_ID,
-      serverUrl: config.serverUrl,
+      serverUrl: config.apiUrl || config.serverUrl,
     });
     lastScanResult = result;
     console.log(`[Aegis] 扫描完成，发现影子AI：${result.shadowAiCount} 个，风险等级：${result.riskLevel}`);
@@ -308,6 +347,7 @@ ipcMain.handle('get-client-info', () => ({
     return 'Linux';
   })(),
   serverUrl: config.serverUrl,
+  apiUrl:    config.apiUrl,
   scanIntervalMinutes: config.scanIntervalMinutes,
   autoStart: config.autoStart,
   lastScanResult,
@@ -358,9 +398,10 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // 不退出应用，继续在托盘运行
+  // On non-macOS platforms, quit the process when all windows are gone.
+  // (On macOS, apps conventionally stay alive until the user explicitly quits.)
   if (process.platform !== 'darwin') {
-    // 在 macOS 上保持活跃直到用户明确退出
+    app.quit();
   }
 });
 
