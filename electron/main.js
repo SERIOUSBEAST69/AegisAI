@@ -39,19 +39,37 @@ function loadConfig() {
     if (fs.existsSync(CONFIG_PATH)) {
       const saved = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
       // ── 向后兼容迁移 ────────────────────────────────────────────────────
-      // 旧版本将 Spring Boot 后端地址（:8080）存在 serverUrl 中，
-      // 迁移时将其移入 apiUrl，并把 serverUrl 重置为 Vue 前端默认地址。
-      // 只迁移确定是后端端口 8080 的情况，避免误判用户的自定义前端端口。
-      if (saved.serverUrl && !saved.apiUrl) {
+      // 将旧配置中保存在 serverUrl 里的后端地址（:8080）迁移到 backendUrl。
+      // 同时修正任何看起来是后端 API 地址的 serverUrl（以 /api 开头，或端口 8080）。
+      const migrateIfApiUrl = (url) => {
+        if (!url) return url;
         try {
-          const u = new URL(saved.serverUrl);
-          if (u.port === '8080') {
-            saved.apiUrl    = saved.serverUrl;
-            saved.serverUrl = defaults.serverUrl;
+          const u = new URL(url);
+          if (u.port === '8080' || u.pathname.startsWith('/api')) {
+            return null; // signal to reset to default
           }
-        } catch { /* invalid URL, use defaults */ }
+        } catch { /* invalid URL, ignore */ }
+        return url;
+      };
+
+      if (saved.serverUrl) {
+        const fixed = migrateIfApiUrl(saved.serverUrl);
+        if (fixed === null) {
+          // serverUrl was pointing at the backend API – move it to backendUrl and reset
+          if (!saved.backendUrl) saved.backendUrl = saved.serverUrl;
+          saved.serverUrl = defaults.serverUrl;
+        }
       }
-      return { ...defaults, ...saved };
+      // legacy apiUrl field → backendUrl
+      if (saved.apiUrl && !saved.backendUrl) {
+        saved.backendUrl = saved.apiUrl;
+      }
+      delete saved.apiUrl;
+
+      const merged = { ...defaults, ...saved };
+      // Persist the corrected config so the fix survives next launch
+      try { fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2)); } catch { /* ignore */ }
+      return merged;
     }
   } catch { /* ignore */ }
   return defaults;
@@ -136,10 +154,16 @@ function createWindow() {
 
 function createTray() {
   const iconPath = path.join(__dirname, 'assets', 'icon.png');
-  // 如果没有图标文件则使用空图标
-  const icon = fs.existsSync(iconPath)
-    ? nativeImage.createFromPath(iconPath)
-    : nativeImage.createEmpty();
+  let icon;
+  if (fs.existsSync(iconPath)) {
+    const raw = nativeImage.createFromPath(iconPath);
+    // macOS tray icons should be 22×22; Windows/Linux 16×16 or 32×32.
+    // Resize so the tray icon is never blank due to size issues.
+    const size = process.platform === 'darwin' ? 22 : 32;
+    icon = raw.isEmpty() ? nativeImage.createEmpty() : raw.resize({ width: size, height: size });
+  } else {
+    icon = nativeImage.createEmpty();
+  }
 
   tray = new Tray(icon);
   tray.setToolTip('Aegis 守护客户端 – 正在保护您的数据');
