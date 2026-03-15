@@ -26,7 +26,7 @@ const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
 
 function loadConfig() {
   const defaults = {
-    serverUrl: 'http://localhost:8080',
+    serverUrl: 'http://localhost:5173',
     scanIntervalMinutes: 30,
     autoStart: true,
     minimizeToTray: true,

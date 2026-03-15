@@ -48,21 +48,34 @@ public class RateLimiterServiceImpl implements RateLimiterService {
     public void checkQuota(String modelCode, int limit, LocalDate date) {
         if (limit <= 0) return; // 0 表示不限
         String key = modelKey(modelCode, date);
-        String value = redisTemplate.opsForValue().get(key);
-        long current = value == null ? 0L : Long.parseLong(value);
-        if (current >= limit) {
-            throw new IllegalStateException("模型" + modelCode + "今日调用已达上限" + limit);
+        try {
+            String value = redisTemplate.opsForValue().get(key);
+            long current = value == null ? 0L : Long.parseLong(value);
+            if (current >= limit) {
+                throw new IllegalStateException("模型" + modelCode + "今日调用已达上限" + limit);
+            }
+        } catch (Exception e) {
+            if (e instanceof IllegalStateException) throw (IllegalStateException) e;
+            log.warn("[RateLimiter] Redis 不可用，跳过配额检查 modelCode={}", modelCode, e);
         }
     }
 
     @Override
     public void increment(String modelCode, LocalDate date) {
-        redisTemplate.opsForValue().increment(modelKey(modelCode, date), 1);
+        try {
+            redisTemplate.opsForValue().increment(modelKey(modelCode, date), 1);
+        } catch (Exception e) {
+            log.warn("[RateLimiter] Redis 不可用，跳过计数递增 modelCode={}", modelCode, e);
+        }
     }
 
     @Override
     public void reset(String modelCode, LocalDate date) {
-        redisTemplate.delete(modelKey(modelCode, date));
+        try {
+            redisTemplate.delete(modelKey(modelCode, date));
+        } catch (Exception e) {
+            log.warn("[RateLimiter] Redis 不可用，跳过重置计数 modelCode={}", modelCode, e);
+        }
     }
 
     /**
