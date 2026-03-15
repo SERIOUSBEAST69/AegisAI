@@ -108,17 +108,22 @@ public class AuditLogServiceImpl extends ServiceImpl<AuditLogMapper, AuditLog> i
 	}
 
 	private List<AuditLogDocument> fallbackSearch(Long userId, String normalizedOperation, Date from, Date to) {
-		return StreamSupport.stream(auditLogEsRepository.findAll().spliterator(), false)
-				.filter(doc -> userId == null || userId.equals(doc.getUserId()))
-				.filter(doc -> normalizedOperation.isEmpty()
-						|| containsIgnoreCase(doc.getOperation(), normalizedOperation)
-						|| containsIgnoreCase(doc.getInputOverview(), normalizedOperation)
-						|| containsIgnoreCase(doc.getOutputOverview(), normalizedOperation)
-						|| containsIgnoreCase(doc.getResult(), normalizedOperation))
-				.filter(doc -> from == null || (doc.getOperationTime() != null && !doc.getOperationTime().before(from)))
-				.filter(doc -> to == null || (doc.getOperationTime() != null && !doc.getOperationTime().after(to)))
-				.limit(MAX_RESULTS)
-				.collect(Collectors.toList());
+		try {
+			return StreamSupport.stream(auditLogEsRepository.findAll().spliterator(), false)
+					.filter(doc -> userId == null || userId.equals(doc.getUserId()))
+					.filter(doc -> normalizedOperation.isEmpty()
+							|| containsIgnoreCase(doc.getOperation(), normalizedOperation)
+							|| containsIgnoreCase(doc.getInputOverview(), normalizedOperation)
+							|| containsIgnoreCase(doc.getOutputOverview(), normalizedOperation)
+							|| containsIgnoreCase(doc.getResult(), normalizedOperation))
+					.filter(doc -> from == null || (doc.getOperationTime() != null && !doc.getOperationTime().before(from)))
+					.filter(doc -> to == null || (doc.getOperationTime() != null && !doc.getOperationTime().after(to)))
+					.limit(MAX_RESULTS)
+					.collect(Collectors.toList());
+		} catch (Exception e) {
+			log.warn("ES fallback search failed (Elasticsearch 可能未启动), 返回空结果", e);
+			return List.of();
+		}
 	}
 
 	private boolean containsIgnoreCase(String source, String normalizedKeyword) {

@@ -42,6 +42,11 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 
 LABELS = ["id_card", "bank_card", "phone", "email", "address", "name", "unknown"]
 
+# ── Auto-training timeouts ────────────────────────────────────────────────────
+# Maximum wait time (seconds) for subprocess steps during startup auto-training.
+DATA_GENERATION_TIMEOUT: int = int(os.environ.get("DATA_GEN_TIMEOUT", "120"))
+MODEL_TRAINING_TIMEOUT: int  = int(os.environ.get("MODEL_TRAIN_TIMEOUT", "300"))
+
 # ── Logistic Regression hyperparameters ───────────────────────────────────────
 # C=2.0: moderate regularisation that prevents overfitting on the small seed set
 #        while leaving room for real-data fine-tuning via POST /train.
@@ -1258,5 +1263,42 @@ def anomaly_status():
 
 
 if __name__ == "__main__":
+    # ── 自动训练异常检测模型（如模型文件不存在）────────────────────────────────
+    required_model_files = [_ANOMALY_MODEL_FILE, _ANOMALY_ENC_FILE, _ANOMALY_SCALER_FILE]
+    if not all(f.exists() for f in required_model_files):
+        logger.info("[Startup] 异常检测模型文件不存在，尝试自动训练...")
+        try:
+            import subprocess
+            import sys
+            script_dir = Path(__file__).parent
+
+            # 步骤 1：生成训练数据（如果 CSV 文件不存在）
+            data_file = script_dir / "employee_behavior_data.csv"
+            if not data_file.exists():
+                logger.info("[Startup] 正在生成训练数据 (gen_behavior_data.py)...")
+                subprocess.run(
+                    [sys.executable, str(script_dir / "gen_behavior_data.py")],
+                    cwd=str(script_dir),
+                    check=True,
+                    timeout=DATA_GENERATION_TIMEOUT,
+                )
+                logger.info("[Startup] 训练数据生成完成")
+
+            # 步骤 2：训练模型
+            logger.info("[Startup] 正在训练异常检测模型 (train_anomaly.py)...")
+            subprocess.run(
+                [sys.executable, str(script_dir / "train_anomaly.py")],
+                cwd=str(script_dir),
+                check=True,
+                timeout=MODEL_TRAINING_TIMEOUT,
+            )
+            logger.info("[Startup] 异常检测模型训练完成")
+        except Exception as e:
+            logger.warning(
+                "[Startup] 自动训练失败: %s\n"
+                "  请手动运行: cd python-service && python gen_behavior_data.py && python train_anomaly.py",
+                e,
+            )
+
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

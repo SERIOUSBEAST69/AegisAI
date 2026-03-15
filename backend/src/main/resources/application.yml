@@ -39,6 +39,18 @@ spring:
           enabled: true
           initial-interval: 3000
           max-attempts: 3
+  # Redis 配置（支持环境变量覆盖，本地开发默认 localhost，Docker 使用容器名）
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASS:}
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: 3000ms
   cloud:
     openfeign:
       client:
@@ -46,9 +58,9 @@ spring:
           aiInferenceClient:
             connect-timeout: 2000
             read-timeout: 5000
-  # Elasticsearch 配置（适配Docker容器）
+  # Elasticsearch 配置（支持环境变量 ELASTICSEARCH_URIS 覆盖，本地开发默认 localhost，Docker 使用容器名）
   elasticsearch:
-    uris: http://elasticsearch:9200  # Docker容器名，而非localhost
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}  # Docker Compose 中设置 ELASTICSEARCH_URIS=http://elasticsearch:9200
 
 # Flowable 配置（和spring同级，正确缩进）
 flowable:
@@ -77,7 +89,7 @@ ai:
   routing:
     default-system-prompt: "你是一个安全合规的企业助手，回答需脱敏且遵守中国法律。"
   inference:
-    base-url: ${AI_INFERENCE_URL:http://ai-inference:5000}
+    base-url: ${AI_INFERENCE_URL:http://localhost:5000}
 
 # 风险规则配置（修复层级+语法错误）
 risk:
