@@ -69,7 +69,7 @@ function calcOverallRisk(services) {
 /**
  * 执行完整扫描并将结果上报至服务端。
  *
- * @param {{ clientId: string, serverUrl: string }} opts
+ * @param {{ clientId: string, backendUrl: string, serverUrl?: string }} opts
  * @returns {Promise<{
  *   shadowAiCount: number,
  *   riskLevel: string,
@@ -77,7 +77,9 @@ function calcOverallRisk(services) {
  *   time: string,
  * }>}
  */
-async function scan({ clientId, serverUrl }) {
+async function scan({ clientId, backendUrl, serverUrl }) {
+  // backendUrl 优先；兼容旧调用方式中传入 serverUrl 的情况
+  const apiBase = backendUrl || serverUrl;
   const startTime = Date.now();
   console.log('[Scanner] 开始扫描，clientId:', clientId);
 
@@ -110,7 +112,7 @@ async function scan({ clientId, serverUrl }) {
   console.log(`[Scanner] 扫描完成，耗时 ${Date.now() - startTime}ms，发现 ${allServices.length} 个影子AI服务`);
 
   // ── 上报至服务端 ────────────────────────────────────────────────────────────
-  if (serverUrl && clientId) {
+  if (apiBase && clientId) {
     const report = {
       clientId,
       hostname:    os.hostname(),
@@ -124,7 +126,7 @@ async function scan({ clientId, serverUrl }) {
     };
 
     try {
-      await axios.post(`${serverUrl}/api/client/report`, report, {
+      await axios.post(`${apiBase}/api/client/report`, report, {
         timeout: 10000,
         headers: { 'Content-Type': 'application/json' },
       });
