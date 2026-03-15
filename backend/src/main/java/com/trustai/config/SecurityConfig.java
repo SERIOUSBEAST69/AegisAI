@@ -76,8 +76,8 @@ public class SecurityConfig {
                         "/h2-console/**"
                     ).permitAll()
                         .anyRequest().authenticated());
-        http.addFilterBefore(crossSiteRequestFilter, JwtAuthFilter.class);
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(crossSiteRequestFilter, JwtAuthFilter.class);
         return http.build();
     }
 
