@@ -24,6 +24,9 @@ const scanner = require('./scanner/index');
 /** 服务端地址，优先读取环境变量或本地配置文件 */
 const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
 
+const DEFAULT_SERVER_URL = 'http://localhost:5173'; // Vue 前端地址（供 BrowserWindow 加载）
+const DEFAULT_API_URL    = 'http://localhost:8080'; // Spring Boot 后端 API 地址（供扫描器上报）
+
 function loadConfig() {
   const defaults = {
     serverUrl: 'http://localhost:5173',
@@ -34,7 +37,21 @@ function loadConfig() {
   };
   try {
     if (fs.existsSync(CONFIG_PATH)) {
-      return { ...defaults, ...JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) };
+      const saved = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+      // ── 向后兼容迁移 ────────────────────────────────────────────────────
+      // 旧版本将 Spring Boot 后端地址（:8080）存在 serverUrl 中，
+      // 迁移时将其移入 apiUrl，并把 serverUrl 重置为 Vue 前端默认地址。
+      // 只迁移确定是后端端口 8080 的情况，避免误判用户的自定义前端端口。
+      if (saved.serverUrl && !saved.apiUrl) {
+        try {
+          const u = new URL(saved.serverUrl);
+          if (u.port === '8080') {
+            saved.apiUrl    = saved.serverUrl;
+            saved.serverUrl = defaults.serverUrl;
+          }
+        } catch { /* invalid URL, use defaults */ }
+      }
+      return { ...defaults, ...saved };
     }
   } catch { /* ignore */ }
   return defaults;
@@ -124,7 +141,7 @@ function createTray() {
     ? nativeImage.createFromPath(iconPath)
     : nativeImage.createEmpty();
 
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  tray = new Tray(icon);
   tray.setToolTip('Aegis 守护客户端 – 正在保护您的数据');
   updateTrayMenu();
 
@@ -370,9 +387,10 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // 不退出应用，继续在托盘运行
+  // On non-macOS platforms, quit the process when all windows are gone.
+  // (On macOS, apps conventionally stay alive until the user explicitly quits.)
   if (process.platform !== 'darwin') {
-    // 在 macOS 上保持活跃直到用户明确退出
+    app.quit();
   }
 });
 

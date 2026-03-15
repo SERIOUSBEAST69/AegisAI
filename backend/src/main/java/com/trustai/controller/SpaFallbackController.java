@@ -1,6 +1,5 @@
 package com.trustai.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,40 +16,44 @@ import org.springframework.web.bind.annotation.RequestMapping;
  *
  * <p>开发模式下，前端运行在独立的 Vite 开发服务器（通常为 {@code http://localhost:5173}），
  * 本控制器不会被触发。
+ *
+ * <p><strong>实现说明</strong>：每个路由模式中第一段路径变量使用了负向先行断言
+ * ({@code (?!...)})，从匹配阶段就排除 {@code /api/}、{@code /uploads/} 等保留前缀。
+ * 这样 REST 控制器始终能在 Spring MVC 解析阶段前拿到请求，避免回退到静态资源处理器
+ * 产生 "No static resource" 误报日志（旧实现在方法体内 {@code return null} 会触发
+ * Spring MVC 的视图名称推断，最终走到静态资源处理器）。
  */
 @Controller
 @ConditionalOnResource(resources = "classpath:static/index.html")
 public class SpaFallbackController {
 
     /**
-     * 将所有非 API、非静态资源路径转发至 {@code index.html}。
+     * 第一路径段的排除模式：不匹配 api、uploads、h2-console、swagger-ui、v3 这几个保留前缀。
+     * 负向先行断言 {@code (?!word(?:/|$))} 排除该词本身以及以该词开头再跟 {@code /} 的情况，
+     * 不影响以相同字母开头但含更多字符的正常前端路由（如 {@code /apidocs}）。
+     * 后半部分 {@code [^.]+} 要求至少一个字符且不含点号（排除静态资源文件名如 {@code favicon.ico}）。
+     */
+    private static final String SAFE_P1 =
+            "(?!(?:api|uploads|h2-console|swagger-ui|v3)(?:/|$))[^.]+";
+
+    /**
+     * 将所有非保留路径转发至 {@code index.html}。
      *
-     * <p>匹配规则（按优先级）：
+     * <p>匹配规则：
      * <ul>
-     *   <li>{@code /api/**}          → 由各 RestController 处理，不在此匹配</li>
-     *   <li>{@code /uploads/**}      → 由静态资源处理器服务，不在此匹配</li>
-     *   <li>{@code /h2-console/**}   → 由 H2 控制台处理，不在此匹配</li>
-     *   <li>{@code /swagger-ui/**}   → 由 Springdoc 处理，不在此匹配</li>
-     *   <li>其他所有路径             → 转发至 {@code /index.html}</li>
+     *   <li>第一路径段为 {@code api / uploads / h2-console / swagger-ui / v3}（或以其为前缀路径）
+     *       → 不匹配此控制器，直接由对应 RestController / 静态资源处理器处理。</li>
+     *   <li>其他所有路径（最多 5 级，不含扩展名）→ 转发至 {@code /index.html}。</li>
      * </ul>
-     *
-     * <p>路由段限制：最多支持 5 级路径（如 {@code /a/b/c/d/e}），可按需扩展。
      */
     @RequestMapping(value = {
-            "/{p1:[^\\.]*}",
-            "/{p1:[^\\.]*}/{p2:[^\\.]*}",
-            "/{p1:[^\\.]*}/{p2:[^\\.]*}/{p3:[^\\.]*}",
-            "/{p1:[^\\.]*}/{p2:[^\\.]*}/{p3:[^\\.]*}/{p4:[^\\.]*}",
-            "/{p1:[^\\.]*}/{p2:[^\\.]*}/{p3:[^\\.]*}/{p4:[^\\.]*}/{p5:[^\\.]*}"
+            "/{p1:" + SAFE_P1 + "}",
+            "/{p1:" + SAFE_P1 + "}/{p2:[^.]*}",
+            "/{p1:" + SAFE_P1 + "}/{p2:[^.]*}/{p3:[^.]*}",
+            "/{p1:" + SAFE_P1 + "}/{p2:[^.]*}/{p3:[^.]*}/{p4:[^.]*}",
+            "/{p1:" + SAFE_P1 + "}/{p2:[^.]*}/{p3:[^.]*}/{p4:[^.]*}/{p5:[^.]*}"
     })
-    public String forward(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        // API 路径、上传文件、H2 控制台、Swagger 由各自处理器接管，不做转发
-        if (uri.startsWith("/api/") || uri.startsWith("/uploads/")
-                || uri.startsWith("/h2-console") || uri.startsWith("/swagger-ui")
-                || uri.startsWith("/v3/api-docs")) {
-            return null;
-        }
+    public String forward() {
         return "forward:/index.html";
     }
 }
