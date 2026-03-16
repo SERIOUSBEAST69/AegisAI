@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS ai_model (
 CREATE TABLE IF NOT EXISTS ai_call_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     user_id BIGINT COMMENT '调用用户',
+    data_asset_id BIGINT DEFAULT NULL COMMENT '关联数据资产ID',
     model_id BIGINT COMMENT '模型ID',
     model_code VARCHAR(100) COMMENT '模型代码',
     provider VARCHAR(50) COMMENT '供应商',
