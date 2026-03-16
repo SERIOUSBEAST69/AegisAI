@@ -89,7 +89,7 @@ public class DataInitializer implements CommandLineRunner {
         if (isNew) {
             userService.save(user);
         } else {
-            // 更新时忽略密码字段
+            user.setPassword(null); // 确保更新时不修改现有用户密码（updateById 默认跳过 null 字段）
             userService.updateById(user);
         }
     }
