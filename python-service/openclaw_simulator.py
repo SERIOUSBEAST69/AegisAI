@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-OpenClaw 代理窃取模拟器
-=====================
-模拟恶意代理软件（OpenClaw）在员工电脑上窃取文件的行为，
-生成大量模拟事件并通过 HTTP 上报到 AegisAI 后端。
+OpenClaw 工作台事件模拟器（Workbench Event Simulator）
+======================================================
+职责定位：向 AegisAI 工作台后端上报模拟的安全事件，用于填充告警面板、
+测试检测规则和可视化大屏。本文件专注于工作台集成，与后端 API 紧密耦合。
+
+⚠️  注意：本文件仅负责工作台的事件数据生成与上报。
+   如需运行攻防博弈推演（独立于工作台），请使用：
+     python openclaw_adversarial.py --verbose --scenario supply_chain_apt
 
 用法：
     python openclaw_simulator.py [--url URL] [--count N] [--batch BATCH_SIZE] [--delay SECONDS]
