@@ -106,11 +106,17 @@ CREATE TABLE IF NOT EXISTS ai_model (
 CREATE TABLE IF NOT EXISTS ai_call_log (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT,
+  data_asset_id BIGINT,
   model_id BIGINT,
-  input_content CLOB,
-  output_content CLOB,
-  cost_time INT,
+  model_code VARCHAR(100),
+  provider VARCHAR(50),
+  input_preview VARCHAR(200),
+  output_preview VARCHAR(200),
   status VARCHAR(20),
+  error_msg VARCHAR(500),
+  duration_ms BIGINT,
+  token_usage INT,
+  ip VARCHAR(64),
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
