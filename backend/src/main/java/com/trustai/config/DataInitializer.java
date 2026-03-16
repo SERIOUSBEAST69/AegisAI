@@ -74,7 +74,7 @@ public class DataInitializer implements CommandLineRunner {
             user.setPassword(passwordEncoder.encode(password));
             user.setCreateTime(new Date());
         }
-        user.setUsername(username);
+        // 对于已存在的用户，不修改密码
         user.setRealName(realName);
         user.setNickname(realName);
         user.setRoleId(role == null ? null : role.getId());
@@ -89,7 +89,8 @@ public class DataInitializer implements CommandLineRunner {
         if (isNew) {
             userService.save(user);
         } else {
+            // 更新时忽略密码字段
             userService.updateById(user);
         }
     }
-}
+ }
