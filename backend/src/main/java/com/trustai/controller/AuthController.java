@@ -239,7 +239,7 @@ public class AuthController {
         user.setWechatOpenId(seed.wechatOpenId());
         user.setStatus(1);
         user.setUpdateTime(new Date());
-        if (!StringUtils.hasText(user.getPassword()) || !passwordEncoder.matches(seed.password(), user.getPassword())) {
+        if (isNew || !StringUtils.hasText(user.getPassword())) {
             user.setPassword(passwordEncoder.encode(seed.password()));
         }
 
