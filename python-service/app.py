@@ -44,6 +44,11 @@ logging.basicConfig(
 logger = logging.getLogger("aegisai")
 
 # ── Configuration ──────────────────────────────────────────────────────────────
+# Configure Hugging Face mirror endpoint to resolve model download failures in
+# network-restricted environments. Defaults to hf-mirror.com if not already set.
+if not os.environ.get("HF_ENDPOINT"):
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
 # Set BERT_MOCK=true to skip loading the heavy BERT model (dev / CI / testing).
 MOCK_MODE: bool = os.environ.get("BERT_MOCK", "false").lower() in ("true", "1", "yes")
 MODEL_NAME: str = os.environ.get("BERT_MODEL", "bert-base-chinese")
