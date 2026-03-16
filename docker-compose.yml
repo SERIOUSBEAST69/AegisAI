@@ -1,4 +1,7 @@
+version: '3.8'
+
 services:
+  # 1. MySQL 容器
   mysql:
     image: mysql:8.0
     container_name: aegisai-mysql
@@ -10,17 +13,10 @@ services:
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
       MYSQL_ROOT_HOST: "%"
     ports:
-      - "3307:3306"          # 映射到主机3307，避免与本地MySQL冲突
-    command:
-      --default-authentication-plugin=mysql_native_password
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --lower_case_table_names=1
+      - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./aegisai.sql:/docker-entrypoint-initdb.d/001-legacy-base.sql:ro
-      - ./docker/mysql/bootstrap/001-latest-compat.sql:/docker-entrypoint-initdb.d/002-latest-compat.sql:ro
-      - ./docker/mysql/bootstrap/002-themed-seed.sql:/docker-entrypoint-initdb.d/003-themed-seed.sql:ro
+      - ./aegisai.sql:/docker-entrypoint-initdb.d/aegisai.sql
     networks:
       - aegisai-network
     healthcheck:
@@ -29,8 +25,9 @@ services:
       timeout: 10s
       retries: 10
 
+  # 2. Redis 容器
   redis:
-    image: redis:6.2
+    image: redis:7.0
     container_name: aegisai-redis
     restart: always
     ports:
@@ -46,14 +43,16 @@ services:
       timeout: 10s
       retries: 10
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+  # 3. Elasticsearch 容器
+  es:
+    image: elasticsearch:8.14.0
     container_name: aegisai-es
     restart: always
     environment:
-      - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - discovery.type=single-node
       - xpack.security.enabled=false
+      - "TZ=Asia/Shanghai"
     ports:
       - "9200:9200"
       - "9300:9300"
@@ -62,14 +61,15 @@ services:
     networks:
       - aegisai-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -s --fail http://localhost:9200 || exit 1"]
       interval: 10s
-      timeout: 20s
+      timeout: 10s
       retries: 10
 
+  # 4. AI 推理服务（Flask+BERT+LSTM）
   ai-inference:
     build:
-      context: ./python-service
+      context: ./python-service       # 关键修正：改为相对于 compose 文件的路径
       dockerfile: Dockerfile
     container_name: ai-inference
     restart: always
@@ -83,6 +83,7 @@ services:
       timeout: 10s
       retries: 5
 
+  # 5. RabbitMQ 服务
   rabbitmq:
     image: rabbitmq:3.12-management
     container_name: aegisai-rabbitmq
@@ -104,21 +105,9 @@ services:
       timeout: 5s
       retries: 5
 
-  mysql-bootstrap:
-    image: mysql:8.0
-    container_name: aegisai-mysql-bootstrap
-    restart: "no"
-    depends_on:
-      mysql:
-        condition: service_healthy
-    volumes:
-      - ./docker/mysql/bootstrap:/bootstrap:ro
-    entrypoint: ["/bin/sh", "/bootstrap/bootstrap.sh"]
-    networks:
-      - aegisai-network
-
+  # 6. 后端应用容器
   aegisai-backend:
-    build: .                     # 使用根目录的 Dockerfile（后端）
+    build: .                          # 使用当前目录的 Dockerfile 构建后端
     container_name: aegisai-backend
     restart: always
     ports:
@@ -130,42 +119,25 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: root
-      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_ELASTICSEARCH_URIS: http://es:9200
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: admin
       SPRING_RABBITMQ_PASSWORD: 123456
       SPRING_RABBITMQ_VIRTUAL_HOST: /aegisai
       AI_INFERENCE_URL: http://ai-inference:5000
-      AI_AES_KEY: "12345678901234567890123456789012"
+      AI_AES_KEY: 12345678901234567890123456789012
     depends_on:
       mysql:
         condition: service_healthy
-      mysql-bootstrap:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
-      elasticsearch:
+      es:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       ai-inference:
         condition: service_started
-    networks:
-      - aegisai-network
-
-  aegisai-frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        VITE_API_BASE_URL: http://aegisai-backend:8080   # 容器内访问后端
-    container_name: aegisai-frontend
-    restart: always
-    ports:
-      - "80:80"                  # 访问 http://localhost 即可
-    depends_on:
-      - aegisai-backend
     networks:
       - aegisai-network
 

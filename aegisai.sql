@@ -191,11 +191,23 @@ LOCK TABLES `compliance_policy` WRITE;
 INSERT INTO `compliance_policy` VALUES (1,'手机号脱敏','{"mask":"****"}','全局',1,1,'2026-03-01 21:09:11','2026-03-01 21:09:11'),(2,'支付导出审批','{"require_approval":true}','支付流水',1,1,'2026-03-01 21:09:11','2026-03-01 21:09:11');
 /*!40000 ALTER TABLE `compliance_policy` ENABLE KEYS */;
 UNLOCK TABLES;
+-- system_config 表
+CREATE TABLE IF NOT EXISTS system_config (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    config_key VARCHAR(100) NOT NULL COMMENT '配置键',
+    config_value TEXT COMMENT '配置值',
+    description VARCHAR(255) COMMENT '描述',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_config_key (config_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
 
+-- 修改 audit_log 表，添加 risk_level 列（如果不存在）
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS risk_level INT COMMENT '风险等级' AFTER result;
 --
 -- Table structure for table `data_asset`
 --
-
+ALTER TABLE ai_call_log ADD COLUMN IF NOT EXISTS data_asset_id BIGINT COMMENT '数据资产ID' AFTER user_id;
 DROP TABLE IF EXISTS `data_asset`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
