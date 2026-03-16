@@ -116,3 +116,158 @@ CREATE TABLE IF NOT EXISTS `system_config` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) COMMENT='系统配置表';
+
+-- AI 调用审计日志表（含 data_asset_id）
+CREATE TABLE IF NOT EXISTS `ai_call_log` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `user_id` BIGINT DEFAULT NULL COMMENT '调用用户',
+  `data_asset_id` BIGINT DEFAULT NULL COMMENT '关联数据资产ID',
+  `model_id` BIGINT DEFAULT NULL COMMENT '模型ID',
+  `model_code` VARCHAR(100) DEFAULT NULL COMMENT '模型代码',
+  `provider` VARCHAR(50) DEFAULT NULL COMMENT '供应商',
+  `input_preview` VARCHAR(200) DEFAULT NULL COMMENT '输入预览（已脱敏）',
+  `output_preview` VARCHAR(200) DEFAULT NULL COMMENT '输出预览（已脱敏）',
+  `status` VARCHAR(20) DEFAULT NULL COMMENT 'success/fail',
+  `error_msg` VARCHAR(500) DEFAULT NULL COMMENT '失败原因',
+  `duration_ms` BIGINT DEFAULT NULL COMMENT '耗时毫秒',
+  `token_usage` INT DEFAULT NULL COMMENT 'token 用量',
+  `ip` VARCHAR(64) DEFAULT NULL COMMENT '调用者IP',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  INDEX idx_model_code_date(`model_code`, `create_time`),
+  INDEX idx_user_date(`user_id`, `create_time`)
+) COMMENT='AI 调用审计日志';
+
+-- 若 ai_call_log 已存在但缺少 data_asset_id 列，则补充
+SET @has_ai_call_log_data_asset_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'data_asset_id'
+);
+SET @sql_add_ai_call_log_data_asset_id := IF(
+  @has_ai_call_log_data_asset_id = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN data_asset_id BIGINT DEFAULT NULL COMMENT ''关联数据资产ID'' AFTER user_id',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_data_asset_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 若 ai_call_log 已存在但缺少 model_code 列，则补充
+SET @has_ai_call_log_model_code := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'model_code'
+);
+SET @sql_add_ai_call_log_model_code := IF(
+  @has_ai_call_log_model_code = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN model_code VARCHAR(100) DEFAULT NULL COMMENT ''模型代码'' AFTER model_id',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_model_code;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 若 ai_call_log 已存在但缺少 provider 列，则补充
+SET @has_ai_call_log_provider := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'provider'
+);
+SET @sql_add_ai_call_log_provider := IF(
+  @has_ai_call_log_provider = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN provider VARCHAR(50) DEFAULT NULL COMMENT ''供应商'' AFTER model_code',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_provider;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 若 ai_call_log 已存在但缺少 input_preview 列，则补充
+SET @has_ai_call_log_input_preview := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'input_preview'
+);
+SET @sql_add_ai_call_log_input_preview := IF(
+  @has_ai_call_log_input_preview = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN input_preview VARCHAR(200) DEFAULT NULL COMMENT ''输入预览（已脱敏）'' AFTER provider',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_input_preview;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 若 ai_call_log 已存在但缺少 output_preview 列，则补充
+SET @has_ai_call_log_output_preview := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'output_preview'
+);
+SET @sql_add_ai_call_log_output_preview := IF(
+  @has_ai_call_log_output_preview = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN output_preview VARCHAR(200) DEFAULT NULL COMMENT ''输出预览（已脱敏）'' AFTER input_preview',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_output_preview;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 若 ai_call_log 已存在但缺少 error_msg 列，则补充
+SET @has_ai_call_log_error_msg := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'error_msg'
+);
+SET @sql_add_ai_call_log_error_msg := IF(
+  @has_ai_call_log_error_msg = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN error_msg VARCHAR(500) DEFAULT NULL COMMENT ''失败原因'' AFTER status',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_error_msg;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 若 ai_call_log 已存在但缺少 duration_ms 列，则补充
+SET @has_ai_call_log_duration_ms := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'duration_ms'
+);
+SET @sql_add_ai_call_log_duration_ms := IF(
+  @has_ai_call_log_duration_ms = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN duration_ms BIGINT DEFAULT NULL COMMENT ''耗时毫秒'' AFTER error_msg',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_duration_ms;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 若 ai_call_log 已存在但缺少 token_usage 列，则补充
+SET @has_ai_call_log_token_usage := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'token_usage'
+);
+SET @sql_add_ai_call_log_token_usage := IF(
+  @has_ai_call_log_token_usage = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN token_usage INT DEFAULT NULL COMMENT ''token 用量'' AFTER duration_ms',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_token_usage;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 若 ai_call_log 已存在但缺少 ip 列，则补充
+SET @has_ai_call_log_ip := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'ai_call_log' AND column_name = 'ip'
+);
+SET @sql_add_ai_call_log_ip := IF(
+  @has_ai_call_log_ip = 0,
+  'ALTER TABLE ai_call_log ADD COLUMN ip VARCHAR(64) DEFAULT NULL COMMENT ''调用者IP'' AFTER token_usage',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_ai_call_log_ip;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

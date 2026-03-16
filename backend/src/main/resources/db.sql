@@ -78,6 +78,25 @@ CREATE TABLE `ai_model` (
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) COMMENT='AI模型表';
 
+CREATE TABLE `ai_call_log` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `user_id` BIGINT DEFAULT NULL COMMENT '调用用户',
+  `data_asset_id` BIGINT DEFAULT NULL COMMENT '关联数据资产ID',
+  `model_id` BIGINT DEFAULT NULL COMMENT '模型ID',
+  `model_code` VARCHAR(100) DEFAULT NULL COMMENT '模型代码',
+  `provider` VARCHAR(50) DEFAULT NULL COMMENT '供应商',
+  `input_preview` VARCHAR(200) DEFAULT NULL COMMENT '输入预览（已脱敏）',
+  `output_preview` VARCHAR(200) DEFAULT NULL COMMENT '输出预览（已脱敏）',
+  `status` VARCHAR(20) DEFAULT NULL COMMENT 'success/fail',
+  `error_msg` VARCHAR(500) DEFAULT NULL COMMENT '失败原因',
+  `duration_ms` BIGINT DEFAULT NULL COMMENT '耗时毫秒',
+  `token_usage` INT DEFAULT NULL COMMENT 'token 用量',
+  `ip` VARCHAR(64) DEFAULT NULL COMMENT '调用者IP',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  INDEX idx_model_code_date(`model_code`, `create_time`),
+  INDEX idx_user_date(`user_id`, `create_time`)
+) COMMENT='AI 调用审计日志';
+
 CREATE TABLE `audit_log` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '日志ID',
   `user_id` BIGINT COMMENT '用户ID',
