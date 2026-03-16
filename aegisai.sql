@@ -24,6 +24,7 @@ DROP TABLE IF EXISTS `ai_call_log`;
 CREATE TABLE `ai_call_log` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id` bigint DEFAULT NULL COMMENT '调用用户',
+  `data_asset_id` bigint DEFAULT NULL COMMENT '关联数据资产ID',
   `model_id` bigint DEFAULT NULL COMMENT '模型ID',
   `model_code` varchar(100) DEFAULT NULL COMMENT '模型代码',
   `provider` varchar(50) DEFAULT NULL COMMENT '供应商',
@@ -151,6 +152,7 @@ CREATE TABLE `audit_log` (
   `input_overview` varchar(200) DEFAULT NULL COMMENT '输入摘要（脱敏）',
   `output_overview` varchar(200) DEFAULT NULL COMMENT '输出摘要（脱敏）',
   `result` varchar(20) DEFAULT NULL COMMENT '结果（成功/失败）',
+  `risk_level` varchar(20) DEFAULT NULL COMMENT '风险等级（NORMAL/LOW/MEDIUM/HIGH）',
   `hash` varchar(128) DEFAULT NULL COMMENT '哈希/签名',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
@@ -162,7 +164,7 @@ CREATE TABLE `audit_log` (
 
 LOCK TABLES `audit_log` WRITE;
 /*!40000 ALTER TABLE `audit_log` DISABLE KEYS */;
-INSERT INTO `audit_log` VALUES (1,1,1,'查询','2026-02-10 09:00:00','10.0.0.1','Chrome','uid=123','name=张*','成功','h1','2026-03-01 21:09:11'),(2,2,2,'导出','2026-02-10 10:00:00','10.0.0.2','Chrome','date=2026-02-01','file=pay.csv','成功','h2','2026-03-01 21:09:11'),(3,3,3,'索引检索','2026-02-10 11:00:00','10.0.0.3','Edge','kw=违规','hits=20','失败','h3','2026-03-01 21:09:11');
+INSERT INTO `audit_log` VALUES (1,1,1,'查询','2026-02-10 09:00:00','10.0.0.1','Chrome','uid=123','name=张*','成功','NORMAL','h1','2026-03-01 21:09:11'),(2,2,2,'导出','2026-02-10 10:00:00','10.0.0.2','Chrome','date=2026-02-01','file=pay.csv','成功','LOW','h2','2026-03-01 21:09:11'),(3,3,3,'索引检索','2026-02-10 11:00:00','10.0.0.3','Edge','kw=违规','hits=20','失败','MEDIUM','h3','2026-03-01 21:09:11');
 /*!40000 ALTER TABLE `audit_log` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -191,24 +193,30 @@ LOCK TABLES `compliance_policy` WRITE;
 INSERT INTO `compliance_policy` VALUES (1,'手机号脱敏','{"mask":"****"}','全局',1,1,'2026-03-01 21:09:11','2026-03-01 21:09:11'),(2,'支付导出审批','{"require_approval":true}','支付流水',1,1,'2026-03-01 21:09:11','2026-03-01 21:09:11');
 /*!40000 ALTER TABLE `compliance_policy` ENABLE KEYS */;
 UNLOCK TABLES;
--- system_config 表
-CREATE TABLE IF NOT EXISTS system_config (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    config_key VARCHAR(100) NOT NULL COMMENT '配置键',
-    config_value TEXT COMMENT '配置值',
-    description VARCHAR(255) COMMENT '描述',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_config_key (config_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
+--
+-- Table structure for table `system_config`
+--
 
--- 修改 audit_log 表，添加 risk_level 列（如果不存在）
-ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS risk_level INT COMMENT '风险等级' AFTER result;
+DROP TABLE IF EXISTS `system_config`;
+CREATE TABLE `system_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '配置ID',
+  `config_key` varchar(128) NOT NULL COMMENT '配置键',
+  `config_value` text COMMENT '配置值',
+  `description` varchar(255) DEFAULT NULL COMMENT '描述',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_config_key` (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统配置表';
+
+LOCK TABLES `system_config` WRITE;
+/*!40000 ALTER TABLE `system_config` DISABLE KEYS */;
+/*!40000 ALTER TABLE `system_config` ENABLE KEYS */;
+UNLOCK TABLES;
+
 --
 -- Table structure for table `data_asset`
 --
-ALTER TABLE ai_call_log ADD COLUMN IF NOT EXISTS data_asset_id BIGINT COMMENT '数据资产ID' AFTER user_id;
-DROP TABLE IF EXISTS `data_asset`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `data_asset` (
@@ -529,6 +537,113 @@ CREATE TABLE `client_report` (
 LOCK TABLES `client_report` WRITE;
 /*!40000 ALTER TABLE `client_report` DISABLE KEYS */;
 /*!40000 ALTER TABLE `client_report` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `security_event`
+--
+
+DROP TABLE IF EXISTS `security_event`;
+CREATE TABLE `security_event` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '事件ID',
+  `event_type` varchar(50) DEFAULT NULL COMMENT '事件类型：FILE_STEAL/SUSPICIOUS_UPLOAD/BATCH_COPY/EXFILTRATION/DATA_SCRAPE/CREDENTIAL_DUMP',
+  `file_path` varchar(500) DEFAULT NULL COMMENT '涉及文件路径',
+  `target_addr` varchar(200) DEFAULT NULL COMMENT '目标地址',
+  `employee_id` varchar(50) DEFAULT NULL COMMENT '员工标识',
+  `hostname` varchar(100) DEFAULT NULL COMMENT '主机名',
+  `file_size` bigint DEFAULT NULL COMMENT '文件大小（字节）',
+  `severity` varchar(20) DEFAULT NULL COMMENT '风险等级：critical/high/medium/low',
+  `status` varchar(20) DEFAULT 'pending' COMMENT '状态：pending/blocked/ignored/reviewing',
+  `source` varchar(50) DEFAULT NULL COMMENT '上报来源：openclaw-sim/agent/manual',
+  `operator_id` bigint DEFAULT NULL COMMENT '操作者ID',
+  `event_time` datetime DEFAULT NULL COMMENT '事件发生时间',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_severity` (`severity`),
+  KEY `idx_status` (`status`),
+  KEY `idx_event_time` (`event_time`),
+  KEY `idx_employee` (`employee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='安全事件表（OpenClaw代理上报）';
+
+LOCK TABLES `security_event` WRITE;
+/*!40000 ALTER TABLE `security_event` DISABLE KEYS */;
+/*!40000 ALTER TABLE `security_event` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `client_scan_queue`
+--
+
+DROP TABLE IF EXISTS `client_scan_queue`;
+CREATE TABLE `client_scan_queue` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `platform` varchar(20) DEFAULT NULL COMMENT '平台：windows/macos/linux',
+  `hostname` varchar(100) DEFAULT NULL COMMENT '主机名',
+  `os_username` varchar(50) DEFAULT NULL COMMENT '操作系统用户名',
+  `user_agent` varchar(200) DEFAULT NULL COMMENT '浏览器User-Agent',
+  `status` varchar(20) DEFAULT 'queued' COMMENT '状态：queued/scanning/done/failed',
+  `scan_result` text COMMENT '扫描结果（JSON）',
+  `download_time` datetime DEFAULT NULL COMMENT '下载时间',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_platform` (`platform`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='客户端扫描队列';
+
+LOCK TABLES `client_scan_queue` WRITE;
+/*!40000 ALTER TABLE `client_scan_queue` DISABLE KEYS */;
+/*!40000 ALTER TABLE `client_scan_queue` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `desense_recommend_rule`
+--
+
+DROP TABLE IF EXISTS `desense_recommend_rule`;
+CREATE TABLE `desense_recommend_rule` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `data_category` varchar(50) DEFAULT NULL COMMENT '数据类别',
+  `user_role` varchar(50) DEFAULT NULL COMMENT '用户角色',
+  `strategy` varchar(50) DEFAULT NULL COMMENT '脱敏策略',
+  `rule_id` bigint DEFAULT NULL COMMENT '关联脱敏规则ID',
+  `priority` int DEFAULT '0' COMMENT '优先级',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_category` (`data_category`),
+  KEY `idx_role` (`user_role`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='脱敏推荐规则表';
+
+LOCK TABLES `desense_recommend_rule` WRITE;
+/*!40000 ALTER TABLE `desense_recommend_rule` DISABLE KEYS */;
+/*!40000 ALTER TABLE `desense_recommend_rule` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `security_detection_rule`
+--
+
+DROP TABLE IF EXISTS `security_detection_rule`;
+CREATE TABLE `security_detection_rule` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '规则ID',
+  `name` varchar(100) DEFAULT NULL COMMENT '规则名称',
+  `sensitive_extensions` varchar(500) DEFAULT NULL COMMENT '敏感文件类型（逗号分隔）',
+  `sensitive_paths` text COMMENT '敏感目录（逗号分隔）',
+  `alert_threshold_bytes` bigint DEFAULT NULL COMMENT '告警阈值（字节）',
+  `enabled` tinyint(1) DEFAULT '1' COMMENT '是否启用',
+  `description` varchar(200) DEFAULT NULL COMMENT '描述',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='安全检测规则表';
+
+LOCK TABLES `security_detection_rule` WRITE;
+/*!40000 ALTER TABLE `security_detection_rule` DISABLE KEYS */;
+INSERT INTO `security_detection_rule` VALUES (1,'默认检测规则','.docx,.pdf,.xlsx,.csv,.sql,.bak,.pem,.pfx,.key,.env','/Documents,/Desktop,/HR,/backup,/export,/certs,/keys,/config',5242880,1,'默认安全检测规则','2026-03-01 21:09:11','2026-03-01 21:09:11');
+/*!40000 ALTER TABLE `security_detection_rule` ENABLE KEYS */;
 UNLOCK TABLES;
 
  /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
