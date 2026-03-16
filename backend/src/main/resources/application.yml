@@ -11,6 +11,9 @@ spring:
     hikari:
       connection-timeout: 30000
       maximum-pool-size: 10
+      max-lifetime: 1800000     # 30 minutes - must be shorter than MySQL wait_timeout
+      idle-timeout: 600000      # 10 minutes
+      keepalive-time: 60000     # 1 minute - prevents idle connections from being closed by server
 
   # H2 控制台（可选，但仅用于开发，数据源仍是 MySQL）
   h2:
