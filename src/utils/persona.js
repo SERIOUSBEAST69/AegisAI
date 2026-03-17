@@ -32,7 +32,6 @@ const PERSONAS = {
     ],
     quickActions: [
       { title: '查看风险事件', description: '优先压降高危事件', route: '/risk-event-manage' },
-      { title: '查看调用成本', description: '核验 AI ROI 与预算压力', route: '/model-cost' },
       { title: '查看审批流', description: '识别卡点与责任链', route: '/approval-manage' },
     ],
     roleHints: ['exec', 'ceo', 'cxo', 'director', 'management', 'leader', 'principal', 'president', '校长', '院长', '管理层', '总经理'],
@@ -57,7 +56,6 @@ const PERSONAS = {
       { step: '03', title: '联动策略处置', description: '必要时冻结模型、调整权限、更新策略或发起审批。' },
     ],
     quickActions: [
-      { title: '告警闭环', description: '进入告警签收与处理', route: '/alerts' },
       { title: '实时威胁监控', description: '检测代理窃取行为', route: '/threat-monitor' },
       { title: '审计日志', description: '追踪证据链', route: '/audit-log' },
       { title: '敏感扫描', description: '复核高敏数据暴露面', route: '/sensitive-scan' },
@@ -85,7 +83,6 @@ const PERSONAS = {
     ],
     quickActions: [
       { title: '数据资产', description: '进入资产清单与画像', route: '/data-asset' },
-      { title: '资产共享', description: '处理共享申请与审批', route: '/data-share' },
       { title: '脱敏预览', description: '校验脱敏效果', route: '/desense-preview' },
     ],
     roleHints: ['data', 'asset', 'steward', 'dba', 'privacy', '数据', '资产', '数据管理员'],
@@ -110,9 +107,9 @@ const PERSONAS = {
       { step: '03', title: '联动合规策略', description: '必要时回到脱敏、审计和审批模块完成交付闭环。' },
     ],
     quickActions: [
-      { title: 'AI 模型', description: '进入模型目录与状态面板', route: '/ai-model-manage' },
-      { title: '调用成本', description: '控制预算与 ROI', route: '/model-cost' },
-      { title: '全局搜索', description: '跨资产与模型查上下文', route: '/global-search' },
+      { title: '影子AI发现', description: '检查未授权 AI 服务', route: '/shadow-ai' },
+      { title: 'AI风险评级', description: '查看服务风险分级', route: '/ai/risk-rating' },
+      { title: '员工AI行为监控', description: '关注高风险行为事件', route: '/ai/anomaly' },
     ],
     roleHints: ['developer', 'dev', 'engineer', 'model', 'ml', 'ai', '研发', '开发'],
   },
@@ -136,7 +133,6 @@ const PERSONAS = {
       { step: '03', title: '推动跨部门协同', description: '把问题拆给数据、安全、研发与治理负责人，加速业务闭环。' },
     ],
     quickActions: [
-      { title: '数据共享', description: '推进业务所需数据流转', route: '/data-share' },
       { title: '审批管理', description: '跟进关键卡点审批', route: '/approval-manage' },
       { title: '数据资产', description: '查看可用资产与上传新数据', route: '/data-asset' },
     ],
@@ -203,7 +199,6 @@ const MENU_SECTIONS = [
     items: [
       { path: '/', label: '首页', icon: 'HomeFilled', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner', 'aiBuilder', 'employee'] },
       { path: '/operations-command', label: '运营指挥台', icon: 'Grid', audiences: ['governanceAdmin', 'executive'] },
-      { path: '/global-search', label: '全局搜索', icon: 'Search', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner', 'aiBuilder', 'employee'] },
     ],
   },
   {
@@ -211,8 +206,6 @@ const MENU_SECTIONS = [
     title: '数据与模型',
     items: [
       { path: '/data-asset', label: '数据资产', icon: 'DataAnalysis', audiences: ['governanceAdmin', 'dataAdmin'] },
-      { path: '/ai-model-manage', label: 'AI模型', icon: 'StarFilled', audiences: ['governanceAdmin', 'secops', 'aiBuilder'] },
-      { path: '/model-cost', label: '调用成本', icon: 'Money', audiences: ['governanceAdmin', 'aiBuilder', 'executive', 'businessOwner'] },
       { path: '/desense-preview', label: '脱敏预览', icon: 'Lock', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'aiBuilder'] },
     ],
   },
@@ -224,7 +217,6 @@ const MENU_SECTIONS = [
       { path: '/threat-monitor', label: '实时威胁监控', icon: 'AlarmClock', audiences: ['governanceAdmin', 'secops'] },
       { path: '/ai/risk-rating', label: 'AI风险评级', icon: 'Histogram', audiences: ['governanceAdmin', 'secops', 'aiBuilder'] },
       { path: '/ai/anomaly', label: '员工AI行为监控', icon: 'AlarmClock', audiences: ['governanceAdmin', 'secops', 'executive', 'dataAdmin', 'aiBuilder', 'businessOwner', 'employee'] },
-      { path: '/alerts', label: '告警闭环', icon: 'Warning', audiences: ['governanceAdmin', 'secops'] },
       { path: '/audit-log', label: '审计日志', icon: 'Timer', audiences: ['governanceAdmin', 'secops'] },
       { path: '/audit-report', label: '审计报告', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/sensitive-scan', label: '敏感扫描', icon: 'Search', audiences: ['governanceAdmin', 'secops', 'dataAdmin'] },
@@ -235,7 +227,6 @@ const MENU_SECTIONS = [
     title: '流转与履约',
     items: [
       { path: '/approval-manage', label: '审批管理', icon: 'Finished', audiences: ['governanceAdmin', 'dataAdmin', 'businessOwner', 'employee'] },
-      { path: '/data-share', label: '数据共享', icon: 'Share', audiences: ['governanceAdmin', 'dataAdmin', 'businessOwner', 'employee'] },
       { path: '/risk-event-manage', label: '风险事件', icon: 'Warning', audiences: ['governanceAdmin', 'secops'] },
       { path: '/subject-request', label: '主体权利', icon: 'UserFilled', audiences: ['governanceAdmin'] },
       { path: '/policy-manage', label: '策略管理', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'aiBuilder'] },
@@ -258,16 +249,13 @@ const EXTRA_ROUTE_AUDIENCES = {
   '/operations-command': ['governanceAdmin', 'executive'],
   '/approval-manage': ['governanceAdmin', 'dataAdmin', 'businessOwner', 'employee'],
   '/risk-event-manage': ['governanceAdmin', 'secops'],
-  '/data-share': ['governanceAdmin', 'dataAdmin', 'businessOwner', 'employee'],
-  '/ai/models': ['governanceAdmin', 'secops', 'aiBuilder'],
-  '/ai/monitor': ['governanceAdmin', 'secops', 'aiBuilder'],
   '/ai/risk-rating': ['governanceAdmin', 'secops', 'aiBuilder'],
   '/ai/anomaly': ['governanceAdmin', 'secops', 'executive', 'dataAdmin', 'aiBuilder', 'businessOwner', 'employee'],
   '/shadow-ai': ['governanceAdmin', 'secops', 'aiBuilder'],
   '/threat-monitor': ['governanceAdmin', 'secops'],
 };
 
-const EMPLOYEE_ALLOWED_PATHS = new Set(['/global-search', '/ai/anomaly', '/approval-manage', '/data-share', '/profile', '/settings', '/login', '/']);
+const EMPLOYEE_ALLOWED_PATHS = new Set(['/ai/anomaly', '/approval-manage', '/profile', '/settings', '/login', '/']);
 
 function normalizeText(user) {
   return [user?.roleCode, user?.roleName, user?.department, user?.username]

@@ -4,24 +4,17 @@ import Home from '../views/Home.vue';
 import DataAsset from '../views/DataAsset.vue';
 import AuditLog from '../views/AuditLog.vue';
 import AuditReport from '../views/AuditReport.vue';
-import AiModelManage from '../views/AiModelManage.vue';
 import UserManage from '../views/UserManage.vue';
 import RoleManage from '../views/RoleManage.vue';
 import PermissionManage from '../views/PermissionManage.vue';
 import OperationsCommand from '../views/OperationsCommand.vue';
 import PolicyManage from '../views/PolicyManage.vue';
-import ModelCost from '../views/ModelCost.vue';
 import SensitiveScan from '../views/SensitiveScan.vue';
-import Alerts from '../views/Alerts.vue';
 import SubjectRequest from '../views/SubjectRequest.vue';
-import DataShare from '../views/DataShare.vue';
 import DesensePreview from '../views/DesensePreview.vue';
-import GlobalSearch from '../views/GlobalSearch.vue';
 import Login from '../views/Login.vue';
 import Profile from '../views/Profile.vue';
 import Settings from '../views/Settings.vue';
-import ModelList from '../views/ai/ModelList.vue';
-import ModelMonitor from '../views/ai/ModelMonitor.vue';
 import ShadowAiDiscovery from '../views/ShadowAiDiscovery.vue';
 import AiRiskRating from '../views/AiRiskRating.vue';
 import EmployeeAiBehaviorMonitor from '../views/EmployeeAiBehaviorMonitor.vue';
@@ -36,8 +29,6 @@ const routes = [
   { path: '/data-asset', name: 'DataAsset', component: DataAsset, meta: { depth: 2 } },
   { path: '/audit-log', name: 'AuditLog', component: AuditLog, meta: { depth: 2 } },
   { path: '/audit-report', name: 'AuditReport', component: AuditReport, meta: { depth: 2 } },
-  { path: '/ai-model-manage', name: 'AiModelManage', component: AiModelManage, meta: { depth: 2 } },
-  { path: '/model-cost', name: 'ModelCost', component: ModelCost, meta: { depth: 2 } },
   { path: '/user-manage', name: 'UserManage', component: UserManage, meta: { depth: 3 } },
   { path: '/role-manage', name: 'RoleManage', component: RoleManage, meta: { depth: 3 } },
   { path: '/permission-manage', name: 'PermissionManage', component: PermissionManage, meta: { depth: 3 } },
@@ -46,13 +37,8 @@ const routes = [
   { path: '/policy-manage', name: 'PolicyManage', component: PolicyManage, meta: { depth: 3 } },
   { path: '/risk-event-manage', name: 'RiskEventManage', component: OperationsCommand, meta: { depth: 3, lane: 'risk' } },
   { path: '/sensitive-scan', name: 'SensitiveScan', component: SensitiveScan, meta: { depth: 2 } },
-  { path: '/alerts', name: 'Alerts', component: Alerts, meta: { depth: 2 } },
-  { path: '/data-share', name: 'DataShare', component: DataShare, meta: { depth: 2 } },
   { path: '/subject-request', name: 'SubjectRequest', component: SubjectRequest, meta: { depth: 2 } },
   { path: '/desense-preview', name: 'DesensePreview', component: DesensePreview, meta: { depth: 2 } },
-  { path: '/global-search', name: 'GlobalSearch', component: GlobalSearch, meta: { depth: 2 } },
-  { path: '/ai/models', name: 'ModelList', component: ModelList, meta: { depth: 3 } },
-  { path: '/ai/monitor', name: 'ModelMonitor', component: ModelMonitor, meta: { depth: 3 } },
   { path: '/ai/risk-rating', name: 'AiRiskRating', component: AiRiskRating, meta: { depth: 3 } },
   { path: '/ai/anomaly', name: 'AnomalyDetection', component: EmployeeAiBehaviorMonitor, meta: { depth: 3 } },
   { path: '/shadow-ai', name: 'ShadowAiDiscovery', component: ShadowAiDiscovery, meta: { depth: 2 } },
