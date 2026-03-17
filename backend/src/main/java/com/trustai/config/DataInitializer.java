@@ -37,6 +37,7 @@ public class DataInitializer implements CommandLineRunner {
         roles.put("AI_BUILDER", "AI应用开发者");
         roles.put("SCHOOL_ADMIN", "学校管理员");
         roles.put("BUSINESS_OWNER", "业务负责人");
+        roles.put("EMPLOYEE", "普通员工");
 
         roles.forEach(this::ensureRole);
 
@@ -47,6 +48,7 @@ public class DataInitializer implements CommandLineRunner {
         ensureUser("builder.demo", "demo1234", "AI应用开发者", "AI_BUILDER", "ai-team", "模型平台组", "13800138004", "builder@aegisai.com", "password", "wx_builder_demo");
         ensureUser("school.demo", "demo1234", "校园数据管理员", "SCHOOL_ADMIN", "school", "智慧校园中心", "13800138005", "school@aegisai.com", "password", "wx_school_demo");
         ensureUser("biz.demo", "demo1234", "业务负责人", "BUSINESS_OWNER", "enterprise", "业务创新部", "13800138006", "biz@aegisai.com", "password", "wx_biz_demo");
+        ensureUser("employee.demo", "demo1234", "普通员工", "EMPLOYEE", "enterprise", "业务一线", "13800138007", "employee@aegisai.com", "password", "wx_employee_demo");
     }
 
     private void ensureRole(String code, String name) {

@@ -1,6 +1,7 @@
 package com.trustai.controller;
 
 import com.trustai.client.AiInferenceClient;
+import com.trustai.service.CurrentUserService;
 import com.trustai.utils.R;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -42,6 +46,9 @@ public class AnomalyController {
 
     @Autowired
     private AiInferenceClient aiInferenceClient;
+
+    @Autowired
+    private CurrentUserService currentUserService;
 
     /**
      * 检测单条员工 AI 行为记录是否异常。
@@ -86,6 +93,9 @@ public class AnomalyController {
     public R<Map<String, Object>> events() {
         try {
             Map<String, Object> result = aiInferenceClient.anomalyEvents();
+            if (currentUserService.isEmployeeUser()) {
+                result = filterEventsForEmployee(result, currentUserService.requireCurrentUser().getUsername());
+            }
             return R.ok(result);
         } catch (Exception e) {
             log.error("[Anomaly] 查询事件日志失败: {}", e.getMessage());
@@ -107,5 +117,35 @@ public class AnomalyController {
             log.error("[Anomaly] 查询模型状态失败: {}", e.getMessage());
             return R.error("模型状态查询失败，请检查 Python 推理服务是否启动");
         }
+    }
+
+    private Map<String, Object> filterEventsForEmployee(Map<String, Object> result, String employeeId) {
+        if (result == null || !result.containsKey("events")) {
+            return result;
+        }
+        Object rawEvents = result.get("events");
+        if (!(rawEvents instanceof List<?> eventList)) {
+            return result;
+        }
+        List<Map<String, Object>> filtered = new ArrayList<>();
+        for (Object item : eventList) {
+            if (!(item instanceof Map<?, ?> rawMap)) {
+                continue;
+            }
+            Map<String, Object> event = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                if (entry.getKey() != null) {
+                    event.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+            }
+            Object eventEmployee = event.get("employee_id");
+            if (eventEmployee != null && employeeId.equalsIgnoreCase(String.valueOf(eventEmployee))) {
+                filtered.add(event);
+            }
+        }
+        Map<String, Object> safe = new LinkedHashMap<>(result);
+        safe.put("events", filtered);
+        safe.put("count", filtered.size());
+        return safe;
     }
 }

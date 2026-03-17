@@ -139,7 +139,7 @@ const menuDescriptions = {
   '/model-cost': '使用趋势概览',
   '/desense-preview': '脱敏策略校验',
   '/shadow-ai': '影子AI发现与治理',
-  '/threat-monitor': 'OpenClaw 代理窃取实时检测与阻拦',
+  '/threat-monitor': '恶意AI模拟攻击实时检测与阻拦',
   '/ai/risk-rating': 'AI服务风险评级',
   '/ai/anomaly': '员工AI行为异常检测',
   '/alerts': '高危告警闭环',
@@ -173,6 +173,7 @@ const staggeredQuickLinks = computed(() => ([
 const menuPanelTitle = computed(() => `${personaExperience.value.label} 导航剧场`);
 const menuPanelSubtitle = computed(() => personaExperience.value.signature);
 const go = (path) => router.push(path);
+const isElectronClient = typeof window !== 'undefined' && !!window.aegisClient;
 
 localStorage.removeItem('theme');
 document.documentElement.classList.remove('light-mode');
@@ -181,8 +182,23 @@ document.documentElement.classList.add('dark');
 
 const logout = async () => {
   await userStore.logout();
+  await syncElectronAuthState();
   router.push('/login');
 };
+
+async function syncElectronAuthState() {
+  if (!isElectronClient || !window.aegisClient?.setAuthState) {
+    return;
+  }
+  try {
+    await window.aegisClient.setAuthState({
+      authenticated: Boolean(userStore.token && userStore.userInfo),
+      user: userStore.userInfo || null,
+    });
+  } catch {
+    // Ignore bridge failures to keep web flow unaffected.
+  }
+}
 
 function handleMenuSelect(item) {
   if (item?.path) {
@@ -337,6 +353,14 @@ watch(isLogin, value => {
     removeTransitionArtifacts();
   }
 });
+
+watch(
+  () => [userStore.token, userStore.userInfo?.username, userStore.userInfo?.roleCode],
+  () => {
+    syncElectronAuthState();
+  },
+  { immediate: true }
+);
 
 watch(
   () => [isLogin.value, userStore.initialized, route.fullPath],

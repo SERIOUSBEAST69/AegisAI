@@ -7,8 +7,13 @@
         <div class="page-eyebrow">SHADOW AI DISCOVERY</div>
         <h1 class="page-title">影子AI发现与治理</h1>
         <p class="page-subtitle">
+          <template v-if="isEmployeeView">
+            员工模式下仅展示当前账号设备相关检测信息，基础检测默认保持开启。
+          </template>
+          <template v-else>
           实时监控终端设备上员工私自使用的AI服务，自动识别 ChatGPT、Midjourney、Claude
           等未受管控的"影子AI"，防止核心数据与隐私泄露。
+          </template>
         </p>
       </div>
       <div class="page-header-actions">
@@ -49,7 +54,7 @@
     </el-alert>
 
     <!-- 统计卡片 -->
-    <div class="stats-grid scene-block">
+    <div v-if="!isEmployeeView" class="stats-grid scene-block">
       <article class="stat-tile card-glass">
         <div class="stat-tile-icon clients">
           <el-icon><Monitor /></el-icon>
@@ -167,7 +172,7 @@
     </div>
 
     <!-- 风险分布 + 客户端列表 -->
-    <div class="main-grid scene-block">
+    <div v-if="!isEmployeeView" class="main-grid scene-block">
 
       <!-- 左侧：风险等级分布 -->
       <el-card class="risk-dist-card card-glass">
@@ -352,7 +357,7 @@
     </div>
 
     <!-- 云端扫描队列（下载触发时自动入队） -->
-    <div v-if="scanQueue.length > 0 || localScanEnabled" class="cloud-queue-panel scene-block card-glass">
+    <div v-if="!isEmployeeView && (scanQueue.length > 0 || localScanEnabled)" class="cloud-queue-panel scene-block card-glass">
       <div class="cloud-queue-header">
         <div>
           <div class="card-header">☁️ 云端扫描队列</div>
@@ -476,9 +481,11 @@ import {
 } from '@element-plus/icons-vue';
 import { shadowAiApi } from '../api/shadowAi';
 import request from '../api/request';
+import { useUserStore } from '../store/user';
 
 // ── 检测是否在 Electron 客户端中运行 ──────────────────────────────────────────
 const isElectron = typeof window !== 'undefined' && !!window.aegisClient;
+const userStore = useUserStore();
 
 // ── 状态 ──────────────────────────────────────────────────────────────────────
 const loading        = ref(false);
@@ -503,6 +510,7 @@ const downloading = ref(null);
 // 云端扫描队列
 const scanQueue   = ref([]);
 const queueLoading = ref(false);
+const isEmployeeView = computed(() => String(userStore.userInfo?.roleCode || '').toUpperCase() === 'EMPLOYEE');
 
 // ── 计算属性 ──────────────────────────────────────────────────────────────────
 const filteredClients = computed(() => {
@@ -603,10 +611,18 @@ async function runLocalScan() {
     if (isElectron) {
       // Electron 客户端模式：直接调用本机扫描 IPC
       const result = await window.aegisClient.runScan();
+      if (result?.skipped) {
+        ElMessage.warning(result.reason || '请先登录后再开始扫描');
+        return;
+      }
       localScanResult.value = result;
       updateLocalClientEntry(result);
       ElMessage.success(`本机扫描完成，发现 ${result?.shadowAiCount ?? 0} 个影子AI服务`);
     } else {
+      if (isEmployeeView.value) {
+        ElMessage.info('员工 Web 模式仅可查看本机客户端检测结果，请在客户端执行扫描。');
+        return;
+      }
       // Web 模式：从服务端拉取最新扫描摘要作为"本机"结果展示
       const [s, c] = await Promise.all([
         shadowAiApi.getStats(),
@@ -676,6 +692,30 @@ function rebuildStats() {
 
 // ── 服务端数据加载 ────────────────────────────────────────────────────────────
 async function refresh() {
+  if (isEmployeeView.value) {
+    loading.value = false;
+    clients.value = [];
+    stats.value = {
+      totalClients: 1,
+      highRiskClients: 0,
+      totalShadowAi: localScanResult.value?.shadowAiCount || 0,
+      recentReports: 0,
+      riskDistribution: {},
+    };
+    if (isElectron) {
+      try {
+        localClientInfo.value = await window.aegisClient.getClientInfo();
+        const lastResult = localClientInfo.value?.lastScanResult;
+        if (lastResult && !lastResult.skipped) {
+          localScanResult.value = lastResult;
+        }
+      } catch (e) {
+        console.warn('[ShadowAI] Unable to load local client info:', e.message);
+      }
+    }
+    return;
+  }
+
   loading.value = true;
   try {
     const [s, c] = await Promise.all([
@@ -758,6 +798,10 @@ async function downloadClient(platform) {
 // ── 云端扫描队列 ──────────────────────────────────────────────────────────────
 
 async function refreshQueue() {
+  if (isEmployeeView.value) {
+    scanQueue.value = [];
+    return;
+  }
   queueLoading.value = true;
   try {
     const data = await request.get('/client/queue');

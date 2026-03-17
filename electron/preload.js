@@ -22,6 +22,12 @@ contextBridge.exposeInMainWorld('aegisClient', {
   /** 保存配置（serverUrl、scanIntervalMinutes 等） */
   saveConfig: (cfg) => ipcRenderer.invoke('save-config', cfg),
 
+  /** 设置当前登录态（用于控制扫描闸门） */
+  setAuthState: (state) => ipcRenderer.invoke('set-auth-state', state),
+
+  /** 获取当前登录态 */
+  getAuthState: () => ipcRenderer.invoke('get-auth-state'),
+
   /** 监听扫描完成事件 */
   onScanComplete: (callback) => {
     ipcRenderer.on('scan-complete', (event, result) => callback(result));

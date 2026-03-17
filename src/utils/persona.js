@@ -1,5 +1,16 @@
 const ALL = 'all';
 
+const ROLE_TO_PERSONA = {
+  ADMIN: 'governanceAdmin',
+  EXECUTIVE: 'executive',
+  SECOPS: 'secops',
+  DATA_ADMIN: 'dataAdmin',
+  AI_BUILDER: 'aiBuilder',
+  SCHOOL_ADMIN: 'schoolAdmin',
+  BUSINESS_OWNER: 'businessOwner',
+  EMPLOYEE: 'employee',
+};
+
 const PERSONAS = {
   executive: {
     id: 'executive',
@@ -158,6 +169,32 @@ const PERSONAS = {
     ],
     roleHints: ['business', 'owner', 'product', '运营', '业务', '业务负责人', '产品'],
   },
+  employee: {
+    id: 'employee',
+    label: '普通员工',
+    kicker: 'EMPLOYEE SAFE WORKSPACE',
+    signature: '仅展示与本人设备和行为相关的检测信息，减少无关治理噪声。',
+    introSubtitle: 'Employee Safety Workspace',
+    headline: 'Aegis Workbench 员工安全工作区',
+    subheadline: '你将看到和本人相关的设备检测与行为异常结果，帮助快速确认自身风险状态。',
+    sceneTags: ['本机检测', '行为异常', '个人告警'],
+    benefits: [
+      { title: '只看本人数据', metric: '最小权限', description: '界面仅保留与你本人设备和行为相关的信息。' },
+      { title: '检测始终开启', metric: '持续防护', description: '关键安全检测强制开启，避免误关导致防护缺口。' },
+      { title: '快速自查', metric: '即时反馈', description: '可随时检查本机风险和异常行为记录。' },
+    ],
+    journey: [
+      { step: '01', title: '查看本机状态', description: '进入影子AI发现，检查当前设备是否存在未授权AI服务。' },
+      { step: '02', title: '查看行为记录', description: '在异常检测页查看本人近期行为是否触发风险。' },
+      { step: '03', title: '按提示整改', description: '根据风险提示调整使用方式并联系管理员协同处理。' },
+    ],
+    quickActions: [
+      { title: '影子AI发现', description: '检查本机未授权AI服务', route: '/shadow-ai' },
+      { title: '行为异常检测', description: '查看本人行为风险', route: '/ai/anomaly' },
+      { title: '个人资料', description: '维护个人信息', route: '/profile' },
+    ],
+    roleHints: ['employee', 'staff', '普通员工', '员工', '一线'],
+  },
   governanceAdmin: {
     id: 'governanceAdmin',
     label: '治理管理员',
@@ -191,9 +228,9 @@ const MENU_SECTIONS = [
     key: 'command',
     title: '指挥工作台',
     items: [
-      { path: '/', label: '首页', icon: 'HomeFilled', audiences: [ALL] },
+      { path: '/', label: '首页', icon: 'HomeFilled', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner', 'aiBuilder'] },
       { path: '/operations-command', label: '运营指挥台', icon: 'Grid', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'] },
-      { path: '/global-search', label: '全局搜索', icon: 'Search', audiences: [ALL] },
+      { path: '/global-search', label: '全局搜索', icon: 'Search', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner', 'aiBuilder'] },
     ],
   },
   {
@@ -210,10 +247,10 @@ const MENU_SECTIONS = [
     key: 'security',
     title: '安全与闭环',
     items: [
-      { path: '/shadow-ai', label: '影子AI发现', icon: 'View', audiences: ['governanceAdmin', 'secops', 'executive'] },
+      { path: '/shadow-ai', label: '影子AI发现', icon: 'View', audiences: ['governanceAdmin', 'secops', 'executive', 'employee'] },
       { path: '/threat-monitor', label: '实时威胁监控', icon: 'AlarmClock', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/ai/risk-rating', label: 'AI风险评级', icon: 'Histogram', audiences: ['governanceAdmin', 'secops', 'executive', 'dataAdmin'] },
-      { path: '/ai/anomaly', label: '行为异常检测', icon: 'AlarmClock', audiences: ['governanceAdmin', 'secops', 'executive'] },
+      { path: '/ai/anomaly', label: '行为异常检测', icon: 'AlarmClock', audiences: ['governanceAdmin', 'secops', 'executive', 'employee'] },
       { path: '/alerts', label: '告警闭环', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-log', label: '审计日志', icon: 'Timer', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-report', label: '审计报告', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'executive'] },
@@ -252,10 +289,12 @@ const EXTRA_ROUTE_AUDIENCES = {
   '/ai/models': ['governanceAdmin', 'aiBuilder', 'executive', 'businessOwner'],
   '/ai/monitor': ['governanceAdmin', 'aiBuilder', 'executive', 'secops'],
   '/ai/risk-rating': ['governanceAdmin', 'secops', 'executive', 'dataAdmin'],
-  '/ai/anomaly': ['governanceAdmin', 'secops', 'executive'],
-  '/shadow-ai': ['governanceAdmin', 'secops', 'executive'],
+  '/ai/anomaly': ['governanceAdmin', 'secops', 'executive', 'employee'],
+  '/shadow-ai': ['governanceAdmin', 'secops', 'executive', 'employee'],
   '/threat-monitor': ['governanceAdmin', 'secops', 'executive'],
 };
+
+const EMPLOYEE_ALLOWED_PATHS = new Set(['/shadow-ai', '/ai/anomaly', '/profile', '/settings', '/login']);
 
 function normalizeText(user) {
   return [user?.roleCode, user?.roleName, user?.department, user?.username]
@@ -265,6 +304,11 @@ function normalizeText(user) {
 }
 
 export function inferPersona(user) {
+  const explicitRole = String(user?.roleCode || '').trim().toUpperCase();
+  if (explicitRole && ROLE_TO_PERSONA[explicitRole]) {
+    return ROLE_TO_PERSONA[explicitRole];
+  }
+
   const haystack = normalizeText(user);
   if (!haystack) {
     return 'governanceAdmin';
@@ -305,6 +349,9 @@ export function canAccessPath(path, user) {
   const explicit = EXTRA_ROUTE_AUDIENCES[path];
   if (explicit) {
     return allows(explicit, personaId);
+  }
+  if (personaId === 'employee') {
+    return EMPLOYEE_ALLOWED_PATHS.has(path);
   }
   return true;
 }

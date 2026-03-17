@@ -5,6 +5,7 @@ import com.trustai.entity.ClientReport;
 import com.trustai.entity.ClientScanQueue;
 import com.trustai.service.ClientReportService;
 import com.trustai.service.ClientScanQueueService;
+import com.trustai.service.CurrentUserService;
 import com.trustai.utils.R;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class ClientReportController {
 
     private final ClientReportService clientReportService;
     private final ClientScanQueueService clientScanQueueService;
+    private final CurrentUserService currentUserService;
 
     // ── 客户端注册（幂等） ──────────────────────────────────────────────────────
 
@@ -93,6 +95,7 @@ public class ClientReportController {
      */
     @GetMapping("/list")
     public R<List<ClientReport>> list() {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN", "BUSINESS_OWNER");
         // 取全部报告，按 clientId 分组，每组保留最新一条
         List<ClientReport> all = clientReportService.list(
                 new QueryWrapper<ClientReport>().orderByDesc("scan_time")
@@ -111,6 +114,7 @@ public class ClientReportController {
      */
     @GetMapping("/history")
     public R<List<ClientReport>> history(@RequestParam String clientId) {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN", "BUSINESS_OWNER");
         List<ClientReport> records = clientReportService.list(
                 new QueryWrapper<ClientReport>()
                         .eq("client_id", clientId)
@@ -127,6 +131,7 @@ public class ClientReportController {
      */
     @GetMapping("/stats")
     public R<Map<String, Object>> stats() {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN", "BUSINESS_OWNER");
         List<ClientReport> all = clientReportService.list(
                 new QueryWrapper<ClientReport>().orderByDesc("scan_time")
         );
@@ -176,6 +181,7 @@ public class ClientReportController {
      */
     @GetMapping("/queue")
     public R<List<ClientScanQueue>> queue() {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN", "BUSINESS_OWNER");
         List<ClientScanQueue> items = clientScanQueueService.list(
                 new QueryWrapper<ClientScanQueue>()
                         .orderByDesc("download_time")
@@ -192,6 +198,7 @@ public class ClientReportController {
      */
     @PostMapping("/queue")
     public R<ClientScanQueue> enqueue(@RequestBody QueueReq req, HttpServletRequest servletReq) {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN", "BUSINESS_OWNER");
         ClientScanQueue entry = new ClientScanQueue();
         entry.setPlatform(req.getPlatform() != null ? req.getPlatform() : "unknown");
         entry.setHostname(req.getHostname());
@@ -210,6 +217,7 @@ public class ClientReportController {
      */
     @PostMapping("/queue/{id}/status")
     public R<?> updateQueueStatus(@PathVariable Long id, @RequestBody QueueStatusReq req) {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN", "BUSINESS_OWNER");
         ClientScanQueue entry = clientScanQueueService.getById(id);
         if (entry == null) return R.error(40000, "队列记录不存在");
         entry.setStatus(req.getStatus());

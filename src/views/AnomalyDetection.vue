@@ -12,6 +12,9 @@
         </p>
       </div>
       <div class="page-header-actions">
+        <el-tag v-if="isEmployeeView" type="warning" size="large" effect="dark">
+          员工模式：检测强制开启
+        </el-tag>
         <el-tag :type="statusTagType" size="large" effect="dark">
           {{ modelStatusLabel }}
         </el-tag>
@@ -70,12 +73,12 @@
           <el-row :gutter="12">
             <el-col :span="12">
               <el-form-item label="员工 ID">
-                <el-input v-model="checkForm.employee_id" placeholder="EMP_R0001" />
+                <el-input v-model="checkForm.employee_id" :disabled="isEmployeeView" placeholder="EMP_R0001" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="部门">
-                <el-select v-model="checkForm.department" style="width:100%">
+                <el-select v-model="checkForm.department" :disabled="isEmployeeView" style="width:100%">
                   <el-option v-for="d in DEPARTMENTS" :key="d" :label="d" :value="d" />
                 </el-select>
               </el-form-item>
@@ -129,8 +132,8 @@
             <el-button type="primary" :loading="checking" style="width:100%" @click="submitCheck">
               🔍 检测异常
             </el-button>
-            <el-button type="default" @click="fillScenario('late_night')">⚡ 演示：深夜代码</el-button>
-            <el-button type="default" @click="fillScenario('new_ai')">⚡ 演示：新AI服务</el-button>
+            <el-button v-if="!isEmployeeView" type="default" @click="fillScenario('late_night')">⚡ 演示：深夜代码</el-button>
+            <el-button v-if="!isEmployeeView" type="default" @click="fillScenario('new_ai')">⚡ 演示：新AI服务</el-button>
           </div>
         </el-form>
 
@@ -223,6 +226,7 @@ import { ref, computed, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Refresh, Loading } from '@element-plus/icons-vue';
 import request from '../api/request';
+import { useUserStore } from '../store/user';
 
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 const DEPARTMENTS = ['研发', '销售', 'HR', '法务', '财务'];
@@ -231,6 +235,8 @@ const AI_SERVICES = [
   '文心一言', '通义千问', '豆包', 'Kimi',
   'Perplexity', 'Ollama',
 ];
+
+const userStore = useUserStore();
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const modelStatus = ref(null);
@@ -270,6 +276,7 @@ const modelStatusLabel = computed(() => {
 const recentAnomalyCount = computed(() =>
   events.value.filter(e => e.is_anomaly).length
 );
+const isEmployeeView = computed(() => String(userStore.userInfo?.roleCode || '').toUpperCase() === 'EMPLOYEE');
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function loadStatus() {
@@ -304,8 +311,12 @@ async function submitCheck() {
   checking.value = true;
   checkResult.value = null;
   try {
+    const employeeId = userStore.userInfo?.username || checkForm.value.employee_id;
+    const employeeDept = userStore.userInfo?.department || checkForm.value.department;
     const payload = {
       ...checkForm.value,
+      employee_id: isEmployeeView.value ? employeeId : checkForm.value.employee_id,
+      department: isEmployeeView.value ? employeeDept : checkForm.value.department,
       is_new_service: checkForm.value.is_new_service_bool ? 1 : 0,
     };
     delete payload.is_new_service_bool;
@@ -375,6 +386,10 @@ function formatTime(ts) {
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  if (isEmployeeView.value) {
+    checkForm.value.employee_id = userStore.userInfo?.username || checkForm.value.employee_id;
+    checkForm.value.department = userStore.userInfo?.department || checkForm.value.department;
+  }
   await loadStatus();
   await loadEvents();
 });

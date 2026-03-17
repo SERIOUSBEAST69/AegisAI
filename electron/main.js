@@ -34,6 +34,7 @@ function loadConfig() {
     scanIntervalMinutes: 30,
     autoStart: true,
     minimizeToTray: true,
+    requireLoginBeforeScan: true,
   };
   try {
     if (fs.existsSync(CONFIG_PATH)) {
@@ -103,6 +104,15 @@ let config       = loadConfig();
 const CLIENT_ID  = getOrCreateClientId();
 let lastScanResult = null;
 let scanJob      = null;
+let authState    = {
+  authenticated: false,
+  user: null,
+  updatedAt: null,
+};
+
+function canRunScan() {
+  return !config.requireLoginBeforeScan || authState.authenticated;
+}
 
 // ── 主窗口 ──────────────────────────────────────────────────────────────────
 
@@ -191,7 +201,19 @@ function updateTrayMenu() {
     { label: '打开工作台', click: showWindow },
     {
       label: '立即扫描',
-      click: () => runScan().catch(console.error),
+      click: () => {
+        runScan()
+          .then((result) => {
+            if (result?.skipped) {
+              dialog.showMessageBox({
+                type: 'info',
+                title: 'Aegis 提示',
+                message: result.reason || '请先登录后再开始检测。',
+              }).catch(() => {});
+            }
+          })
+          .catch(console.error);
+      },
     },
     {
       label: '开机自启',
@@ -303,6 +325,17 @@ async function showServerSettings() {
 // ── 后台扫描 ─────────────────────────────────────────────────────────────────
 
 async function runScan() {
+  if (!canRunScan()) {
+    return {
+      time: new Date().toISOString(),
+      shadowAiCount: 0,
+      riskLevel: 'none',
+      services: [],
+      skipped: true,
+      reason: '请先登录后再开始检测。',
+    };
+  }
+
   console.log('[Aegis] 开始影子AI扫描…');
   try {
     const result = await scanner.scan({
@@ -363,13 +396,32 @@ ipcMain.handle('get-client-info', () => ({
   backendUrl: config.backendUrl || 'http://localhost:8080',
   scanIntervalMinutes: config.scanIntervalMinutes,
   autoStart: config.autoStart,
+  requireLoginBeforeScan: config.requireLoginBeforeScan,
+  authState,
   lastScanResult,
 }));
 
 ipcMain.handle('run-scan', async () => {
-  await runScan();
-  return lastScanResult;
+  const result = await runScan();
+  if (result && !result.skipped) {
+    return lastScanResult;
+  }
+  return result;
 });
+
+ipcMain.handle('set-auth-state', async (event, state) => {
+  authState = {
+    authenticated: Boolean(state?.authenticated),
+    user: state?.user || null,
+    updatedAt: new Date().toISOString(),
+  };
+  if (canRunScan()) {
+    setTimeout(() => runScan().catch(console.error), 500);
+  }
+  return authState;
+});
+
+ipcMain.handle('get-auth-state', () => authState);
 
 ipcMain.on('save-server-url', (event, url) => {
   config.serverUrl = url;
@@ -405,9 +457,6 @@ app.whenReady().then(async () => {
 
   createTray();
   startScheduledScan();
-
-  // 首次启动立即扫描一次（延迟 5 秒，等窗口就绪）
-  setTimeout(() => runScan().catch(console.error), 5000);
 });
 
 app.on('window-all-closed', () => {

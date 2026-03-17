@@ -14,6 +14,9 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class CurrentUserService {
 
+    private static final String ADMIN_ROLE_CODE = "ADMIN";
+    private static final String EMPLOYEE_ROLE_CODE = "EMPLOYEE";
+
     private final UserService userService;
     private final RoleService roleService;
 
@@ -31,12 +34,9 @@ public class CurrentUserService {
 
     public void requireAdmin() {
         User user = requireCurrentUser();
-        if (user.getRoleId() == null) {
-            throw new BizException(40300, "仅管理员可操作");
-        }
-        Role role = roleService.getById(user.getRoleId());
+        Role role = getCurrentRole(user);
         boolean isAdmin = "admin".equalsIgnoreCase(user.getUsername())
-                || (role != null && ("ADMIN".equalsIgnoreCase(role.getCode()) || role.getName().contains("管理员")));
+                || (role != null && (ADMIN_ROLE_CODE.equalsIgnoreCase(role.getCode()) || role.getName().contains("管理员")));
         if (!isAdmin) {
             throw new BizException(40300, "仅管理员可操作");
         }
@@ -45,19 +45,48 @@ public class CurrentUserService {
     public void requireAnyRole(String... roleCodes) {
         User user = requireCurrentUser();
         Role role = getCurrentRole(user);
-        if (role == null || !StringUtils.hasText(role.getCode())) {
+        String currentRoleCode = getCurrentRoleCode(user, role);
+        if (!StringUtils.hasText(currentRoleCode)) {
             throw new BizException(40300, "当前账号未分配身份");
         }
 
         boolean allowed = Arrays.stream(roleCodes)
             .filter(StringUtils::hasText)
-            .anyMatch(code -> code.equalsIgnoreCase(role.getCode()));
+            .anyMatch(code -> code.equalsIgnoreCase(currentRoleCode));
         if (!allowed) {
             throw new BizException(40300, "当前身份无权执行该操作");
         }
     }
 
     public Role getCurrentRole(User user) {
-        return user.getRoleId() == null ? null : roleService.getById(user.getRoleId());
+        if (user.getRoleId() != null) {
+            Role resolved = roleService.getById(user.getRoleId());
+            if (resolved != null) {
+                return resolved;
+            }
+        }
+        if ("admin".equalsIgnoreCase(user.getUsername())) {
+            return roleService.lambdaQuery().eq(Role::getCode, ADMIN_ROLE_CODE).one();
+        }
+        return null;
+    }
+
+    public String currentRoleCode() {
+        User user = requireCurrentUser();
+        return getCurrentRoleCode(user, getCurrentRole(user));
+    }
+
+    public boolean isEmployeeUser() {
+        return EMPLOYEE_ROLE_CODE.equalsIgnoreCase(currentRoleCode());
+    }
+
+    private String getCurrentRoleCode(User user, Role role) {
+        if (role != null && StringUtils.hasText(role.getCode())) {
+            return role.getCode();
+        }
+        if ("admin".equalsIgnoreCase(user.getUsername())) {
+            return ADMIN_ROLE_CODE;
+        }
+        return null;
     }
 }

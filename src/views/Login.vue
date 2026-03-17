@@ -422,11 +422,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import gsap from 'gsap';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { ChatDotRound, Iphone, UserFilled } from '@element-plus/icons-vue';
 import { authApi } from '../api/auth';
 import { useUserStore } from '../store/user';
 import LiquidChrome from '../components/LiquidChrome.vue';
+import { acceptEmployeeAgreement, hasAcceptedEmployeeAgreement, isEmployeeUser } from '../utils/employeePolicy';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -465,6 +466,7 @@ const demoAccounts = [
   { label: 'AI开发者', username: 'builder.demo', password: 'demo1234', phone: '13800138004', nickname: 'AI应用开发者', roleCode: 'AI_BUILDER', organizationType: 'ai-team', department: '模型平台组', wechatOpenId: 'wx_builder_demo' },
   { label: '学校管理员', username: 'school.demo', password: 'demo1234', phone: '13800138005', nickname: '校园数据管理员', roleCode: 'SCHOOL_ADMIN', organizationType: 'school', department: '智慧校园中心', wechatOpenId: 'wx_school_demo' },
   { label: '业务负责人', username: 'biz.demo', password: 'demo1234', phone: '13800138006', nickname: '业务负责人', roleCode: 'BUSINESS_OWNER', organizationType: 'enterprise', department: '业务创新部', wechatOpenId: 'wx_biz_demo' },
+  { label: '普通员工', username: 'employee.demo', password: 'demo1234', phone: '13800138007', nickname: '普通员工', roleCode: 'EMPLOYEE', organizationType: 'enterprise', department: '业务一线', wechatOpenId: 'wx_employee_demo' },
 ];
 
 const environmentLabel = import.meta.env.VITE_USE_MOCK === 'true' ? 'Mock' : 'Real API';
@@ -510,6 +512,7 @@ const registrationOptions = reactive({
     { code: 'AI_BUILDER', label: 'AI应用开发者' },
     { code: 'SCHOOL_ADMIN', label: '学校管理员' },
     { code: 'BUSINESS_OWNER', label: '业务负责人' },
+    { code: 'EMPLOYEE', label: '普通员工' },
   ],
   organizations: [
     { code: 'enterprise', label: '企业' },
@@ -787,7 +790,8 @@ function selectMode(value) {
 }
 
 async function establishAndRoute(response) {
-  await userStore.establishSession(response);
+  const user = await userStore.establishSession(response);
+  await enforceEmployeeAgreement(user);
   await playCinematicSuccess();
   sessionStorage.setItem('aegis.transition.origin', 'login');
   const redirect = typeof router.currentRoute.value.query.redirect === 'string' ? router.currentRoute.value.query.redirect : '/';
@@ -801,6 +805,30 @@ async function establishAndRoute(response) {
   } else {
     createTitleGhost();
     await router.push(redirect);
+  }
+}
+
+async function enforceEmployeeAgreement(user) {
+  if (!isEmployeeUser(user) || hasAcceptedEmployeeAgreement(user)) {
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      '作为普通员工，首次登录需同意《终端检测与隐私合规协议》。同意后，基础检测能力将保持开启，无法在员工端关闭。',
+      '员工使用协议',
+      {
+        confirmButtonText: '同意并继续',
+        cancelButtonText: '取消登录',
+        closeOnClickModal: false,
+        closeOnPressEscape: false,
+        distinguishCancelAndClose: true,
+        type: 'warning',
+      }
+    );
+    acceptEmployeeAgreement(user);
+  } catch {
+    await userStore.logout();
+    throw new Error('未同意员工协议，已取消登录');
   }
 }
 

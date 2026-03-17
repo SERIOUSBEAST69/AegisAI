@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.trustai.entity.SecurityDetectionRule;
 import com.trustai.entity.SecurityEvent;
+import com.trustai.entity.User;
 import com.trustai.service.CurrentUserService;
 import com.trustai.service.SecurityDetectionRuleService;
 import com.trustai.service.SecurityEventService;
@@ -77,6 +78,9 @@ public class SecurityEventController {
             return R.error(40000, "keyword 长度不得超过 200 字符");
         }
 
+        User currentUser = currentUserService.requireCurrentUser();
+        boolean employeeOnly = currentUserService.isEmployeeUser();
+
         QueryWrapper<SecurityEvent> qw = new QueryWrapper<>();
         if (status != null && !status.isBlank()) {
             qw.eq("status", status);
@@ -88,6 +92,9 @@ public class SecurityEventController {
             qw.and(w -> w.like("file_path", keyword)
                     .or().like("hostname", keyword)
                     .or().like("employee_id", keyword));
+        }
+        if (employeeOnly) {
+            qw.eq("employee_id", currentUser.getUsername());
         }
         qw.orderByDesc("event_time");
 
@@ -175,6 +182,7 @@ public class SecurityEventController {
     /** GET /api/security/rules — 查询所有检测规则 */
     @GetMapping("/rules")
     public R<List<SecurityDetectionRule>> rules() {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN", "EXECUTIVE");
         return R.ok(ruleService.list(new QueryWrapper<SecurityDetectionRule>().orderByAsc("id")));
     }
 
@@ -201,11 +209,14 @@ public class SecurityEventController {
     /** GET /api/security/stats — 事件统计摘要 */
     @GetMapping("/stats")
     public R<Map<String, Object>> stats() {
-        long total = securityEventService.count();
-        long pending = securityEventService.count(new QueryWrapper<SecurityEvent>().eq("status", "pending"));
-        long blocked = securityEventService.count(new QueryWrapper<SecurityEvent>().eq("status", "blocked"));
-        long critical = securityEventService.count(new QueryWrapper<SecurityEvent>().eq("severity", "critical"));
-        long high = securityEventService.count(new QueryWrapper<SecurityEvent>().eq("severity", "high"));
+        User currentUser = currentUserService.requireCurrentUser();
+        boolean employeeOnly = currentUserService.isEmployeeUser();
+
+        long total = securityEventService.count(scopedQuery(currentUser, employeeOnly));
+        long pending = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("status", "pending"));
+        long blocked = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("status", "blocked"));
+        long critical = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("severity", "critical"));
+        long high = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("severity", "high"));
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("total", total);
@@ -214,6 +225,14 @@ public class SecurityEventController {
         data.put("critical", critical);
         data.put("high", high);
         return R.ok(data);
+    }
+
+    private QueryWrapper<SecurityEvent> scopedQuery(User user, boolean employeeOnly) {
+        QueryWrapper<SecurityEvent> query = new QueryWrapper<>();
+        if (employeeOnly && user != null) {
+            query.eq("employee_id", user.getUsername());
+        }
+        return query;
     }
 
     // ── 内部类 ────────────────────────────────────────────────────────────────

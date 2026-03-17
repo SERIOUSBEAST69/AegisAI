@@ -7,7 +7,7 @@
         <div class="page-eyebrow">REAL-TIME THREAT MONITOR</div>
         <h1 class="page-title">实时威胁监控</h1>
         <p class="page-subtitle">
-          检测并响应 OpenClaw 等恶意代理软件的文件窃取行为。
+          检测并响应恶意AI模拟攻击与代理窃取行为。
           实时告警、手动阻拦或忽略，并可配置敏感文件检测规则。
         </p>
       </div>
@@ -228,10 +228,10 @@
       </el-tab-pane>
 
       <!-- ── 模拟说明 Tab ── -->
-      <el-tab-pane label="OpenClaw 模拟器" name="simulator">
+      <el-tab-pane label="恶意AI模拟器" name="simulator">
         <el-card class="card-glass" style="margin-top: 0">
           <div class="simulator-info">
-            <h3>OpenClaw 代理窃取模拟器</h3>
+            <h3>恶意AI代理窃取模拟器</h3>
             <p>
               项目提供了一个 Python 模拟程序，可以模拟恶意代理软件在员工电脑上窃取文件的行为，
               并通过 HTTP 向本系统实时上报事件，用于测试告警和阻拦功能。
@@ -317,16 +317,59 @@ python openclaw_simulator.py --count 1200 --url http://localhost:8080</pre>
       </template>
     </el-dialog>
 
+    <button
+      v-if="isAdmin"
+      class="simulator-fab"
+      :disabled="simulatorRunning"
+      @click="toggleSimulatorPanel"
+    >
+      {{ simulatorRunning ? '执行中' : '模拟攻防' }}
+    </button>
+
+    <transition name="fade-slide">
+      <div v-if="isAdmin && simulatorPanelVisible" class="simulator-fab-panel card-glass">
+        <div class="fab-panel-header">
+          <strong>恶意AI模拟器</strong>
+          <el-button size="small" type="primary" :loading="simulatorRunning" @click="triggerSimulatorProbe">
+            触发一次模拟攻击
+          </el-button>
+        </div>
+        <p class="fab-panel-hint">用于管理员快速验证当前防护链路是否正常，包含最近攻击记录与防御响应。</p>
+        <div class="fab-panel-block">
+          <div class="fab-panel-title">最近攻击记录</div>
+          <ul>
+            <li v-for="item in simulatorInsight.attackEvents" :key="`atk-${item.id}`">
+              #{{ item.id }} · {{ eventTypeLabel(item.eventType) }} · {{ item.hostname || 'unknown-host' }}
+            </li>
+            <li v-if="simulatorInsight.attackEvents.length === 0">暂无攻击记录</li>
+          </ul>
+        </div>
+        <div class="fab-panel-block">
+          <div class="fab-panel-title">最近防御响应</div>
+          <ul>
+            <li v-for="item in simulatorInsight.defenseEvents" :key="`def-${item.id}`">
+              #{{ item.id }} · {{ statusLabel(item.status) }} · {{ item.employeeId || 'unknown-user' }}
+            </li>
+            <li v-if="simulatorInsight.defenseEvents.length === 0">暂无防御响应</li>
+          </ul>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import {
   Refresh, Search, Plus, VideoPause, VideoPlay,
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import request from '../api/request';
+import { useUserStore } from '../store/user';
+
+const userStore = useUserStore();
+const isAdmin = computed(() => String(userStore.userInfo?.roleCode || '').toUpperCase() === 'ADMIN');
 
 // ── 统计 ──────────────────────────────────────────────────────────────────────
 const stats = ref({});
@@ -482,6 +525,13 @@ async function deleteRule(id) {
 const autoRefresh = ref(true);
 let refreshTimer = null;
 
+const simulatorPanelVisible = ref(false);
+const simulatorRunning = ref(false);
+const simulatorInsight = ref({
+  attackEvents: [],
+  defenseEvents: [],
+});
+
 function startAutoRefresh() {
   stopAutoRefresh();
   refreshTimer = setInterval(() => {
@@ -514,6 +564,58 @@ const activeTab = ref('events');
 // ── 总刷新 ────────────────────────────────────────────────────────────────────
 async function refresh() {
   await Promise.all([refreshEvents(), fetchStats()]);
+}
+
+async function loadSimulatorInsights() {
+  if (!isAdmin.value) {
+    simulatorInsight.value = { attackEvents: [], defenseEvents: [] };
+    return;
+  }
+  try {
+    const data = await request.get('/security/events', {
+      params: { page: 1, pageSize: 30 },
+    });
+    const list = data?.list || [];
+    simulatorInsight.value = {
+      attackEvents: list.slice(0, 6),
+      defenseEvents: list.filter(item => ['blocked', 'ignored', 'reviewing'].includes(item.status)).slice(0, 6),
+    };
+  } catch (e) {
+    console.warn('[ThreatMonitor] simulator insight error:', e.message);
+  }
+}
+
+function toggleSimulatorPanel() {
+  simulatorPanelVisible.value = !simulatorPanelVisible.value;
+  if (simulatorPanelVisible.value) {
+    loadSimulatorInsights();
+  }
+}
+
+async function triggerSimulatorProbe() {
+  if (!isAdmin.value) {
+    return;
+  }
+  simulatorRunning.value = true;
+  try {
+    await request.post('/security/events/report', {
+      eventType: 'EXFILTRATION',
+      filePath: 'C:/Users/Public/Documents/simulated_sensitive_file.docx',
+      targetAddr: 'https://malicious-ai-simulator.local/upload',
+      employeeId: userStore.userInfo?.username || 'simulator-admin',
+      hostname: 'simulator-host',
+      fileSize: 7340032,
+      severity: 'high',
+      source: 'malicious-ai-simulator',
+    });
+    ElMessage.success('模拟攻击已触发，请观察下方防御响应。');
+    await refresh();
+    await loadSimulatorInsights();
+  } catch (e) {
+    ElMessage.error('模拟触发失败：' + (e.message || '未知错误'));
+  } finally {
+    simulatorRunning.value = false;
+  }
 }
 
 // ── 格式化工具 ────────────────────────────────────────────────────────────────
@@ -569,6 +671,9 @@ onMounted(() => {
   refresh();
   fetchRules();
   if (autoRefresh.value) startAutoRefresh();
+  if (isAdmin.value) {
+    loadSimulatorInsights();
+  }
 });
 
 onUnmounted(() => {
@@ -775,6 +880,84 @@ code {
   font-family: 'Fira Code', 'Courier New', monospace;
   font-size: 12px;
   color: #90caf9;
+}
+
+.simulator-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 40;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #2d8cff, #00c2ff);
+  color: #001326;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 168, 255, 0.35);
+}
+
+.simulator-fab:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.simulator-fab-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 78px;
+  width: min(420px, calc(100vw - 32px));
+  z-index: 39;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.fab-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.fab-panel-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: rgba(200, 220, 255, 0.75);
+}
+
+.fab-panel-block {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(100, 180, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.fab-panel-title {
+  font-size: 12px;
+  color: #7fd0ff;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.fab-panel-block ul {
+  margin: 0;
+  padding-left: 16px;
+  color: rgba(220, 234, 255, 0.9);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.25s ease;
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 :deep(.card-glass) {
