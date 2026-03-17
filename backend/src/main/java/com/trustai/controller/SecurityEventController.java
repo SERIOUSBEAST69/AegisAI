@@ -67,6 +67,8 @@ public class SecurityEventController {
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) String keyword) {
 
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "EXECUTIVE");
+
         // 校验枚举参数，防止非法值注入查询
         if (status != null && !VALID_STATUSES.contains(status)) {
             return R.error(40000, "status 参数非法，合法值：" + VALID_STATUSES);
@@ -117,7 +119,7 @@ public class SecurityEventController {
      */
     @PostMapping("/block")
     public R<?> block(@RequestBody IdReq req) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN", "EXECUTIVE");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS");
         SecurityEvent event = securityEventService.getById(req.getId());
         if (event == null) {
             return R.error(40400, "事件不存在");
@@ -138,7 +140,7 @@ public class SecurityEventController {
      */
     @PostMapping("/ignore")
     public R<?> ignore(@RequestBody IdReq req) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN", "EXECUTIVE");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS");
         SecurityEvent event = securityEventService.getById(req.getId());
         if (event == null) {
             return R.error(40400, "事件不存在");
@@ -182,14 +184,14 @@ public class SecurityEventController {
     /** GET /api/security/rules — 查询所有检测规则 */
     @GetMapping("/rules")
     public R<List<SecurityDetectionRule>> rules() {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN", "EXECUTIVE");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS");
         return R.ok(ruleService.list(new QueryWrapper<SecurityDetectionRule>().orderByAsc("id")));
     }
 
     /** POST /api/security/rules — 新增或更新检测规则 */
     @PostMapping("/rules")
     public R<?> saveRule(@RequestBody SecurityDetectionRule rule) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN", "EXECUTIVE");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS");
         if (rule.getCreateTime() == null) rule.setCreateTime(new Date());
         rule.setUpdateTime(new Date());
         ruleService.saveOrUpdate(rule);
@@ -199,7 +201,7 @@ public class SecurityEventController {
     /** DELETE /api/security/rules/{id} — 删除检测规则 */
     @DeleteMapping("/rules/{id}")
     public R<?> deleteRule(@PathVariable Long id) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN", "EXECUTIVE");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS");
         ruleService.removeById(id);
         return R.okMsg("删除成功");
     }
@@ -209,6 +211,7 @@ public class SecurityEventController {
     /** GET /api/security/stats — 事件统计摘要 */
     @GetMapping("/stats")
     public R<Map<String, Object>> stats() {
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "EXECUTIVE");
         User currentUser = currentUserService.requireCurrentUser();
         boolean employeeOnly = currentUserService.isEmployeeUser();
 

@@ -6,7 +6,6 @@ const ROLE_TO_PERSONA = {
   SECOPS: 'secops',
   DATA_ADMIN: 'dataAdmin',
   AI_BUILDER: 'aiBuilder',
-  SCHOOL_ADMIN: 'schoolAdmin',
   BUSINESS_OWNER: 'businessOwner',
   EMPLOYEE: 'employee',
 };
@@ -117,32 +116,6 @@ const PERSONAS = {
     ],
     roleHints: ['developer', 'dev', 'engineer', 'model', 'ml', 'ai', '研发', '开发'],
   },
-  schoolAdmin: {
-    id: 'schoolAdmin',
-    label: '学校 / 校园管理员',
-    kicker: 'CAMPUS TRUST LENS',
-    signature: '把校园数据、师生权益、共享审批和教学 AI 风险放到统一工作台。',
-    introSubtitle: 'Campus Trust Governance Stage',
-    headline: 'Aegis Workbench 校园数据与AI治理舞台',
-    subheadline: '适合学校、院系与教育机构的治理入口，让师生数据、教学模型和共享审批形成一张图。',
-    sceneTags: ['校园数据', '师生权益', '教学模型', '共享审批'],
-    benefits: [
-      { title: '校园数据集中治理', metric: '院系协同', description: '从学生档案到教学平台调用记录，都能回到统一治理视图。' },
-      { title: '师生权益更顺滑', metric: '请求闭环', description: '访问、导出、删除类主体权利工单能更快闭环。' },
-      { title: '教学场景更安心', metric: '模型受控', description: '教学 AI 的调用和共享风险不再散落在不同系统里。' },
-    ],
-    journey: [
-      { step: '01', title: '先看院系高敏资产', description: '确认学生、教师和校园运营数据的高敏分布与最近访问压力。' },
-      { step: '02', title: '处理师生权利请求', description: '优先推进导出、更正、删除和共享类请求，保证校园服务体验。' },
-      { step: '03', title: '审查教学 AI 调用', description: '核验模型是否越界、是否引入不必要的数据共享与风险。' },
-    ],
-    quickActions: [
-      { title: '主体权利', description: '处理师生个人数据请求', route: '/subject-request' },
-      { title: '数据共享', description: '审批跨院系数据流转', route: '/data-share' },
-      { title: '风险事件', description: '查看校园风险处置', route: '/risk-event-manage' },
-    ],
-    roleHints: ['school', 'campus', 'education', 'teacher', 'academy', '校园', '学校', '教务', '院系'],
-  },
   businessOwner: {
     id: 'businessOwner',
     label: '业务负责人',
@@ -228,19 +201,19 @@ const MENU_SECTIONS = [
     key: 'command',
     title: '指挥工作台',
     items: [
-      { path: '/', label: '首页', icon: 'HomeFilled', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner', 'aiBuilder'] },
-      { path: '/operations-command', label: '运营指挥台', icon: 'Grid', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'] },
-      { path: '/global-search', label: '全局搜索', icon: 'Search', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner', 'aiBuilder'] },
+      { path: '/', label: '首页', icon: 'HomeFilled', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner', 'aiBuilder'] },
+      { path: '/operations-command', label: '运营指挥台', icon: 'Grid', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner'] },
+      { path: '/global-search', label: '全局搜索', icon: 'Search', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner', 'aiBuilder'] },
     ],
   },
   {
     key: 'governance',
     title: '数据与模型',
     items: [
-      { path: '/data-asset', label: '数据资产', icon: 'DataAnalysis', audiences: ['governanceAdmin', 'dataAdmin', 'schoolAdmin', 'executive', 'businessOwner'] },
-      { path: '/ai-model-manage', label: 'AI模型', icon: 'StarFilled', audiences: ['governanceAdmin', 'aiBuilder', 'executive', 'schoolAdmin', 'businessOwner'] },
+      { path: '/data-asset', label: '数据资产', icon: 'DataAnalysis', audiences: ['governanceAdmin', 'dataAdmin', 'executive', 'businessOwner'] },
+      { path: '/ai-model-manage', label: 'AI模型', icon: 'StarFilled', audiences: ['governanceAdmin', 'aiBuilder', 'executive', 'businessOwner'] },
       { path: '/model-cost', label: '调用成本', icon: 'Money', audiences: ['governanceAdmin', 'aiBuilder', 'executive', 'businessOwner'] },
-      { path: '/desense-preview', label: '脱敏预览', icon: 'Lock', audiences: ['governanceAdmin', 'dataAdmin', 'aiBuilder', 'schoolAdmin'] },
+      { path: '/desense-preview', label: '脱敏预览', icon: 'Lock', audiences: ['governanceAdmin', 'dataAdmin', 'aiBuilder'] },
     ],
   },
   {
@@ -254,17 +227,17 @@ const MENU_SECTIONS = [
       { path: '/alerts', label: '告警闭环', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-log', label: '审计日志', icon: 'Timer', audiences: ['governanceAdmin', 'secops', 'executive'] },
       { path: '/audit-report', label: '审计报告', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'executive'] },
-      { path: '/sensitive-scan', label: '敏感扫描', icon: 'Search', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'schoolAdmin'] },
+      { path: '/sensitive-scan', label: '敏感扫描', icon: 'Search', audiences: ['governanceAdmin', 'secops', 'dataAdmin'] },
     ],
   },
   {
     key: 'process',
     title: '流转与履约',
     items: [
-      { path: '/approval-manage', label: '审批管理', icon: 'Finished', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'] },
-      { path: '/data-share', label: '数据共享', icon: 'Share', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'] },
-      { path: '/risk-event-manage', label: '风险事件', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'] },
-      { path: '/subject-request', label: '主体权利', icon: 'UserFilled', audiences: ['governanceAdmin', 'dataAdmin', 'schoolAdmin', 'secops'] },
+      { path: '/approval-manage', label: '审批管理', icon: 'Finished', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner'] },
+      { path: '/data-share', label: '数据共享', icon: 'Share', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner'] },
+      { path: '/risk-event-manage', label: '风险事件', icon: 'Warning', audiences: ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner'] },
+      { path: '/subject-request', label: '主体权利', icon: 'UserFilled', audiences: ['governanceAdmin', 'dataAdmin', 'secops'] },
       { path: '/policy-manage', label: '策略管理', icon: 'Document', audiences: ['governanceAdmin', 'secops', 'dataAdmin'] },
     ],
   },
@@ -282,10 +255,10 @@ const MENU_SECTIONS = [
 const EXTRA_ROUTE_AUDIENCES = {
   '/profile': [ALL],
   '/settings': [ALL],
-  '/operations-command': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
-  '/approval-manage': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
-  '/risk-event-manage': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
-  '/data-share': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'schoolAdmin', 'businessOwner'],
+  '/operations-command': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner'],
+  '/approval-manage': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner'],
+  '/risk-event-manage': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner'],
+  '/data-share': ['governanceAdmin', 'secops', 'dataAdmin', 'executive', 'businessOwner'],
   '/ai/models': ['governanceAdmin', 'aiBuilder', 'executive', 'businessOwner'],
   '/ai/monitor': ['governanceAdmin', 'aiBuilder', 'executive', 'secops'],
   '/ai/risk-rating': ['governanceAdmin', 'secops', 'executive', 'dataAdmin'],
@@ -311,12 +284,12 @@ export function inferPersona(user) {
 
   const haystack = normalizeText(user);
   if (!haystack) {
-    return 'governanceAdmin';
+    return 'employee';
   }
 
-  const orderedIds = ['schoolAdmin', 'businessOwner', 'executive', 'secops', 'dataAdmin', 'aiBuilder', 'governanceAdmin'];
+  const orderedIds = ['businessOwner', 'executive', 'secops', 'dataAdmin', 'aiBuilder', 'employee', 'governanceAdmin'];
   const matched = orderedIds.find(id => PERSONAS[id].roleHints.some(hint => haystack.includes(hint.toLowerCase())));
-  return matched || 'governanceAdmin';
+  return matched || 'employee';
 }
 
 export function getPersonaExperience(user) {

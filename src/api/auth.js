@@ -193,7 +193,6 @@ export const authApi = {
           { code: 'SECOPS', label: '安全运维' },
           { code: 'DATA_ADMIN', label: '数据管理员' },
           { code: 'AI_BUILDER', label: 'AI应用开发者' },
-          { code: 'SCHOOL_ADMIN', label: '学校管理员' },
           { code: 'BUSINESS_OWNER', label: '业务负责人' },
           { code: 'EMPLOYEE', label: '普通员工' },
         ],

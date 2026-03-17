@@ -117,6 +117,39 @@ CREATE TABLE IF NOT EXISTS `system_config` (
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) COMMENT='系统配置表';
 
+CREATE TABLE IF NOT EXISTS `security_event` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `event_type` VARCHAR(64) NOT NULL COMMENT '事件类型',
+  `file_path` VARCHAR(512) COMMENT '涉及文件路径',
+  `target_addr` VARCHAR(256) COMMENT '目标地址（模拟远端）',
+  `employee_id` VARCHAR(128) COMMENT '员工标识',
+  `hostname` VARCHAR(128) COMMENT '主机名',
+  `file_size` BIGINT COMMENT '文件大小（字节）',
+  `severity` VARCHAR(20) DEFAULT 'medium' COMMENT 'critical/high/medium/low',
+  `status` VARCHAR(20) DEFAULT 'pending' COMMENT 'pending/blocked/ignored/reviewing',
+  `source` VARCHAR(64) DEFAULT 'agent' COMMENT '上报来源',
+  `operator_id` BIGINT COMMENT '操作者ID',
+  `event_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_event_status(`status`),
+  INDEX idx_event_severity(`severity`),
+  INDEX idx_event_employee(`employee_id`),
+  INDEX idx_event_time(`event_time`)
+) COMMENT='安全事件表';
+
+CREATE TABLE IF NOT EXISTS `security_detection_rule` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL,
+  `sensitive_extensions` VARCHAR(500) DEFAULT '.docx,.pdf,.xlsx,.pptx,.key,.csv,.sql,.env,.pem,.pfx',
+  `sensitive_paths` VARCHAR(1000) DEFAULT 'C:/Users,/home,/Documents,/Desktop',
+  `alert_threshold_bytes` BIGINT DEFAULT 1048576,
+  `enabled` TINYINT(1) DEFAULT 1,
+  `description` VARCHAR(500),
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) COMMENT='安全检测规则表';
+
 -- AI 调用审计日志表（含 data_asset_id）
 CREATE TABLE IF NOT EXISTS `ai_call_log` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',

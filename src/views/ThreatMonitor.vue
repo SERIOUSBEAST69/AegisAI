@@ -159,14 +159,14 @@
             <el-table-column label="操作" width="160" fixed="right">
               <template #default="{ row }">
                 <el-button
-                  v-if="row.status === 'pending' || row.status === 'reviewing'"
+                  v-if="canHandleThreats && (row.status === 'pending' || row.status === 'reviewing')"
                   size="small"
                   type="danger"
                   :loading="actionLoading === row.id + '-block'"
                   @click="blockEvent(row)"
                 >阻拦</el-button>
                 <el-button
-                  v-if="row.status === 'pending' || row.status === 'reviewing'"
+                  v-if="canHandleThreats && (row.status === 'pending' || row.status === 'reviewing')"
                   size="small"
                   :loading="actionLoading === row.id + '-ignore'"
                   @click="ignoreEvent(row)"
@@ -193,7 +193,7 @@
       </el-tab-pane>
 
       <!-- ── 检测规则 Tab ── -->
-      <el-tab-pane label="检测规则" name="rules">
+      <el-tab-pane v-if="canManageThreatRules" label="检测规则" name="rules">
         <el-card class="card-glass" style="margin-top: 0">
           <div class="toolbar-row">
             <el-button type="primary" @click="openAddRule">
@@ -318,7 +318,7 @@ python openclaw_simulator.py --count 1200 --url http://localhost:8080</pre>
     </el-dialog>
 
     <button
-      v-if="isAdmin"
+      v-if="canRunThreatSimulation"
       class="simulator-fab"
       :disabled="simulatorRunning"
       @click="toggleSimulatorPanel"
@@ -327,7 +327,7 @@ python openclaw_simulator.py --count 1200 --url http://localhost:8080</pre>
     </button>
 
     <transition name="fade-slide">
-      <div v-if="isAdmin && simulatorPanelVisible" class="simulator-fab-panel card-glass">
+      <div v-if="canRunThreatSimulation && simulatorPanelVisible" class="simulator-fab-panel card-glass">
         <div class="fab-panel-header">
           <strong>恶意AI模拟器</strong>
           <el-button size="small" type="primary" :loading="simulatorRunning" @click="triggerSimulatorProbe">
@@ -369,7 +369,16 @@ import request from '../api/request';
 import { useUserStore } from '../store/user';
 
 const userStore = useUserStore();
-const isAdmin = computed(() => String(userStore.userInfo?.roleCode || '').toUpperCase() === 'ADMIN');
+
+function hasAnyRole(...roleCodes) {
+  const currentRole = String(userStore.userInfo?.roleCode || '').toUpperCase();
+  return roleCodes.some(role => role === currentRole);
+}
+
+const canViewThreatMonitor = computed(() => hasAnyRole('ADMIN', 'SECOPS', 'EXECUTIVE'));
+const canHandleThreats = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
+const canManageThreatRules = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
+const canRunThreatSimulation = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
 
 // ── 统计 ──────────────────────────────────────────────────────────────────────
 const stats = ref({});
@@ -567,7 +576,7 @@ async function refresh() {
 }
 
 async function loadSimulatorInsights() {
-  if (!isAdmin.value) {
+  if (!canRunThreatSimulation.value) {
     simulatorInsight.value = { attackEvents: [], defenseEvents: [] };
     return;
   }
@@ -593,7 +602,7 @@ function toggleSimulatorPanel() {
 }
 
 async function triggerSimulatorProbe() {
-  if (!isAdmin.value) {
+  if (!canRunThreatSimulation.value) {
     return;
   }
   simulatorRunning.value = true;
@@ -668,10 +677,16 @@ function rowStyle({ row }) {
 
 // ── 生命周期 ──────────────────────────────────────────────────────────────────
 onMounted(() => {
+  if (!canViewThreatMonitor.value) {
+    ElMessage.error('当前身份无权访问实施威胁检测模块');
+    return;
+  }
   refresh();
-  fetchRules();
+  if (canManageThreatRules.value) {
+    fetchRules();
+  }
   if (autoRefresh.value) startAutoRefresh();
-  if (isAdmin.value) {
+  if (canRunThreatSimulation.value) {
     loadSimulatorInsights();
   }
 });

@@ -33,13 +33,24 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+    private static final Map<String, String> ROLE_LABELS = new LinkedHashMap<>();
+
+    static {
+        ROLE_LABELS.put("ADMIN", "治理管理员");
+        ROLE_LABELS.put("EXECUTIVE", "管理层");
+        ROLE_LABELS.put("SECOPS", "安全运维");
+        ROLE_LABELS.put("DATA_ADMIN", "数据管理员");
+        ROLE_LABELS.put("AI_BUILDER", "AI应用开发者");
+        ROLE_LABELS.put("BUSINESS_OWNER", "业务负责人");
+        ROLE_LABELS.put("EMPLOYEE", "普通员工");
+    }
+
     private static final List<DemoAccountSeed> DEMO_ACCOUNT_SEEDS = List.of(
         new DemoAccountSeed("admin", "admin123", "平台管理员", "ADMIN", "enterprise", "治理中心", "13800138000", "admin@aegisai.com", "wx_admin"),
         new DemoAccountSeed("exec.demo", "demo1234", "经营负责人", "EXECUTIVE", "enterprise", "经营管理部", "13800138001", "exec@aegisai.com", "wx_exec_demo"),
         new DemoAccountSeed("secops.demo", "demo1234", "安全运维负责人", "SECOPS", "enterprise", "安全运营中心", "13800138002", "secops@aegisai.com", "wx_secops_demo"),
         new DemoAccountSeed("data.demo", "demo1234", "数据管理员", "DATA_ADMIN", "enterprise", "数据治理部", "13800138003", "data@aegisai.com", "wx_data_demo"),
         new DemoAccountSeed("builder.demo", "demo1234", "AI应用开发者", "AI_BUILDER", "ai-team", "模型平台组", "13800138004", "builder@aegisai.com", "wx_builder_demo"),
-        new DemoAccountSeed("school.demo", "demo1234", "校园数据管理员", "SCHOOL_ADMIN", "school", "智慧校园中心", "13800138005", "school@aegisai.com", "wx_school_demo"),
         new DemoAccountSeed("biz.demo", "demo1234", "业务负责人", "BUSINESS_OWNER", "enterprise", "业务创新部", "13800138006", "biz@aegisai.com", "wx_biz_demo"),
         new DemoAccountSeed("employee.demo", "demo1234", "普通员工", "EMPLOYEE", "enterprise", "业务一线", "13800138007", "employee@aegisai.com", "wx_employee_demo")
     );
@@ -128,16 +139,9 @@ public class AuthController {
 
     @GetMapping("/registration-options")
     public R<?> registrationOptions() {
-        List<Map<String, String>> identities = List.of(
-            option("ADMIN", "治理管理员"),
-            option("EXECUTIVE", "管理层"),
-            option("SECOPS", "安全运维"),
-            option("DATA_ADMIN", "数据管理员"),
-            option("AI_BUILDER", "AI应用开发者"),
-            option("SCHOOL_ADMIN", "学校管理员"),
-            option("BUSINESS_OWNER", "业务负责人"),
-            option("EMPLOYEE", "普通员工")
-        );
+        List<Map<String, String>> identities = ROLE_LABELS.entrySet().stream()
+            .map(entry -> option(entry.getKey(), entry.getValue()))
+            .toList();
         List<Map<String, String>> organizations = List.of(
             option("enterprise", "企业"),
             option("school", "学校"),
@@ -216,7 +220,7 @@ public class AuthController {
         if (seed == null) {
             return;
         }
-        Role role = roleService.lambdaQuery().eq(Role::getCode, seed.roleCode()).one();
+        Role role = resolveOrCreateRole(seed.roleCode());
         if (role == null) {
             return;
         }
@@ -241,7 +245,7 @@ public class AuthController {
         user.setWechatOpenId(seed.wechatOpenId());
         user.setStatus(1);
         user.setUpdateTime(new Date());
-        if (isNew || !StringUtils.hasText(user.getPassword())) {
+        if (isNew || !isBcryptHash(user.getPassword())) {
             user.setPassword(passwordEncoder.encode(seed.password()));
         }
 
@@ -250,6 +254,29 @@ public class AuthController {
         } else {
             userService.updateById(user);
         }
+    }
+
+    private Role resolveOrCreateRole(String roleCode) {
+        Role role = roleService.lambdaQuery().eq(Role::getCode, roleCode).one();
+        if (role != null) {
+            return role;
+        }
+        String roleName = ROLE_LABELS.get(roleCode);
+        if (!StringUtils.hasText(roleName)) {
+            return null;
+        }
+        Role created = new Role();
+        created.setCode(roleCode);
+        created.setName(roleName);
+        created.setDescription("系统默认角色: " + roleName);
+        created.setCreateTime(new Date());
+        created.setUpdateTime(new Date());
+        roleService.save(created);
+        return created;
+    }
+
+    private boolean isBcryptHash(String value) {
+        return StringUtils.hasText(value) && value.startsWith("$2");
     }
 
     private User createUser(RegisterReq req, String loginType) {

@@ -68,7 +68,7 @@ public class DataShareController {
 
     @PostMapping("/approve")
     public R<?> approve(@RequestBody @Validated ApproveReq req) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE");
         User currentUser = currentUserService.requireCurrentUser();
         DataShareRequest ds = dataShareRequestService.getById(req.getId());
         if (ds == null) return R.error(40000, "申请不存在");
@@ -139,7 +139,7 @@ public class DataShareController {
         if (role == null || role.getCode() == null) {
             return false;
         }
-        return Arrays.asList("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN").contains(role.getCode().toUpperCase());
+        return Arrays.asList("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE").contains(role.getCode().toUpperCase());
     }
 
     private String generateToken() {

@@ -26,7 +26,7 @@ public class RiskEventController {
 
     @PostMapping("/add")
     public R<?> add(@RequestBody RiskEvent event) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN");
         User currentUser = currentUserService.requireCurrentUser();
         event.setId(null);
         event.setHandlerId(currentUser.getId());
@@ -38,7 +38,7 @@ public class RiskEventController {
 
     @PostMapping("/update")
     public R<?> update(@RequestBody RiskEvent event) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN");
         User currentUser = currentUserService.requireCurrentUser();
         event.setHandlerId(currentUser.getId());
         event.setUpdateTime(new Date());
@@ -48,7 +48,7 @@ public class RiskEventController {
 
     @PostMapping("/delete")
     public R<?> delete(@RequestBody IdReq req) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "SCHOOL_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN");
         riskEventService.removeById(req.getId());
         return R.okMsg("删除成功");
     }

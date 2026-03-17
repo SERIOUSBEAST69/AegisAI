@@ -236,8 +236,8 @@ const shareForm = ref({ assetId: '', collaborators: '', reason: '' });
 const riskForm = ref({ type: '', level: 'high', status: 'open', processLog: '' });
 
 const currentRoleCode = computed(() => String(userStore.userInfo?.roleCode || '').toUpperCase());
-const canManageRisk = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'SECOPS', 'DATA_ADMIN', 'SCHOOL_ADMIN'));
-const canApproveFlow = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'SECOPS', 'DATA_ADMIN', 'EXECUTIVE', 'SCHOOL_ADMIN'));
+const canManageRisk = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'SECOPS', 'DATA_ADMIN'));
+const canApproveFlow = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'SECOPS', 'DATA_ADMIN', 'EXECUTIVE'));
 const composerOptions = computed(() => ([
   { key: 'risk', label: '风险事件', enabled: canManageRisk.value },
   { key: 'approval', label: '审批申请', enabled: true },

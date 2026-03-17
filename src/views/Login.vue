@@ -464,7 +464,6 @@ const demoAccounts = [
   { label: '安全运维', username: 'secops.demo', password: 'demo1234', phone: '13800138002', nickname: '安全运维负责人', roleCode: 'SECOPS', organizationType: 'enterprise', department: '安全运营中心', wechatOpenId: 'wx_secops_demo' },
   { label: '数据管理员', username: 'data.demo', password: 'demo1234', phone: '13800138003', nickname: '数据管理员', roleCode: 'DATA_ADMIN', organizationType: 'enterprise', department: '数据治理部', wechatOpenId: 'wx_data_demo' },
   { label: 'AI开发者', username: 'builder.demo', password: 'demo1234', phone: '13800138004', nickname: 'AI应用开发者', roleCode: 'AI_BUILDER', organizationType: 'ai-team', department: '模型平台组', wechatOpenId: 'wx_builder_demo' },
-  { label: '学校管理员', username: 'school.demo', password: 'demo1234', phone: '13800138005', nickname: '校园数据管理员', roleCode: 'SCHOOL_ADMIN', organizationType: 'school', department: '智慧校园中心', wechatOpenId: 'wx_school_demo' },
   { label: '业务负责人', username: 'biz.demo', password: 'demo1234', phone: '13800138006', nickname: '业务负责人', roleCode: 'BUSINESS_OWNER', organizationType: 'enterprise', department: '业务创新部', wechatOpenId: 'wx_biz_demo' },
   { label: '普通员工', username: 'employee.demo', password: 'demo1234', phone: '13800138007', nickname: '普通员工', roleCode: 'EMPLOYEE', organizationType: 'enterprise', department: '业务一线', wechatOpenId: 'wx_employee_demo' },
 ];
@@ -510,7 +509,6 @@ const registrationOptions = reactive({
     { code: 'SECOPS', label: '安全运维' },
     { code: 'DATA_ADMIN', label: '数据管理员' },
     { code: 'AI_BUILDER', label: 'AI应用开发者' },
-    { code: 'SCHOOL_ADMIN', label: '学校管理员' },
     { code: 'BUSINESS_OWNER', label: '业务负责人' },
     { code: 'EMPLOYEE', label: '普通员工' },
   ],

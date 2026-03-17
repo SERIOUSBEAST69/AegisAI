@@ -54,7 +54,7 @@ public class ApprovalController {
 
     @PostMapping("/reject")
     public R<?> reject(@RequestBody ApproveReq req) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE");
         User currentUser = currentUserService.requireCurrentUser();
         ApprovalRequest before = approvalRequestService.getById(req.getRequestId());
         if (before == null) return R.error(40000, "申请不存在");
@@ -74,7 +74,7 @@ public class ApprovalController {
     @PostMapping("/approve")
     public R<?> approve(@RequestBody ApproveReq req) {
         if (!APPROVE_STATUS.contains(req.getStatus())) return R.error(40000, "不支持的状态");
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE");
         User currentUser = currentUserService.requireCurrentUser();
         approvalRequestService.approve(req.getRequestId(), currentUser.getId(), req.getStatus());
         return R.okMsg("审批完成");
@@ -82,7 +82,7 @@ public class ApprovalController {
 
     @GetMapping("/todo")
     public R<List<ApprovalRequest>> todo() {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE");
         User currentUser = currentUserService.requireCurrentUser();
         return R.ok(approvalRequestService.todo(currentUser.getId()));
     }
@@ -106,7 +106,7 @@ public class ApprovalController {
         if (role == null || role.getCode() == null) {
             return false;
         }
-        return Arrays.asList("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "SCHOOL_ADMIN").contains(role.getCode().toUpperCase());
+        return Arrays.asList("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE").contains(role.getCode().toUpperCase());
     }
 
     public static class ApproveReq { public Long getRequestId(){return requestId;} public void setRequestId(Long id){this.requestId=id;} public String getStatus(){return status;} public void setStatus(String s){this.status=s;} private Long requestId; private String status; }
