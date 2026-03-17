@@ -249,6 +249,11 @@
                       </div>
 
                       <div class="field-group">
+                        <label for="register-company-name">公司名称</label>
+                        <input id="register-company-name" v-model.trim="registerForm.companyName" class="field-input" type="text" placeholder="例如：Aegis 科技有限公司" />
+                      </div>
+
+                      <div class="field-group">
                         <label for="register-department">部门 / 团队</label>
                         <input id="register-department" v-model.trim="registerForm.department" class="field-input" type="text" placeholder="例如：安全运营中心 / AI研发部 / 教务处" />
                       </div>
@@ -262,6 +267,11 @@
                           <label for="register-password">密码</label>
                           <input id="register-password" v-model="registerForm.password" class="field-input" type="password" placeholder="至少 6 位" />
                         </div>
+                      </div>
+
+                      <div class="field-group">
+                        <label for="register-password-confirm">确认密码</label>
+                        <input id="register-password-confirm" v-model="registerForm.confirmPassword" class="field-input" type="password" placeholder="请再次输入密码" />
                       </div>
 
                       <div class="field-group">
@@ -295,6 +305,11 @@
                             <option v-for="item in registrationOptions.organizations" :key="item.code" :value="item.code">{{ item.label }}</option>
                           </select>
                         </div>
+                      </div>
+
+                      <div class="field-group">
+                        <label for="phone-register-company-name">公司名称</label>
+                        <input id="phone-register-company-name" v-model.trim="registerForm.companyName" class="field-input" type="text" placeholder="例如：Aegis 科技有限公司" />
                       </div>
 
                       <div class="field-group">
@@ -348,6 +363,11 @@
                             <option v-for="item in registrationOptions.organizations" :key="item.code" :value="item.code">{{ item.label }}</option>
                           </select>
                         </div>
+                      </div>
+
+                      <div class="field-group">
+                        <label for="wechat-register-company-name">公司名称</label>
+                        <input id="wechat-register-company-name" v-model.trim="registerForm.companyName" class="field-input" type="text" placeholder="例如：Aegis 科技有限公司" />
                       </div>
 
                       <div class="field-group">
@@ -488,9 +508,12 @@ const passwordForm = reactive({ username: '', password: '', captcha: '' });
 const phoneForm = reactive({ phone: '', code: '' });
 const wechatForm = reactive({ nickname: '', phone: '', roleCode: 'BUSINESS_OWNER', organizationType: 'enterprise', wechatOpenId: '' });
 const registerForm = reactive({
+  accountType: 'real',
   loginType: 'password',
+  companyName: '',
   username: '',
   password: '',
+  confirmPassword: '',
   realName: '',
   nickname: '',
   roleCode: 'BUSINESS_OWNER',
@@ -597,10 +620,18 @@ const reviewDepartment = computed(() => {
   return '当前已有身份';
 });
 
+const reviewCompany = computed(() => {
+  if (flowType.value === 'register') {
+    return registerForm.companyName || '未填写';
+  }
+  return '已绑定公司';
+});
+
 const reviewItems = computed(() => [
   { label: '当前流程', value: currentFlowMeta.value.title },
   { label: '认证方式', value: currentModeMeta.value.label },
   { label: '主标识', value: reviewPrimaryIdentity.value },
+  { label: '公司', value: reviewCompany.value },
   { label: '角色 / 身份', value: reviewRole.value },
   { label: '组织类型', value: reviewOrganization.value },
   { label: '部门 / 团队', value: reviewDepartment.value },
@@ -700,6 +731,9 @@ function ensureRegistrationBasics() {
   if (!registerForm.realName || !registerForm.roleCode || !registerForm.organizationType) {
     throw new Error('请先填写姓名、身份与组织类型');
   }
+  if (!registerForm.companyName) {
+    throw new Error('请填写公司名称');
+  }
   if (!registerForm.department) {
     throw new Error('请填写部门或团队');
   }
@@ -731,6 +765,9 @@ function getFormValidationError() {
   if (activeMode.value === 'password') {
     if (!registerForm.username || !registerForm.password || registerForm.password.length < 6) {
       return '账号注册需要用户名和至少 6 位密码';
+    }
+    if (!registerForm.confirmPassword || registerForm.confirmPassword !== registerForm.password) {
+      return '请确认两次输入的密码一致';
     }
     return '';
   }
@@ -934,7 +971,17 @@ async function submitRegistration() {
 
   isLoading.value = true;
   try {
-    const res = await authApi.register({ ...registerForm, loginType: activeMode.value });
+    const res = await authApi.register({ ...registerForm, loginType: activeMode.value, accountType: 'real' });
+    if (res?.pendingApproval || !res?.token) {
+      ElMessage.success(res?.message || '注册申请已提交，等待管理员审批');
+      flowType.value = 'login';
+      activeMode.value = 'password';
+      modeChosen.value = true;
+      currentStep.value = 3;
+      passwordForm.username = registerForm.username || registerForm.phone || '';
+      passwordForm.password = '';
+      return;
+    }
     await establishAndRoute(res);
   } catch (err) {
     globalError.value = err?.message || '注册失败';

@@ -6,14 +6,18 @@ import { clearSession, getSession, isMockSession, setSession } from '../utils/au
 function buildMockUser(session) {
   return {
     id: session.user?.id || 1,
+    companyId: session.user?.companyId || 1,
     username: session.user?.username || 'demo-admin',
     nickname: session.user?.nickname || '演示管理员',
     realName: session.user?.realName || '演示管理员',
     email: session.user?.email || 'demo@aegis.workbench',
     phone: session.user?.phone || '13800138000',
     department: session.user?.department || '创新实验室',
+    companyName: session.user?.companyName || 'Aegis 默认公司',
     roleName: session.user?.roleName || '演示管理员',
     roleCode: session.user?.roleCode || 'ADMIN',
+    accountType: session.user?.accountType || 'demo',
+    accountStatus: session.user?.accountStatus || 'active',
     lastActiveAt: new Date().toISOString(),
     avatar: session.user?.avatar || ''
   };

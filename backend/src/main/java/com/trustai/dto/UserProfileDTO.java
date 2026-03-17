@@ -8,6 +8,10 @@ import lombok.Data;
 @Builder
 public class UserProfileDTO {
     private Long id;
+    private Long companyId;
+    private String companyName;
+    private String accountType;
+    private String accountStatus;
     private String username;
     private String avatar;
     private String nickname;

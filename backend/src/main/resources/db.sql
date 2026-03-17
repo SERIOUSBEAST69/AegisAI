@@ -2,6 +2,9 @@
 
 CREATE TABLE `sys_user` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
+  `company_id` BIGINT COMMENT '公司ID',
+  `account_type` VARCHAR(20) DEFAULT 'demo' COMMENT '账号类型 demo/real',
+  `account_status` VARCHAR(20) DEFAULT 'active' COMMENT '账号状态 pending/active/rejected/disabled',
   `username` VARCHAR(50) NOT NULL COMMENT '用户名',
   `password` VARCHAR(100) NOT NULL COMMENT '密码（加密存储）',
   `real_name` VARCHAR(50) COMMENT '真实姓名',
@@ -13,11 +16,25 @@ CREATE TABLE `sys_user` (
   `phone` VARCHAR(20) COMMENT '联系方式',
   `email` VARCHAR(100) COMMENT '邮箱',
   `status` TINYINT DEFAULT 1 COMMENT '状态 1-正常 0-禁用',
+  `approved_by` BIGINT COMMENT '审批人ID',
+  `reject_reason` VARCHAR(255) COMMENT '拒绝原因',
+  `approved_at` DATETIME COMMENT '审批时间',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   INDEX idx_username(`username`),
+  INDEX idx_company(`company_id`),
   INDEX idx_role(`role_id`)
 ) COMMENT='系统用户表';
+
+CREATE TABLE `company` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '公司ID',
+  `company_code` VARCHAR(64) NOT NULL COMMENT '公司编码',
+  `company_name` VARCHAR(128) NOT NULL COMMENT '公司名称',
+  `status` TINYINT DEFAULT 1 COMMENT '状态 1-启用 0-禁用',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_company_code(`company_code`)
+) COMMENT='公司表';
 
 CREATE TABLE `role` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '角色ID',
@@ -48,6 +65,7 @@ CREATE TABLE `role_permission` (
 
 CREATE TABLE `data_asset` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '数据资产ID',
+  `company_id` BIGINT COMMENT '公司ID',
   `name` VARCHAR(100) NOT NULL COMMENT '资产名称',
   `type` VARCHAR(50) COMMENT '类型（MySQL/Excel/API等）',
   `sensitivity_level` VARCHAR(20) COMMENT '敏感等级（公开/内部/敏感/受限）',
@@ -143,6 +161,7 @@ CREATE TABLE `compliance_policy` (
 
 CREATE TABLE `risk_event` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '风险事件ID',
+  `company_id` BIGINT COMMENT '公司ID',
   `type` VARCHAR(50) COMMENT '事件类型',
   `level` VARCHAR(20) COMMENT '风险等级',
   `related_log_id` BIGINT COMMENT '关联日志ID',
@@ -181,19 +200,6 @@ CREATE TABLE `model_call_stat` (
   INDEX idx_user_date(`user_id`, `date`)
 ) COMMENT='模型调用成本统计';
 
--- 告警闭环记录
-CREATE TABLE `alert_record` (
-  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `title` VARCHAR(100),
-  `level` VARCHAR(20),
-  `status` VARCHAR(20) COMMENT 'open/claimed/resolved/archived',
-  `assignee_id` BIGINT,
-  `related_log_id` BIGINT,
-  `resolution` TEXT,
-  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) COMMENT='告警闭环记录';
-
 -- 数据主体权利申请工单
 CREATE TABLE `subject_request` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -206,19 +212,6 @@ CREATE TABLE `subject_request` (
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) COMMENT='数据主体权利申请工单';
-
--- 数据资产共享审批
-CREATE TABLE `data_share_request` (
-  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `asset_id` BIGINT,
-  `applicant_id` BIGINT,
-  `collaborators` VARCHAR(200) COMMENT '协作人ID列表',
-  `reason` VARCHAR(200),
-  `status` VARCHAR(20) COMMENT 'pending/approved/rejected',
-  `approver_id` BIGINT,
-  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) COMMENT='数据资产共享审批';
 
 -- 脱敏规则
 CREATE TABLE `desensitize_rule` (
@@ -254,6 +247,7 @@ CREATE TABLE `system_config` (
 
 CREATE TABLE `security_event` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `company_id` BIGINT COMMENT '公司ID',
   `event_type` VARCHAR(64) NOT NULL COMMENT '事件类型',
   `file_path` VARCHAR(512) COMMENT '涉及文件路径',
   `target_addr` VARCHAR(256) COMMENT '目标地址（模拟远端）',

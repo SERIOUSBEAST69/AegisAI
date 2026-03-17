@@ -93,6 +93,7 @@ public class DataInitializer implements CommandLineRunner {
         user.setRealName(realName);
         user.setNickname(realName);
         user.setRoleId(role == null ? null : role.getId());
+        user.setCompanyId(1L);
         user.setDeviceId(username + "-device");
         user.setOrganizationType(organizationType);
         user.setDepartment(department);
@@ -100,6 +101,11 @@ public class DataInitializer implements CommandLineRunner {
         user.setEmail(email);
         user.setLoginType(loginType);
         user.setWechatOpenId(wechatOpenId);
+        user.setAccountType("demo");
+        user.setAccountStatus("active");
+        user.setRejectReason(null);
+        user.setApprovedBy(1L);
+        user.setApprovedAt(new Date());
         user.setStatus(1);
         user.setUpdateTime(new Date());
         if (isNew) {

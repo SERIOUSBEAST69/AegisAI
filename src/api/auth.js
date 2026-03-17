@@ -14,6 +14,9 @@ function normalizeAuthResponse(response, mode) {
   return {
     token: response?.token,
     user: response?.user || response?.userInfo || null,
+    pendingApproval: Boolean(response?.pendingApproval),
+    accountStatus: response?.accountStatus,
+    message: response?.message,
     mode,
   };
 }
@@ -30,6 +33,7 @@ function mockLogin({ username, password }) {
           token: 'mock-jwt-token-' + Date.now(),
           user: {
             id: 1,
+            companyId: 1,
             username,
             nickname: '管理员',
             roles: ['ADMIN'],
@@ -49,6 +53,7 @@ function buildMockSession(identity = 'ADMIN', overrides = {}) {
     token: 'mock-jwt-token-' + Date.now(),
     user: {
       id: 1,
+      companyId: Number(overrides.companyId || 1),
       username: overrides.username || overrides.phone || 'demo-user',
       nickname: overrides.nickname || '演示用户',
       realName: overrides.realName || overrides.nickname || '演示用户',
@@ -58,6 +63,8 @@ function buildMockSession(identity = 'ADMIN', overrides = {}) {
       roleCode: overrides.roleCode || identity,
       organizationType: overrides.organizationType || 'enterprise',
       loginType: overrides.loginType || 'mock',
+      accountType: overrides.accountType || 'demo',
+      accountStatus: overrides.accountStatus || 'active',
     },
   };
 }
@@ -160,6 +167,22 @@ export const authApi = {
 
   register(payload) {
     if (USE_MOCK) {
+      const accountType = payload.accountType || 'real';
+      if (accountType === 'real') {
+        return Promise.resolve(normalizeAuthResponse({
+          pendingApproval: true,
+          accountStatus: 'pending',
+          message: '注册申请已提交，等待管理员审批',
+          user: {
+            username: payload.username || payload.phone || payload.wechatOpenId || 'new-user',
+            realName: payload.realName,
+            nickname: payload.nickname || payload.realName,
+            accountType: 'real',
+            accountStatus: 'pending',
+            companyName: payload.companyName || '',
+          }
+        }, 'mock'));
+      }
       return Promise.resolve(normalizeAuthResponse(buildMockSession(payload.roleCode || 'BUSINESS_OWNER', {
         username: payload.username || payload.phone || payload.wechatOpenId || 'new-user',
         nickname: payload.nickname || payload.realName,
@@ -168,6 +191,8 @@ export const authApi = {
         department: payload.department,
         organizationType: payload.organizationType,
         loginType: payload.loginType || 'password',
+        accountType,
+        accountStatus: 'active',
       }), 'mock'));
     }
     return realRegister(payload).then(response => normalizeAuthResponse(response, 'real'));

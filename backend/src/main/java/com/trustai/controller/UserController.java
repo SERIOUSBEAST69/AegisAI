@@ -4,9 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.dto.ChangePasswordDTO;
 import com.trustai.dto.UserProfileDTO;
 import com.trustai.dto.UserUpdateDTO;
+import com.trustai.entity.AuditLog;
+import com.trustai.entity.Company;
 import com.trustai.entity.Role;
 import com.trustai.entity.User;
 import com.trustai.exception.BizException;
+import com.trustai.service.AuditLogService;
+import com.trustai.service.CompanyService;
 import com.trustai.service.CurrentUserService;
 import com.trustai.service.UserService;
 import com.trustai.utils.R;
@@ -17,11 +21,13 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,26 +43,99 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/user")
 @Validated
 public class UserController {
+    private static final String ACCOUNT_STATUS_PENDING = "pending";
+    private static final String ACCOUNT_STATUS_ACTIVE = "active";
+    private static final String ACCOUNT_STATUS_REJECTED = "rejected";
+
     @Autowired private UserService userService;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private CurrentUserService currentUserService;
+    @Autowired private CompanyService companyService;
+    @Autowired private AuditLogService auditLogService;
 
     @GetMapping("/list")
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
-    public R<List<User>> list(@RequestParam(required = false) String username) {
+    public R<List<User>> list(@RequestParam(required = false) String username,
+                              @RequestParam(required = false) String accountStatus,
+                              @RequestParam(required = false) String accountType) {
         currentUserService.requireAdmin();
+        Long companyId = currentUserService.requireCurrentUser().getCompanyId();
         QueryWrapper<User> qw = new QueryWrapper<>();
+        if (companyId != null) {
+            qw.eq("company_id", companyId);
+        }
         if (username != null && !username.isEmpty()) qw.like("username", username);
+        if (accountStatus != null && !accountStatus.isEmpty()) qw.eq("account_status", accountStatus);
+        if (accountType != null && !accountType.isEmpty()) qw.eq("account_type", accountType);
         List<User> list = userService.list(qw);
         list.forEach(u -> u.setPassword(null));
         return R.ok(list);
+    }
+
+    @GetMapping("/pending")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    public R<List<User>> pendingList() {
+        currentUserService.requireAdmin();
+        Long companyId = currentUserService.requireCurrentUser().getCompanyId();
+        QueryWrapper<User> qw = new QueryWrapper<User>()
+            .eq("account_type", "real")
+            .eq("account_status", ACCOUNT_STATUS_PENDING);
+        if (companyId != null) {
+            qw.eq("company_id", companyId);
+        }
+        List<User> list = userService.list(qw);
+        list.forEach(u -> u.setPassword(null));
+        return R.ok(list);
+    }
+
+    @PostMapping("/approve")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    public R<?> approve(@RequestBody ApproveReq req) {
+        currentUserService.requireAdmin();
+        User admin = currentUserService.requireCurrentUser();
+        User user = requireCompanyUser(req.getId(), admin.getCompanyId());
+        user.setAccountStatus(ACCOUNT_STATUS_ACTIVE);
+        user.setRejectReason(null);
+        user.setApprovedBy(admin.getId());
+        user.setApprovedAt(new Date());
+        user.setStatus(1);
+        user.setUpdateTime(new Date());
+        userService.updateById(user);
+        writeApprovalAudit(admin, user, "approve", "账号审批通过");
+        return R.okMsg("审批通过");
+    }
+
+    @PostMapping("/reject")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    public R<?> reject(@RequestBody RejectReq req) {
+        currentUserService.requireAdmin();
+        User admin = currentUserService.requireCurrentUser();
+        User user = requireCompanyUser(req.getId(), admin.getCompanyId());
+        user.setAccountStatus(ACCOUNT_STATUS_REJECTED);
+        user.setRejectReason(req.getReason());
+        user.setApprovedBy(admin.getId());
+        user.setApprovedAt(new Date());
+        user.setUpdateTime(new Date());
+        userService.updateById(user);
+        writeApprovalAudit(admin, user, "reject", StringUtils.hasText(req.getReason()) ? req.getReason() : "账号审批拒绝");
+        return R.okMsg("审批已拒绝");
     }
 
     @PostMapping("/register")
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> register(@RequestBody User user) {
         currentUserService.requireAdmin();
+        user.setCompanyId(currentUserService.requireCurrentUser().getCompanyId());
         user.setPassword(passwordEncoder.encode(user.getPassword()));
+        if (!StringUtils.hasText(user.getAccountType())) {
+            user.setAccountType("real");
+        }
+        if (!StringUtils.hasText(user.getAccountStatus())) {
+            user.setAccountStatus(ACCOUNT_STATUS_ACTIVE);
+        }
+        user.setApprovedBy(currentUserService.requireCurrentUser().getId());
+        user.setApprovedAt(new Date());
+        user.setRejectReason(null);
         user.setCreateTime(new Date());
         user.setUpdateTime(new Date());
         userService.save(user);
@@ -67,9 +146,14 @@ public class UserController {
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> update(@RequestBody User user) {
         currentUserService.requireAdmin();
+        User existing = userService.getById(user.getId());
+        if (existing == null || !java.util.Objects.equals(existing.getCompanyId(), currentUserService.requireCurrentUser().getCompanyId())) {
+            throw new BizException(40400, "用户不存在或不在当前公司");
+        }
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
+        user.setCompanyId(existing.getCompanyId());
         user.setUpdateTime(new Date());
         userService.updateById(user);
         return R.okMsg("更新成功");
@@ -79,11 +163,24 @@ public class UserController {
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> delete(@RequestBody IdReq req) {
         currentUserService.requireAdmin();
+        User existing = userService.getById(req.getId());
+        if (existing == null || !java.util.Objects.equals(existing.getCompanyId(), currentUserService.requireCurrentUser().getCompanyId())) {
+            throw new BizException(40400, "用户不存在或不在当前公司");
+        }
         userService.removeById(req.getId());
         return R.okMsg("删除成功");
     }
 
     public static class IdReq { public Long getId(){return id;} public void setId(Long id){this.id=id;} private Long id; }
+    public static class ApproveReq { public Long getId(){return id;} public void setId(Long id){this.id=id;} private Long id; }
+    public static class RejectReq {
+        private Long id;
+        private String reason;
+        public Long getId(){return id;}
+        public void setId(Long id){this.id=id;}
+        public String getReason(){return reason;}
+        public void setReason(String reason){this.reason=reason;}
+    }
 
     @GetMapping("/profile")
     @PreAuthorize("isAuthenticated()")
@@ -125,19 +222,53 @@ public class UserController {
 
     private UserProfileDTO toProfile(User user) {
         Role role = currentUserService.getCurrentRole(user);
+        Company company = user.getCompanyId() == null ? null : companyService.getById(user.getCompanyId());
         return UserProfileDTO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .avatar(user.getAvatar())
-                .nickname(user.getNickname())
-                .realName(user.getRealName())
-                .email(user.getEmail())
-                .phone(user.getPhone())
-                .department(user.getDepartment())
-                .roleName(role == null ? null : role.getName())
-                .roleCode(role == null ? null : role.getCode())
-                .lastActiveAt(user.getUpdateTime() == null ? null : user.getUpdateTime().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime())
-                .build();
+            .id(user.getId())
+            .companyId(user.getCompanyId())
+            .companyName(company == null ? null : company.getCompanyName())
+            .accountType(user.getAccountType())
+            .accountStatus(resolveAccountStatus(user))
+            .username(user.getUsername())
+            .avatar(user.getAvatar())
+            .nickname(user.getNickname())
+            .realName(user.getRealName())
+            .email(user.getEmail())
+            .phone(user.getPhone())
+            .department(user.getDepartment())
+            .roleName(role == null ? null : role.getName())
+            .roleCode(role == null ? null : role.getCode())
+            .lastActiveAt(user.getUpdateTime() == null ? null : user.getUpdateTime().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime())
+            .build();
+    }
+
+    private String resolveAccountStatus(User user) {
+        if (StringUtils.hasText(user.getAccountStatus())) {
+            return user.getAccountStatus();
+        }
+        return user.getStatus() != null && user.getStatus() == 0 ? "disabled" : ACCOUNT_STATUS_ACTIVE;
+    }
+
+    private User requireCompanyUser(Long id, Long companyId) {
+        User existing = userService.getById(id);
+        if (existing == null || !Objects.equals(existing.getCompanyId(), companyId)) {
+            throw new BizException(40400, "用户不存在或不在当前公司");
+        }
+        return existing;
+    }
+
+    private void writeApprovalAudit(User admin, User target, String action, String detail) {
+        AuditLog log = new AuditLog();
+        log.setUserId(admin.getId());
+        log.setOperation("user_registration_" + action);
+        log.setOperationTime(new Date());
+        log.setDevice(admin.getDeviceId());
+        log.setInputOverview("targetUser=" + target.getUsername());
+        log.setOutputOverview(detail);
+        log.setResult("success");
+        log.setRiskLevel("NORMAL");
+        log.setCreateTime(new Date());
+        auditLogService.saveAudit(log);
     }
 
     private String storeAvatar(MultipartFile file) {

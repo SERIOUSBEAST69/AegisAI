@@ -3,10 +3,12 @@ package com.trustai.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.config.jwt.JwtUtil;
 import com.trustai.dto.UserProfileDTO;
+import com.trustai.entity.Company;
 import com.trustai.entity.Role;
 import com.trustai.entity.User;
 import com.trustai.exception.BizException;
 import com.trustai.service.AuthVerificationService;
+import com.trustai.service.CompanyService;
 import com.trustai.service.CurrentUserService;
 import com.trustai.service.RoleService;
 import com.trustai.service.UserService;
@@ -33,6 +35,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+    private static final String ACCOUNT_TYPE_DEMO = "demo";
+    private static final String ACCOUNT_TYPE_REAL = "real";
+    private static final String ACCOUNT_STATUS_PENDING = "pending";
+    private static final String ACCOUNT_STATUS_ACTIVE = "active";
+    private static final String ACCOUNT_STATUS_REJECTED = "rejected";
+    private static final String ACCOUNT_STATUS_DISABLED = "disabled";
     private static final Map<String, String> ROLE_LABELS = new LinkedHashMap<>();
 
     static {
@@ -61,17 +69,16 @@ public class AuthController {
     @Autowired private CurrentUserService currentUserService;
     @Autowired private RoleService roleService;
     @Autowired private AuthVerificationService authVerificationService;
+    @Autowired private CompanyService companyService;
 
     @PostMapping("/login")
     public R<?> login(@RequestBody LoginReq req) {
         ensureDemoUserByUsername(req.getUsername());
-        User user = findEnabledUserByUsername(req.getUsername());
+        User user = findUserByUsername(req.getUsername());
         log.info("login pick user id={}, pwdPref={}",
             user != null ? user.getId() : null,
             user != null && user.getPassword() != null ? user.getPassword().substring(0, Math.min(4, user.getPassword().length())) : null);
-        if (user == null) {
-            throw new BizException(40100, "用户不存在或已禁用");
-        }
+        assertLoginAllowed(user, "用户不存在");
         if (!passwordEncoder.matches(req.getPassword(), user.getPassword())) {
             throw new BizException(40100, "用户名或密码错误");
         }
@@ -85,10 +92,8 @@ public class AuthController {
     public R<?> loginByPhone(@RequestBody PhoneLoginReq req) {
         authVerificationService.verifyPhoneCode(req.getPhone(), req.getCode());
         ensureDemoUserByPhone(req.getPhone());
-        User user = findEnabledUserByPhone(req.getPhone());
-        if (user == null) {
-            throw new BizException(40100, "手机号未注册或已禁用");
-        }
+        User user = findUserByPhone(req.getPhone());
+        assertLoginAllowed(user, "手机号未注册");
         user.setLoginType("phone");
         user.setUpdateTime(new Date());
         userService.updateById(user);
@@ -99,21 +104,11 @@ public class AuthController {
     public R<?> loginByWechat(@RequestBody WechatLoginReq req) {
         String openId = normalizeWechatOpenId(req.getWechatOpenId(), req.getNickname());
         ensureDemoUserByWechat(openId);
-        User user = findEnabledUserByWechat(openId);
+        User user = findUserByWechat(openId);
         if (user == null) {
-            RegisterReq registerReq = new RegisterReq();
-            registerReq.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : "微信用户");
-            registerReq.setRealName(registerReq.getNickname());
-            registerReq.setRoleCode(StringUtils.hasText(req.getRoleCode()) ? req.getRoleCode() : "BUSINESS_OWNER");
-            registerReq.setOrganizationType(StringUtils.hasText(req.getOrganizationType()) ? req.getOrganizationType() : "enterprise");
-            registerReq.setDepartment(StringUtils.hasText(req.getDepartment()) ? req.getDepartment() : "微信快速接入");
-            registerReq.setPhone(req.getPhone());
-            registerReq.setWechatOpenId(openId);
-            user = createUser(registerReq, "wechat");
+            throw new BizException(40100, "微信身份未注册，请先完成账号注册");
         }
-        if (user.getStatus() != null && user.getStatus() == 0) {
-            throw new BizException(40100, "用户已禁用");
-        }
+        assertLoginAllowed(user, "用户不存在");
         user.setLoginType("wechat");
         user.setUpdateTime(new Date());
         userService.updateById(user);
@@ -123,7 +118,11 @@ public class AuthController {
     @PostMapping("/register")
     public R<?> register(@RequestBody RegisterReq req) {
         User user = createUser(req, StringUtils.hasText(req.getLoginType()) ? req.getLoginType() : inferLoginType(req));
-        return R.ok(buildSession(user, true));
+        String accountStatus = normalizeAccountStatus(user);
+        if (ACCOUNT_STATUS_ACTIVE.equals(accountStatus)) {
+            return R.ok(buildSession(user, true));
+        }
+        return R.ok(new RegisterResp(false, true, accountStatus, "注册申请已提交，等待管理员审批", toProfile(user)));
     }
 
     @PostMapping("/phone-code")
@@ -169,33 +168,31 @@ public class AuthController {
     }
 
     private SessionResp buildSession(User user, boolean includeToken) {
-        String token = includeToken ? jwtUtil.generateToken(user.getUsername(), user.getId()) : null;
+        String token = includeToken ? jwtUtil.generateToken(user.getUsername(), user.getId(), user.getCompanyId()) : null;
         user.setPassword(null);
         return new SessionResp(token, toProfile(user), true, System.currentTimeMillis());
     }
 
-    private User findEnabledUserByUsername(String username) {
+    private User findUserByUsername(String username) {
         List<User> users = userService.list(new QueryWrapper<User>().eq("username", username));
-        return pickEnabledUser(users);
+        return pickLatestUser(users);
     }
 
-    private User findEnabledUserByPhone(String phone) {
+    private User findUserByPhone(String phone) {
         List<User> users = userService.list(new QueryWrapper<User>().eq("phone", phone));
-        return pickEnabledUser(users);
+        return pickLatestUser(users);
     }
 
-    private User findEnabledUserByWechat(String wechatOpenId) {
+    private User findUserByWechat(String wechatOpenId) {
         List<User> users = userService.list(new QueryWrapper<User>().eq("wechat_open_id", wechatOpenId));
-        return pickEnabledUser(users);
+        return pickLatestUser(users);
     }
 
-    private User pickEnabledUser(List<User> users) {
+    private User pickLatestUser(List<User> users) {
         User user = users.stream()
-            .filter(candidate -> candidate.getStatus() == null || candidate.getStatus() != 0)
             .filter(candidate -> candidate.getPassword() != null && candidate.getPassword().startsWith("$2"))
             .findFirst()
             .orElseGet(() -> users.stream()
-                .filter(candidate -> candidate.getStatus() == null || candidate.getStatus() != 0)
                 .findFirst()
                 .orElse(null));
         if (user == null) {
@@ -237,6 +234,9 @@ public class AuthController {
         user.setRealName(seed.realName());
         user.setNickname(seed.realName());
         user.setRoleId(role.getId());
+        if (user.getCompanyId() == null) {
+            user.setCompanyId(1L);
+        }
         user.setDeviceId(seed.username() + "-device");
         user.setOrganizationType(seed.organizationType());
         user.setDepartment(seed.department());
@@ -244,6 +244,11 @@ public class AuthController {
         user.setEmail(seed.email());
         user.setLoginType("password");
         user.setWechatOpenId(seed.wechatOpenId());
+        user.setAccountType(ACCOUNT_TYPE_DEMO);
+        user.setAccountStatus(ACCOUNT_STATUS_ACTIVE);
+        user.setApprovedBy(1L);
+        user.setApprovedAt(new Date());
+        user.setRejectReason(null);
         user.setStatus(1);
         user.setUpdateTime(new Date());
         if (isNew || !isBcryptHash(user.getPassword())) {
@@ -306,12 +311,16 @@ public class AuthController {
             authVerificationService.verifyPhoneCode(req.getPhone(), req.getPhoneCode());
         }
 
+        String accountType = resolveAccountType(req);
+        boolean realAccount = ACCOUNT_TYPE_REAL.equals(accountType);
+
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(resolvePassword(req, loginType)));
         user.setRealName(StringUtils.hasText(req.getRealName()) ? req.getRealName() : req.getNickname());
         user.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : req.getRealName());
         user.setRoleId(role.getId());
+        user.setCompanyId(resolveCompanyId(req, accountType));
         user.setDeviceId(username + "-device");
         user.setDepartment(req.getDepartment());
         user.setOrganizationType(req.getOrganizationType());
@@ -319,11 +328,63 @@ public class AuthController {
         user.setEmail(req.getEmail());
         user.setLoginType(loginType);
         user.setWechatOpenId(wechatOpenId);
+        user.setAccountType(accountType);
+        user.setAccountStatus(realAccount ? ACCOUNT_STATUS_PENDING : ACCOUNT_STATUS_ACTIVE);
+        user.setApprovedBy(realAccount ? null : 1L);
+        user.setApprovedAt(realAccount ? null : new Date());
+        user.setRejectReason(null);
         user.setStatus(1);
         user.setCreateTime(new Date());
         user.setUpdateTime(new Date());
         userService.save(user);
         return user;
+    }
+
+    private String resolveAccountType(RegisterReq req) {
+        if (!StringUtils.hasText(req.getAccountType())) {
+            return ACCOUNT_TYPE_REAL;
+        }
+        String normalized = req.getAccountType().trim().toLowerCase();
+        if (!ACCOUNT_TYPE_DEMO.equals(normalized) && !ACCOUNT_TYPE_REAL.equals(normalized)) {
+            throw new BizException(40000, "不支持的账号类型");
+        }
+        return normalized;
+    }
+
+    private Long resolveCompanyId(RegisterReq req, String accountType) {
+        if (ACCOUNT_TYPE_DEMO.equals(accountType)) {
+            return 1L;
+        }
+        if (!StringUtils.hasText(req.getCompanyName())) {
+            throw new BizException(40000, "真实账号注册必须填写公司名称");
+        }
+        String companyName = req.getCompanyName().trim();
+        Company existing = companyService.lambdaQuery().eq(Company::getCompanyName, companyName).one();
+        if (existing != null) {
+            return existing.getId();
+        }
+        Company company = new Company();
+        company.setCompanyName(companyName);
+        company.setCompanyCode(buildCompanyCode(companyName));
+        company.setStatus(1);
+        company.setCreateTime(new Date());
+        company.setUpdateTime(new Date());
+        companyService.save(company);
+        return company.getId();
+    }
+
+    private String buildCompanyCode(String companyName) {
+        String base = companyName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
+        if (!StringUtils.hasText(base)) {
+            base = "tenant";
+        }
+        String candidate = base;
+        int suffix = 1;
+        while (companyService.count(new QueryWrapper<Company>().eq("company_code", candidate)) > 0) {
+            candidate = base + "-" + suffix;
+            suffix++;
+        }
+        return candidate;
     }
 
     private String resolveUsername(RegisterReq req, String loginType) {
@@ -343,7 +404,15 @@ public class AuthController {
     }
 
     private String resolvePassword(RegisterReq req, String loginType) {
+        if ("password".equals(loginType) && !StringUtils.hasText(req.getConfirmPassword())) {
+            throw new BizException(40000, "请确认注册密码");
+        }
         if (StringUtils.hasText(req.getPassword())) {
+            if ("password".equals(loginType)
+                && StringUtils.hasText(req.getConfirmPassword())
+                && !req.getPassword().equals(req.getConfirmPassword())) {
+                throw new BizException(40000, "两次输入的密码不一致");
+            }
             return req.getPassword();
         }
         if ("phone".equals(loginType) || "wechat".equals(loginType)) {
@@ -379,10 +448,52 @@ public class AuthController {
         return item;
     }
 
+    private void assertLoginAllowed(User user, String notFoundMessage) {
+        if (user == null) {
+            throw new BizException(40100, notFoundMessage);
+        }
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            throw new BizException(40100, "账号已禁用，请联系管理员");
+        }
+        String status = normalizeAccountStatus(user);
+        if (ACCOUNT_STATUS_PENDING.equals(status)) {
+            throw new BizException(40100, "账号待审批，请联系管理员审核后再登录");
+        }
+        if (ACCOUNT_STATUS_REJECTED.equals(status)) {
+            String reason = StringUtils.hasText(user.getRejectReason()) ? ("，原因：" + user.getRejectReason()) : "";
+            throw new BizException(40100, "账号审批未通过" + reason);
+        }
+        if (ACCOUNT_STATUS_DISABLED.equals(status)) {
+            throw new BizException(40100, "账号已禁用，请联系管理员");
+        }
+    }
+
+    private String normalizeAccountStatus(User user) {
+        if (StringUtils.hasText(user.getAccountStatus())) {
+            return user.getAccountStatus().trim().toLowerCase();
+        }
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            return ACCOUNT_STATUS_DISABLED;
+        }
+        return ACCOUNT_STATUS_ACTIVE;
+    }
+
+    private String resolveCompanyName(Long companyId) {
+        if (companyId == null) {
+            return null;
+        }
+        Company company = companyService.getById(companyId);
+        return company == null ? null : company.getCompanyName();
+    }
+
     private UserProfileDTO toProfile(User user) {
         Role role = currentUserService.getCurrentRole(user);
         return UserProfileDTO.builder()
             .id(user.getId())
+            .companyId(user.getCompanyId())
+            .companyName(resolveCompanyName(user.getCompanyId()))
+            .accountType(user.getAccountType())
+            .accountStatus(normalizeAccountStatus(user))
             .username(user.getUsername())
             .avatar(user.getAvatar())
             .nickname(user.getNickname())
@@ -394,7 +505,7 @@ public class AuthController {
             .loginType(user.getLoginType())
             .roleName(role == null ? null : role.getName())
             .roleCode(role == null ? null : role.getCode())
-                .deviceId(user.getDeviceId())
+            .deviceId(user.getDeviceId())
             .lastActiveAt(user.getUpdateTime() == null ? null : user.getUpdateTime().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime())
             .build();
     }
@@ -422,8 +533,11 @@ public class AuthController {
     public static class RegisterReq {
         private String username;
         private String password;
+        private String confirmPassword;
         private String realName;
         private String nickname;
+        private String companyName;
+        private String accountType;
         private String roleCode;
         private String organizationType;
         private String department;
@@ -432,6 +546,15 @@ public class AuthController {
         private String email;
         private String loginType;
         private String wechatOpenId;
+    }
+
+    @Data
+    public static class RegisterResp {
+        private final boolean authenticated;
+        private final boolean pendingApproval;
+        private final String accountStatus;
+        private final String message;
+        private final UserProfileDTO user;
     }
 
     @Data

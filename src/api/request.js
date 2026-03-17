@@ -43,6 +43,11 @@ function handleUnauthorized(message, data) {
 service.interceptors.request.use(config => {
   const token = getAuthHeaderToken();
   if (token) config.headers['Authorization'] = 'Bearer ' + token;
+  const session = getSession();
+  const companyId = session?.user?.companyId;
+  if (companyId !== undefined && companyId !== null && companyId !== '') {
+    config.headers['X-Company-Id'] = String(companyId);
+  }
   return config;
 });
 

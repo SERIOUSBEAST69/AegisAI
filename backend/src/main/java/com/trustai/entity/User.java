@@ -10,6 +10,9 @@ import java.util.Date;
 public class User {
     @TableId
     private Long id;
+    private Long companyId;
+    private String accountType;
+    private String accountStatus;
     private String username;
     private String password;
     private String realName;
@@ -24,6 +27,9 @@ public class User {
     private String phone;
     private String email;
     private Integer status;
+    private Long approvedBy;
+    private String rejectReason;
+    private Date approvedAt;
     private Date createTime;
     private Date updateTime;
 }

@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS client_scan_queue (
 
 CREATE TABLE IF NOT EXISTS sys_user (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
+  account_type VARCHAR(20) DEFAULT 'demo',
+  account_status VARCHAR(20) DEFAULT 'active',
   username VARCHAR(50) NOT NULL UNIQUE,
   password VARCHAR(100) NOT NULL,
   real_name VARCHAR(50),
@@ -43,6 +46,18 @@ CREATE TABLE IF NOT EXISTS sys_user (
   wechat_open_id VARCHAR(120),
   phone VARCHAR(20),
   email VARCHAR(100),
+  status INT DEFAULT 1,
+  approved_by BIGINT,
+  reject_reason VARCHAR(255),
+  approved_at TIMESTAMP,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS company (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_code VARCHAR(64) NOT NULL,
+  company_name VARCHAR(128) NOT NULL,
   status INT DEFAULT 1,
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -75,6 +90,7 @@ CREATE TABLE IF NOT EXISTS role_permission (
 
 CREATE TABLE IF NOT EXISTS data_asset (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   name VARCHAR(100) NOT NULL,
   type VARCHAR(50),
   sensitivity_level VARCHAR(20),
@@ -148,18 +164,6 @@ CREATE TABLE IF NOT EXISTS approval_request (
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS alert_record (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(200) NOT NULL,
-  level VARCHAR(20),
-  status VARCHAR(20) DEFAULT 'open',
-  assignee_id BIGINT,
-  related_log_id BIGINT,
-  resolution VARCHAR(500),
-  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS compliance_policy (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
@@ -167,18 +171,6 @@ CREATE TABLE IF NOT EXISTS compliance_policy (
   scope VARCHAR(200),
   status INT DEFAULT 1,
   version INT DEFAULT 1,
-  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS data_share_request (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  asset_id BIGINT,
-  applicant_id BIGINT,
-  collaborators VARCHAR(500),
-  reason VARCHAR(500),
-  status VARCHAR(20) DEFAULT 'pending',
-  approver_id BIGINT,
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -216,6 +208,7 @@ CREATE TABLE IF NOT EXISTS model_call_stat (
 
 CREATE TABLE IF NOT EXISTS risk_event (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   type VARCHAR(50),
   level VARCHAR(20),
   related_log_id BIGINT,
@@ -261,6 +254,10 @@ CREATE TABLE IF NOT EXISTS system_config (
 
 -- Default admin user will be created by DataInitializer on startup
 
+INSERT INTO company (company_code, company_name, status, create_time, update_time)
+SELECT 'aegis-default', 'Aegis 默认公司', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM company WHERE company_code = 'aegis-default');
+
 -- Default AI models
 INSERT INTO ai_model (model_name, model_code, provider, api_url, api_key, model_type, risk_level, status, call_limit, current_calls, description) VALUES
 ('GPT-4', 'gpt-4', 'OpenAI', 'https://api.openai.com/v1/chat/completions', 'encrypted_key_1', 'chat', 'medium', 'enabled', 1000, 0, 'OpenAI GPT-4 大语言模型'),
@@ -269,21 +266,11 @@ INSERT INTO ai_model (model_name, model_code, provider, api_url, api_key, model_
 ('文心一言', 'ernie-bot', '百度', 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions', 'encrypted_key_4', 'chat', 'low', 'enabled', 2000, 0, '百度文心一言大模型'),
 ('通义千问', 'qwen-turbo', '阿里云', 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', 'encrypted_key_5', 'chat', 'low', 'enabled', 3000, 0, '阿里云通义千问模型');
 
--- Default alert records
-INSERT INTO alert_record (title, level, status, assignee_id, related_log_id, resolution, create_time, update_time) VALUES
-('检测到异常登录行为', 'high', 'open', null, null, null, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('敏感数据访问频率异常', 'medium', 'claimed', 1, 1, null, CURRENT_TIMESTAMP - INTERVAL '1' HOUR, CURRENT_TIMESTAMP),
-('AI模型调用次数超过阈值', 'low', 'resolved', 1, 2, '已调整调用限制', CURRENT_TIMESTAMP - INTERVAL '2' HOUR, CURRENT_TIMESTAMP - INTERVAL '1' HOUR),
-('数据脱敏规则匹配失败', 'high', 'open', null, null, null, CURRENT_TIMESTAMP - INTERVAL '30' MINUTE, CURRENT_TIMESTAMP),
-('跨境传输审批超时', 'medium', 'open', 1, null, '等待数据出境责任人确认', CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP - INTERVAL '12' HOUR),
-('模型输出命中敏感词策略', 'high', 'claimed', 1, null, '已触发人工复核', CURRENT_TIMESTAMP - INTERVAL '2' DAY, CURRENT_TIMESTAMP - INTERVAL '1' DAY),
-('主体权利请求接近SLA', 'low', 'open', 1, null, '需要在24小时内完成导出', CURRENT_TIMESTAMP - INTERVAL '3' DAY, CURRENT_TIMESTAMP - INTERVAL '2' DAY);
-
 -- Default data assets
-INSERT INTO data_asset (name, type, sensitivity_level, location, discovery_time, owner_id, lineage, description, create_time, update_time) VALUES
-('客户信息表', 'database', 'high', 'mysql://localhost:3306/crm/customers', CURRENT_TIMESTAMP, 1, 'CRM系统 -> 数据仓库', '包含客户姓名、电话、地址等敏感信息', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('订单数据', 'database', 'medium', 'mysql://localhost:3306/erp/orders', CURRENT_TIMESTAMP, 1, 'ERP系统 -> 数据仓库', '订单交易数据', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('产品目录', 'file', 'low', '/data/products/catalog.xlsx', CURRENT_TIMESTAMP, 1, '产品管理系统', '产品基本信息', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO data_asset (company_id, name, type, sensitivity_level, location, discovery_time, owner_id, lineage, description, create_time, update_time) VALUES
+(1, '客户信息表', 'database', 'high', 'mysql://localhost:3306/crm/customers', CURRENT_TIMESTAMP, 1, 'CRM系统 -> 数据仓库', '包含客户姓名、电话、地址等敏感信息', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(1, '订单数据', 'database', 'medium', 'mysql://localhost:3306/erp/orders', CURRENT_TIMESTAMP, 1, 'ERP系统 -> 数据仓库', '订单交易数据', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(1, '产品目录', 'file', 'low', '/data/products/catalog.xlsx', CURRENT_TIMESTAMP, 1, '产品管理系统', '产品基本信息', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Default compliance policies
 INSERT INTO compliance_policy (name, rule_content, scope, status, version, create_time, update_time) VALUES
@@ -298,16 +285,16 @@ INSERT INTO desensitize_rule (name, pattern, mask, example, create_time, update_
 ('邮箱脱敏', '(\\w{2})\\w+(@\\w+)', '$1***$2', 'zhangsan@example.com -> zh***@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Default risk events
-INSERT INTO risk_event (type, level, related_log_id, audit_log_ids, status, handler_id, process_log, create_time, update_time) VALUES
-('数据泄露', 'high', 1, '1,4', 'open', null, '等待法务与安全联合复核', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('未授权访问', 'medium', 2, '2,5', 'processing', 1, '正在调查中', CURRENT_TIMESTAMP - INTERVAL '1' HOUR, CURRENT_TIMESTAMP),
-('异常导出', 'low', 3, '3', 'resolved', 1, '已确认是正常业务操作', CURRENT_TIMESTAMP - INTERVAL '2' HOUR, CURRENT_TIMESTAMP - INTERVAL '1' HOUR),
-('跨境传输未走审批', 'high', 6, '6', 'open', 1, '需补录数据出境评估材料', CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP - INTERVAL '12' HOUR),
-('模型输出含个人信息', 'medium', 7, '7', 'processing', 1, '已转交模型治理专员复查', CURRENT_TIMESTAMP - INTERVAL '2' DAY, CURRENT_TIMESTAMP - INTERVAL '1' DAY),
-('夜间批量下载异常', 'high', 8, '8,9', 'open', null, '触发安全策略封禁下载令牌', CURRENT_TIMESTAMP - INTERVAL '3' DAY, CURRENT_TIMESTAMP - INTERVAL '2' DAY),
-('主体删除请求超时', 'medium', 10, '10', 'processing', 1, '正在协调业务系统同步删除', CURRENT_TIMESTAMP - INTERVAL '4' DAY, CURRENT_TIMESTAMP - INTERVAL '3' DAY),
-('高敏资产权限漂移', 'low', 11, '11', 'resolved', 1, '已回收历史冗余角色', CURRENT_TIMESTAMP - INTERVAL '5' DAY, CURRENT_TIMESTAMP - INTERVAL '4' DAY),
-('模型调用成本突增', 'medium', 12, '12', 'processing', 1, '已触发预算阈值治理', CURRENT_TIMESTAMP - INTERVAL '6' DAY, CURRENT_TIMESTAMP - INTERVAL '5' DAY);
+INSERT INTO risk_event (company_id, type, level, related_log_id, audit_log_ids, status, handler_id, process_log, create_time, update_time) VALUES
+(1, '数据泄露', 'high', 1, '1,4', 'open', null, '等待法务与安全联合复核', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(1, '未授权访问', 'medium', 2, '2,5', 'processing', 1, '正在调查中', CURRENT_TIMESTAMP - INTERVAL '1' HOUR, CURRENT_TIMESTAMP),
+(1, '异常导出', 'low', 3, '3', 'resolved', 1, '已确认是正常业务操作', CURRENT_TIMESTAMP - INTERVAL '2' HOUR, CURRENT_TIMESTAMP - INTERVAL '1' HOUR),
+(1, '跨境传输未走审批', 'high', 6, '6', 'open', 1, '需补录数据出境评估材料', CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP - INTERVAL '12' HOUR),
+(1, '模型输出含个人信息', 'medium', 7, '7', 'processing', 1, '已转交模型治理专员复查', CURRENT_TIMESTAMP - INTERVAL '2' DAY, CURRENT_TIMESTAMP - INTERVAL '1' DAY),
+(1, '夜间批量下载异常', 'high', 8, '8,9', 'open', null, '触发安全策略封禁下载令牌', CURRENT_TIMESTAMP - INTERVAL '3' DAY, CURRENT_TIMESTAMP - INTERVAL '2' DAY),
+(1, '主体删除请求超时', 'medium', 10, '10', 'processing', 1, '正在协调业务系统同步删除', CURRENT_TIMESTAMP - INTERVAL '4' DAY, CURRENT_TIMESTAMP - INTERVAL '3' DAY),
+(1, '高敏资产权限漂移', 'low', 11, '11', 'resolved', 1, '已回收历史冗余角色', CURRENT_TIMESTAMP - INTERVAL '5' DAY, CURRENT_TIMESTAMP - INTERVAL '4' DAY),
+(1, '模型调用成本突增', 'medium', 12, '12', 'processing', 1, '已触发预算阈值治理', CURRENT_TIMESTAMP - INTERVAL '6' DAY, CURRENT_TIMESTAMP - INTERVAL '5' DAY);
 
 -- Default sensitive scan tasks
 INSERT INTO sensitive_scan_task (source_type, source_path, status, sensitive_ratio, report_path, create_time, update_time) VALUES
@@ -319,12 +306,6 @@ INSERT INTO sensitive_scan_task (source_type, source_path, status, sensitive_rat
 INSERT INTO approval_request (applicant_id, asset_id, reason, status, approver_id, create_time, update_time) VALUES
 (1, 1, '需要导出客户数据进行营销活动', 'pending', null, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (1, 2, '申请访问订单数据用于财务分析', 'approved', 1, CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP - INTERVAL '12' HOUR);
-
--- Default data share requests
-INSERT INTO data_share_request (asset_id, applicant_id, collaborators, reason, status, approver_id, create_time, update_time) VALUES
-(1, 1, 'user1,user2,user3', '与营销团队共享客户数据', 'pending', null, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(2, 1, 'user4,user5', '与财务部门共享订单数据', 'approved', 1, CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP - INTERVAL '12' HOUR),
-(3, 1, 'user6', '与产品部门共享产品目录', 'rejected', 1, CURRENT_TIMESTAMP - INTERVAL '2' DAY, CURRENT_TIMESTAMP - INTERVAL '1' DAY);
 
 -- Default subject requests
 INSERT INTO subject_request (user_id, type, comment, status, handler_id, result, create_time, update_time) VALUES
@@ -366,6 +347,7 @@ INSERT INTO model_call_stat (model_id, user_id, date, call_count, total_latency_
 -- ── 安全事件表（OpenClaw 模拟程序窃取事件） ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS security_event (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   event_type VARCHAR(64) NOT NULL COMMENT '事件类型',
   file_path VARCHAR(512) COMMENT '涉及文件路径',
   target_addr VARCHAR(256) COMMENT '目标地址（模拟远端）',
