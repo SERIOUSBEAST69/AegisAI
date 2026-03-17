@@ -16,9 +16,9 @@
       "allow": ["ADMIN", "EXECUTIVE", "SECOPS", "DATA_ADMIN", "AI_BUILDER", "BUSINESS_OWNER", "EMPLOYEE"]
     },
     {
-      "name": "GLOBAL_SEARCH",
+      "name": "AI_CATALOG",
       "method": "GET",
-      "path": "/api/search/global?keyword=test",
+      "path": "/api/ai/catalog",
       "allow": ["ADMIN", "EXECUTIVE", "SECOPS", "DATA_ADMIN", "AI_BUILDER", "BUSINESS_OWNER", "EMPLOYEE"]
     },
     {
@@ -38,24 +38,6 @@
       "method": "GET",
       "path": "/api/data-asset/list",
       "allow": ["ADMIN", "DATA_ADMIN"]
-    },
-    {
-      "name": "AI_MODEL_LIST",
-      "method": "GET",
-      "path": "/api/ai-model/list",
-      "allow": ["ADMIN", "SECOPS", "AI_BUILDER"]
-    },
-    {
-      "name": "MODEL_STAT_SUMMARY",
-      "method": "GET",
-      "path": "/api/model-stat/summary",
-      "allow": ["ADMIN", "EXECUTIVE", "AI_BUILDER", "BUSINESS_OWNER"]
-    },
-    {
-      "name": "ALERT_LIST",
-      "method": "GET",
-      "path": "/api/alert/list",
-      "allow": ["ADMIN", "SECOPS"]
     },
     {
       "name": "AUDIT_LOG_SEARCH",
@@ -88,12 +70,6 @@
       "allow": ["ADMIN", "DATA_ADMIN", "BUSINESS_OWNER", "EMPLOYEE"]
     },
     {
-      "name": "DATA_SHARE_LIST",
-      "method": "GET",
-      "path": "/api/data-share/list",
-      "allow": ["ADMIN", "DATA_ADMIN", "BUSINESS_OWNER", "EMPLOYEE"]
-    },
-    {
       "name": "SUBJECT_REQUEST_LIST",
       "method": "GET",
       "path": "/api/subject-request/list",
@@ -116,12 +92,6 @@
       "method": "GET",
       "path": "/api/security/events?page=1&pageSize=5",
       "allow": ["ADMIN", "SECOPS"]
-    },
-    {
-      "name": "AI_MONITOR_SUMMARY",
-      "method": "GET",
-      "path": "/api/ai/monitor/summary",
-      "allow": ["ADMIN", "SECOPS", "AI_BUILDER"]
     },
     {
       "name": "ANOMALY_CHECK",
