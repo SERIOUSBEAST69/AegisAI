@@ -492,7 +492,7 @@ const adversarialConfig = ref({
   rounds: 10,
   seed: ''
 });
-const isAdmin = computed(() => String(userStore.userInfo?.roleCode || '').toUpperCase() === 'ADMIN');
+const isAdmin = computed(() => false);
 let adversarialPlaybackTimer = null;
 
 let privacyCheckDebounceTimer = null;
@@ -578,7 +578,7 @@ async function fetchAiModels() {
   aiModelLoadState.value = 'loading';
   aiModelLoadMessage.value = '';
   try {
-    const payload = await request.get('/ai-model/list');
+    const payload = await request.get('/ai/catalog');
     const list = normalizeModelListPayload(payload)
       .filter(isEnabledModel)
       .map(item => ({
@@ -591,7 +591,7 @@ async function fetchAiModels() {
     }
     if (aiModelOptions.value.length === 0) {
       aiModelLoadState.value = 'empty';
-      aiModelLoadMessage.value = '当前没有可发送的启用模型，请前往 AI模型管理 将状态设为 enabled。';
+      aiModelLoadMessage.value = '当前没有可发送的启用模型，请联系管理员检查模型目录。';
     } else {
       aiModelLoadState.value = 'ready';
     }
@@ -599,7 +599,7 @@ async function fetchAiModels() {
     aiModelOptions.value = [];
     selectedAiModelCode.value = '';
     aiModelLoadState.value = 'error';
-    aiModelLoadMessage.value = error?.message || '模型列表加载失败，请前往 AI 模型管理检查状态';
+    aiModelLoadMessage.value = error?.message || '模型列表加载失败，请检查 AI 目录服务';
     ElMessage.warning(aiModelLoadMessage.value);
   }
 }

@@ -5,9 +5,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.trustai.entity.SecurityDetectionRule;
 import com.trustai.entity.SecurityEvent;
 import com.trustai.entity.User;
+import com.trustai.service.CompanyScopeService;
 import com.trustai.service.CurrentUserService;
 import com.trustai.service.SecurityDetectionRuleService;
 import com.trustai.service.SecurityEventService;
+import com.trustai.service.UserService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -49,6 +51,12 @@ public class SecurityEventController {
     @Autowired
     private CurrentUserService currentUserService;
 
+    @Autowired
+    private CompanyScopeService companyScopeService;
+
+    @Autowired
+    private UserService userService;
+
     // ── 事件列表（分页） ──────────────────────────────────────────────────────────
 
     /**
@@ -86,6 +94,7 @@ public class SecurityEventController {
         boolean employeeOnly = currentUserService.isEmployeeUser();
 
         QueryWrapper<SecurityEvent> qw = new QueryWrapper<>();
+        companyScopeService.withCompany(qw);
         if (status != null && !status.isBlank()) {
             qw.eq("status", status);
         }
@@ -123,7 +132,7 @@ public class SecurityEventController {
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<?> block(@RequestBody IdReq req) {
         currentUserService.requireAnyRole("ADMIN", "SECOPS");
-        SecurityEvent event = securityEventService.getById(req.getId());
+        SecurityEvent event = securityEventService.getOne(companyScopeService.withCompany(new QueryWrapper<SecurityEvent>()).eq("id", req.getId()));
         if (event == null) {
             return R.error(40400, "事件不存在");
         }
@@ -145,7 +154,7 @@ public class SecurityEventController {
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<?> ignore(@RequestBody IdReq req) {
         currentUserService.requireAnyRole("ADMIN", "SECOPS");
-        SecurityEvent event = securityEventService.getById(req.getId());
+        SecurityEvent event = securityEventService.getOne(companyScopeService.withCompany(new QueryWrapper<SecurityEvent>()).eq("id", req.getId()));
         if (event == null) {
             return R.error(40400, "事件不存在");
         }
@@ -165,7 +174,23 @@ public class SecurityEventController {
      * 但需要请求体中包含合法的事件字段。
      */
     @PostMapping("/events/report")
-    public R<?> report(@RequestBody SecurityEvent event) {
+    public R<?> report(@RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
+                       @RequestBody SecurityEvent event) {
+        Long companyId = null;
+        if (headerCompanyId != null) {
+            companyId = headerCompanyId;
+        } else if (event.getCompanyId() != null) {
+            companyId = event.getCompanyId();
+        } else if (event.getEmployeeId() != null && !event.getEmployeeId().isBlank()) {
+            User reporter = userService.lambdaQuery().eq(User::getUsername, event.getEmployeeId()).one();
+            if (reporter != null) {
+                companyId = reporter.getCompanyId();
+            }
+        }
+        if (companyId == null) {
+            companyId = 1L;
+        }
+        event.setCompanyId(companyId);
         if (event.getEventTime() == null) {
             event.setEventTime(new Date());
         }
@@ -239,7 +264,7 @@ public class SecurityEventController {
     }
 
     private QueryWrapper<SecurityEvent> scopedQuery(User user, boolean employeeOnly) {
-        QueryWrapper<SecurityEvent> query = new QueryWrapper<>();
+        QueryWrapper<SecurityEvent> query = companyScopeService.withCompany(new QueryWrapper<>());
         if (employeeOnly && user != null) {
             query.eq("employee_id", user.getUsername());
         }

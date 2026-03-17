@@ -1,6 +1,5 @@
 package com.trustai.controller;
 
-import com.trustai.client.AiInferenceClient;
 import com.trustai.service.AiGatewayService;
 import com.trustai.service.AiModelAccessGuardService;
 import com.trustai.utils.R;
@@ -27,9 +26,6 @@ public class AiGatewayController {
     @Autowired
     private AiModelAccessGuardService aiModelAccessGuardService;
 
-    @Autowired
-    private AiInferenceClient aiInferenceClient;
-
     @PostMapping("/chat")
     public R<Map<String, Object>> chat(@RequestBody @Valid ChatReq req) {
         return R.ok(aiGatewayService.chat(req));
@@ -38,6 +34,11 @@ public class AiGatewayController {
     @GetMapping("/model-metrics")
     public R<Map<String, Object>> modelMetrics() {
         return R.ok(aiGatewayService.modelMetrics());
+    }
+
+    @GetMapping("/catalog")
+    public R<List<Map<String, Object>>> modelCatalog() {
+        return R.ok(aiGatewayService.modelCatalog());
     }
 
     /**
@@ -68,17 +69,13 @@ public class AiGatewayController {
     @GetMapping("/adversarial/meta")
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<Map<String, Object>> adversarialMeta() {
-        return R.ok(aiInferenceClient.adversarialMeta());
+        return R.ok(aiGatewayService.adversarialMeta());
     }
 
     @PostMapping("/adversarial/run")
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<Map<String, Object>> adversarialRun(@RequestBody BattleReq req) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("scenario", req.getScenario());
-        payload.put("rounds", req.getRounds());
-        payload.put("seed", req.getSeed());
-        return R.ok(aiInferenceClient.adversarialRun(payload));
+        return R.ok(aiGatewayService.adversarialRun());
     }
 
     public static class ChatReq {

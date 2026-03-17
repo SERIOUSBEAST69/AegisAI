@@ -12,6 +12,8 @@ public class SecurityEvent {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long companyId;
+
     /** 事件类型：FILE_STEAL / SUSPICIOUS_UPLOAD / BATCH_COPY / EXFILTRATION */
     private String eventType;
 

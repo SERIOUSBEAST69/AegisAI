@@ -6,7 +6,6 @@ import com.trustai.dto.dashboard.TrustPulseDTO;
 import com.trustai.dto.dashboard.WorkbenchOverviewDTO;
 import com.trustai.entity.AiModel;
 import com.trustai.entity.AuditLog;
-import com.trustai.entity.AlertRecord;
 import com.trustai.entity.ApprovalRequest;
 import com.trustai.entity.DataAsset;
 import com.trustai.entity.ModelCallStat;
@@ -45,17 +44,23 @@ public class DashboardController {
     @Autowired private SubjectRequestService subjectRequestService;
     @Autowired private AuditLogService auditLogService;
     @Autowired private ModelCallStatService modelCallStatService;
-    @Autowired private AlertRecordService alertRecordService;
     @Autowired private ApprovalRequestService approvalRequestService;
     @Autowired private CurrentUserService currentUserService;
+    @Autowired private CompanyScopeService companyScopeService;
 
     @GetMapping("/stats")
     public R<Map<String, Object>> stats() {
+        User currentUser = currentUserService.requireCurrentUser();
+        if (isDemoAccount(currentUser)) {
+            return R.ok(buildDemoStats());
+        }
+        Long companyId = companyScopeService.requireCompanyId();
+        List<Long> companyUserIds = companyScopeService.companyUserIds();
         Map<String, Object> map = new HashMap<>();
-        map.put("dataAsset", dataAssetService.count());
+        map.put("dataAsset", dataAssetService.count(new QueryWrapper<DataAsset>().eq("company_id", companyId)));
         map.put("aiModel", aiModelService.count());
-        map.put("user", userService.count());
-        map.put("riskEvent", riskEventService.count());
+        map.put("user", userService.count(new QueryWrapper<User>().eq("company_id", companyId)));
+        map.put("riskEvent", riskEventService.count(new QueryWrapper<RiskEvent>().eq("company_id", companyId)));
         return R.ok(map);
     }
 
@@ -67,7 +72,12 @@ public class DashboardController {
     @GetMapping("/workbench")
     public R<WorkbenchOverviewDTO> workbench() {
         User currentUser = currentUserService.requireCurrentUser();
+        if (isDemoAccount(currentUser)) {
+            return R.ok(buildDemoWorkbench(currentUser));
+        }
         Role currentRole = currentUserService.getCurrentRole(currentUser);
+        Long companyId = companyScopeService.requireCompanyId();
+        List<Long> companyUserIds = companyScopeService.companyUserIds();
         ZoneId zoneId = ZoneId.systemDefault();
         LocalDate today = LocalDate.now();
         LocalDate last7Start = today.minusDays(6);
@@ -78,34 +88,49 @@ public class DashboardController {
         Date todayDate = Date.from(today.atStartOfDay(zoneId).toInstant());
         Date yesterdayDate = Date.from(today.minusDays(1).atStartOfDay(zoneId).toInstant());
 
-        List<RiskEvent> recentRiskEvents = riskEventService.list(new QueryWrapper<RiskEvent>().ge("create_time", previous7Date));
-        List<AuditLog> recentAuditLogs = auditLogService.list(new QueryWrapper<AuditLog>().ge("operation_time", previous7Date));
-        List<ModelCallStat> recentModelStats = modelCallStatService.list(new QueryWrapper<ModelCallStat>().ge("date", previous7Date));
-        List<AlertRecord> alertRecords = alertRecordService.list();
-        List<SubjectRequest> subjectRequests = subjectRequestService.list();
+        List<RiskEvent> recentRiskEvents = riskEventService.list(new QueryWrapper<RiskEvent>().eq("company_id", companyId).ge("create_time", previous7Date));
+        QueryWrapper<AuditLog> auditQuery = new QueryWrapper<AuditLog>().ge("operation_time", previous7Date);
+        if (!companyUserIds.isEmpty()) {
+            auditQuery.in("user_id", companyUserIds);
+        }
+        List<AuditLog> recentAuditLogs = auditLogService.list(auditQuery);
+        QueryWrapper<ModelCallStat> modelStatQuery = new QueryWrapper<ModelCallStat>().ge("date", previous7Date);
+        if (!companyUserIds.isEmpty()) {
+            modelStatQuery.in("user_id", companyUserIds);
+        }
+        List<ModelCallStat> recentModelStats = modelCallStatService.list(modelStatQuery);
+        QueryWrapper<SubjectRequest> subjectQuery = new QueryWrapper<>();
+        if (!companyUserIds.isEmpty()) {
+            subjectQuery.in("user_id", companyUserIds);
+        }
+        List<SubjectRequest> subjectRequests = subjectRequestService.list(subjectQuery);
 
         long highSensitivityAssets = dataAssetService.count(
-            new QueryWrapper<DataAsset>().in("sensitivity_level", Arrays.asList("high", "critical", "HIGH", "CRITICAL", "高", "高敏"))
+            new QueryWrapper<DataAsset>()
+                .eq("company_id", companyId)
+                .in("sensitivity_level", Arrays.asList("high", "critical", "HIGH", "CRITICAL", "高", "高敏"))
         );
         long newHighSensitivityAssets = dataAssetService.count(
             new QueryWrapper<DataAsset>()
+                .eq("company_id", companyId)
                 .in("sensitivity_level", Arrays.asList("high", "critical", "HIGH", "CRITICAL", "高", "高敏"))
                 .ge("create_time", last7Date)
         );
         long previousHighSensitivityAssets = dataAssetService.count(
             new QueryWrapper<DataAsset>()
+                .eq("company_id", companyId)
                 .in("sensitivity_level", Arrays.asList("high", "critical", "HIGH", "CRITICAL", "高", "高敏"))
                 .between("create_time", previous7Date, last7Date)
         );
-        long openAlerts = alertRecords.stream()
-            .filter(item -> Arrays.asList("open", "claimed").contains(normalizeLower(item.getStatus())))
+        long openAlerts = recentRiskEvents.stream()
+            .filter(item -> Arrays.asList("open", "processing").contains(normalizeLower(item.getStatus())))
             .count();
-        long recentOpenAlerts = alertRecords.stream()
-            .filter(item -> Arrays.asList("open", "claimed").contains(normalizeLower(item.getStatus())))
+        long recentOpenAlerts = recentRiskEvents.stream()
+            .filter(item -> Arrays.asList("open", "processing").contains(normalizeLower(item.getStatus())))
             .filter(item -> item.getCreateTime() != null && !item.getCreateTime().before(last7Date))
             .count();
-        long previousOpenAlerts = alertRecords.stream()
-            .filter(item -> Arrays.asList("open", "claimed").contains(normalizeLower(item.getStatus())))
+        long previousOpenAlerts = recentRiskEvents.stream()
+            .filter(item -> Arrays.asList("open", "processing").contains(normalizeLower(item.getStatus())))
             .filter(item -> item.getCreateTime() != null && !item.getCreateTime().before(previous7Date) && item.getCreateTime().before(last7Date))
             .count();
         long aiCallsLast7 = recentModelStats.stream()
@@ -154,34 +179,43 @@ public class DashboardController {
         dto.setTrend(buildTrend(last7Start, recentRiskEvents, recentAuditLogs, recentModelStats));
         dto.setRiskDistribution(buildRiskDistribution(recentRiskEvents));
         dto.setTodos(buildTodos(highRiskEvents, openAlerts, pendingSubjectRequests, enabledModels));
-        dto.setFeeds(buildFeeds(recentRiskEvents, alertRecords, subjectRequests));
+        dto.setFeeds(buildFeeds(recentRiskEvents, subjectRequests));
         return R.ok(dto);
     }
 
         @GetMapping("/insights")
         public R<GovernanceInsightDTO> insights() {
+        User currentUser = currentUserService.requireCurrentUser();
+        if (isDemoAccount(currentUser)) {
+            return R.ok(buildDemoInsights());
+        }
         long highSensitivityAssets = dataAssetService.count(
-            new QueryWrapper<DataAsset>().in("sensitivity_level", Arrays.asList("high", "critical", "HIGH", "CRITICAL", "高", "高敏"))
+            new QueryWrapper<DataAsset>()
+                .eq("company_id", companyScopeService.requireCompanyId())
+                .in("sensitivity_level", Arrays.asList("high", "critical", "HIGH", "CRITICAL", "高", "高敏"))
         );
+        List<Long> companyUserIds = companyScopeService.companyUserIds();
         long openRiskEvents = riskEventService.count(
-            new QueryWrapper<RiskEvent>().eq("status", "open")
+            new QueryWrapper<RiskEvent>().eq("company_id", companyScopeService.requireCompanyId()).eq("status", "open")
         );
         long highRiskEvents = riskEventService.count(
-            new QueryWrapper<RiskEvent>().eq("status", "open").in("level", Arrays.asList("high", "HIGH", "critical", "CRITICAL", "高"))
+            new QueryWrapper<RiskEvent>().eq("company_id", companyScopeService.requireCompanyId()).eq("status", "open").in("level", Arrays.asList("high", "HIGH", "critical", "CRITICAL", "高"))
         );
         long highRiskModels = aiModelService.count(
             new QueryWrapper<AiModel>().eq("status", "enabled").in("risk_level", Arrays.asList("high", "HIGH", "高"))
         );
         long pendingSubjectRequests = subjectRequestService.count(
-            new QueryWrapper<SubjectRequest>().in("status", Arrays.asList("pending", "processing"))
+            new QueryWrapper<SubjectRequest>().in("status", Arrays.asList("pending", "processing")).in(!companyUserIds.isEmpty(), "user_id", companyUserIds)
         );
 
         LocalDate today = LocalDate.now();
         long todayAuditCount = auditLogService.count(
-            new QueryWrapper<AuditLog>().ge("operation_time", java.util.Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant()))
+            new QueryWrapper<AuditLog>()
+                .ge("operation_time", java.util.Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant()))
+                .in(!companyUserIds.isEmpty(), "user_id", companyUserIds)
         );
 
-        List<ModelCallStat> modelStats = modelCallStatService.list();
+        List<ModelCallStat> modelStats = modelCallStatService.list(new QueryWrapper<ModelCallStat>().in(!companyUserIds.isEmpty(), "user_id", companyUserIds));
         long totalAiCalls = modelStats.stream().mapToLong(item -> item.getCallCount() == null ? 0L : item.getCallCount()).sum();
         long totalCostCents = modelStats.stream().mapToLong(item -> item.getCostCents() == null ? 0L : item.getCostCents()).sum();
 
@@ -205,24 +239,31 @@ public class DashboardController {
         @GetMapping("/trust-pulse")
         public R<TrustPulseDTO> trustPulse() {
         User currentUser = currentUserService.requireCurrentUser();
+        if (isDemoAccount(currentUser)) {
+            return R.ok(buildDemoTrustPulse(currentUser));
+        }
         Role currentRole = currentUserService.getCurrentRole(currentUser);
+            Long companyId = companyScopeService.requireCompanyId();
+            List<Long> companyUserIds = companyScopeService.companyUserIds();
         long highSensitivityAssets = dataAssetService.count(
-            new QueryWrapper<DataAsset>().in("sensitivity_level", Arrays.asList("high", "critical", "HIGH", "CRITICAL", "高", "高敏"))
+                new QueryWrapper<DataAsset>().eq("company_id", companyId).in("sensitivity_level", Arrays.asList("high", "critical", "HIGH", "CRITICAL", "高", "高敏"))
         );
-        long openRiskEvents = riskEventService.count(new QueryWrapper<RiskEvent>().eq("status", "open"));
+            long openRiskEvents = riskEventService.count(new QueryWrapper<RiskEvent>().eq("company_id", companyId).eq("status", "open"));
         long highRiskEvents = riskEventService.count(
-            new QueryWrapper<RiskEvent>().eq("status", "open").in("level", Arrays.asList("high", "HIGH", "critical", "CRITICAL", "高"))
+                new QueryWrapper<RiskEvent>().eq("company_id", companyId).eq("status", "open").in("level", Arrays.asList("high", "HIGH", "critical", "CRITICAL", "高"))
         );
         long enabledModels = aiModelService.count(new QueryWrapper<AiModel>().eq("status", "enabled"));
         long highRiskModels = aiModelService.count(
             new QueryWrapper<AiModel>().eq("status", "enabled").in("risk_level", Arrays.asList("high", "HIGH", "高"))
         );
         long pendingSubjectRequests = subjectRequestService.count(
-            new QueryWrapper<SubjectRequest>().in("status", Arrays.asList("pending", "processing"))
+            new QueryWrapper<SubjectRequest>().in("status", Arrays.asList("pending", "processing")).in(!companyUserIds.isEmpty(), "user_id", companyUserIds)
         );
-        long pendingApprovals = countPendingApprovals();
+        long pendingApprovals = countPendingApprovals(companyUserIds);
         long todayAuditCount = auditLogService.count(
-            new QueryWrapper<AuditLog>().ge("operation_time", java.util.Date.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()))
+            new QueryWrapper<AuditLog>()
+                .ge("operation_time", java.util.Date.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()))
+                .in(!companyUserIds.isEmpty(), "user_id", companyUserIds)
         );
 
         TrustPulseDTO dto = new TrustPulseDTO();
@@ -269,8 +310,12 @@ public class DashboardController {
         return Math.max(18, Math.min(100, score));
         }
 
-        private long countPendingApprovals() {
-        return approvalRequestService.count(new QueryWrapper<ApprovalRequest>().in("status", Arrays.asList("待审批", "pending", "processing")));
+        private long countPendingApprovals(List<Long> companyUserIds) {
+        return approvalRequestService.count(
+            new QueryWrapper<ApprovalRequest>()
+                .in("status", Arrays.asList("待审批", "pending", "processing"))
+                .in(!companyUserIds.isEmpty(), "applicant_id", companyUserIds)
+        );
         }
 
         private String resolvePulseLevel(int score) {
@@ -370,7 +415,7 @@ public class DashboardController {
                 "P1",
                 "强化高风险模型接入治理",
                 "高风险模型已纳入平台，但仍需持续校验额度、状态和审计策略，避免模型成为监管盲区。",
-                "/ai-model-manage",
+                "/ai/risk-rating",
                 highRiskModels + " 个高风险模型"
             ));
         }
@@ -390,7 +435,7 @@ public class DashboardController {
                 "P2",
                 "关注 AI 成本波动",
                 "调用成本已明显增长，平台已具备成本治理基础，可进一步细化模型与业务维度归因。",
-                "/model-cost",
+                "/operations-command",
                 "累计 ¥" + String.format("%.2f", totalCostCents / 100.0)
             ));
         }
@@ -521,18 +566,17 @@ public class DashboardController {
             todos.add(new WorkbenchOverviewDTO.TodoItem("P0", "闭环高风险事件", "优先压降高风险事件，避免平台只监测不处置。", "/risk-event-manage", highRiskEvents + " 个高危事件"));
         }
         if (openAlerts > 0) {
-            todos.add(new WorkbenchOverviewDTO.TodoItem("P0", "处理待闭环告警", "仍有告警未完成签收或处置，需进入告警闭环视图。", "/alerts", openAlerts + " 条未关闭告警"));
+            todos.add(new WorkbenchOverviewDTO.TodoItem("P0", "处理待处置风险", "仍有高优先级风险待跟进，需进入风险编排视图。", "/risk-event-manage", openAlerts + " 条待处置风险"));
         }
         if (pendingSubjectRequests > 0) {
             todos.add(new WorkbenchOverviewDTO.TodoItem("P1", "履约主体权利请求", "访问、删除、导出类工单仍在队列中，影响隐私履约体验。", "/subject-request", pendingSubjectRequests + " 个待处理工单"));
         }
-        todos.add(new WorkbenchOverviewDTO.TodoItem("P1", "巡检启用AI模型", "核验高风险模型额度、状态与绑定资产是否仍符合最新策略。", "/ai-model-manage", enabledModels + " 个启用模型"));
+        todos.add(new WorkbenchOverviewDTO.TodoItem("P1", "巡检启用AI能力", "核验高风险模型额度、状态与绑定资产是否仍符合最新策略。", "/ai/risk-rating", enabledModels + " 个启用模型"));
         return todos.stream().limit(4).collect(Collectors.toList());
         }
 
         private List<WorkbenchOverviewDTO.ActivityFeed> buildFeeds(List<RiskEvent> riskEvents,
-                                                   List<AlertRecord> alertRecords,
-                                                   List<SubjectRequest> subjectRequests) {
+                               List<SubjectRequest> subjectRequests) {
         List<WorkbenchOverviewDTO.ActivityFeed> feeds = new ArrayList<>();
         riskEvents.stream()
             .filter(item -> item.getCreateTime() != null)
@@ -543,17 +587,6 @@ public class DashboardController {
                 "风险事件 · " + defaultText(item.getType(), "待识别类型"),
                 "状态：" + defaultText(item.getStatus(), "open") + "，处置日志：" + defaultText(item.getProcessLog(), "待跟进"),
                 "/risk-event-manage",
-                formatTime(item.getCreateTime())
-            )));
-        alertRecords.stream()
-            .filter(item -> item.getCreateTime() != null)
-            .sorted(Comparator.comparing(AlertRecord::getCreateTime).reversed())
-            .limit(2)
-            .forEach(item -> feeds.add(new WorkbenchOverviewDTO.ActivityFeed(
-                normalizeLower(item.getLevel()),
-                "告警闭环 · " + defaultText(item.getTitle(), "待命名告警"),
-                "状态：" + defaultText(item.getStatus(), "open") + "，处置说明：" + defaultText(item.getResolution(), "待签收"),
-                "/alerts",
                 formatTime(item.getCreateTime())
             )));
         subjectRequests.stream()
@@ -571,6 +604,101 @@ public class DashboardController {
             .sorted(Comparator.comparing(WorkbenchOverviewDTO.ActivityFeed::getTimeLabel).reversed())
             .limit(6)
             .collect(Collectors.toList());
+        }
+
+        private boolean isDemoAccount(User user) {
+        return user != null && "demo".equalsIgnoreCase(user.getAccountType());
+        }
+
+        private Map<String, Object> buildDemoStats() {
+        Map<String, Object> map = new HashMap<>();
+        map.put("dataAsset", 5L);
+        map.put("aiModel", 9L);
+        map.put("user", 14L);
+        map.put("riskEvent", 3L);
+        return map;
+        }
+
+        private WorkbenchOverviewDTO buildDemoWorkbench(User user) {
+        WorkbenchOverviewDTO dto = new WorkbenchOverviewDTO();
+        Role role = currentUserService.getCurrentRole(user);
+        dto.setOperator(new WorkbenchOverviewDTO.Operator(
+            safeUserName(user),
+            role == null ? "演示身份" : role.getName(),
+            user.getDepartment() == null ? "演示组织" : user.getDepartment(),
+            user.getAvatar()
+        ));
+        dto.setHeadline("可信AI数据治理与隐私合规工作台（演示数据）");
+        dto.setSubheadline("当前账号为演示账号，展示的是 Faker 模拟指标，不会影响真实企业数据。");
+        dto.setSceneTags(Arrays.asList("演示态势", "模拟风险", "模拟工单", "模拟成本"));
+        dto.setMetrics(Arrays.asList(
+            new WorkbenchOverviewDTO.Metric("assets", "高敏资产纳管", 12L, "项", 18, "演示数据：近7日新增2项"),
+            new WorkbenchOverviewDTO.Metric("alerts", "待闭环告警", 4L, "条", -22, "演示数据：告警持续下降"),
+            new WorkbenchOverviewDTO.Metric("aiCalls", "7日AI调用", 1386L, "次", 35, "演示数据：业务接入增长"),
+            new WorkbenchOverviewDTO.Metric("audits", "今日审计留痕", 87L, "条", 12, "演示数据：证据链正常")
+        ));
+        WorkbenchOverviewDTO.Trend trend = new WorkbenchOverviewDTO.Trend();
+        trend.setLabels(Arrays.asList("03/11", "03/12", "03/13", "03/14", "03/15", "03/16", "03/17"));
+        trend.setRiskSeries(Arrays.asList(7L, 6L, 6L, 5L, 4L, 4L, 3L));
+        trend.setAuditSeries(Arrays.asList(60L, 72L, 70L, 79L, 82L, 85L, 87L));
+        trend.setAiCallSeries(Arrays.asList(160L, 180L, 192L, 205L, 220L, 210L, 219L));
+        trend.setCostSeries(Arrays.asList(1220L, 1300L, 1420L, 1480L, 1550L, 1520L, 1588L));
+        trend.setForecastNextDay(3L);
+        dto.setTrend(trend);
+        dto.setRiskDistribution(Arrays.asList(
+            new WorkbenchOverviewDTO.RiskBucket("高危", 1L),
+            new WorkbenchOverviewDTO.RiskBucket("中危", 2L),
+            new WorkbenchOverviewDTO.RiskBucket("低危", 6L),
+            new WorkbenchOverviewDTO.RiskBucket("待研判", 1L)
+        ));
+        dto.setTodos(Arrays.asList(
+            new WorkbenchOverviewDTO.TodoItem("P0", "回放高危外发演练", "验证阻断链路是否可复现", "/threat-monitor", "1 条模拟事件"),
+            new WorkbenchOverviewDTO.TodoItem("P1", "复核脱敏策略命中", "检查手机号和邮箱规则命中率", "/desense-preview", "命中率 93%"),
+            new WorkbenchOverviewDTO.TodoItem("P1", "处理模拟审批工单", "演示共享申请流程闭环", "/approval-manage", "2 个待处理工单")
+        ));
+        dto.setFeeds(Arrays.asList(
+            new WorkbenchOverviewDTO.ActivityFeed("warning", "模拟风险事件 · 非法外传尝试", "系统已阻断并生成审计证据", "/threat-monitor", "03-17 10:26"),
+            new WorkbenchOverviewDTO.ActivityFeed("safe", "模拟主体请求 · access", "工单已进入处理队列", "/subject-request", "03-17 09:48")
+        ));
+        dto.set_dataSource("mock");
+        return dto;
+        }
+
+        private GovernanceInsightDTO buildDemoInsights() {
+        GovernanceInsightDTO dto = new GovernanceInsightDTO();
+        dto.setPostureScore(86);
+        dto.setSummary(new GovernanceInsightDTO.Summary(12L, 3L, 1L, 2L, 2L, 87L, 1386L, 15880L));
+        dto.setHighlights(Arrays.asList(
+            new GovernanceInsightDTO.Highlight("高敏资产纳管", "12 项", "演示资产覆盖客户、订单、员工和营销线索场景"),
+            new GovernanceInsightDTO.Highlight("今日审计留痕", "87 条", "演示环境持续写入审计记录，便于讲解追溯链路"),
+            new GovernanceInsightDTO.Highlight("AI 调用成本", "¥158.80", "演示成本曲线用于展示配额和预算治理")
+        ));
+        dto.setRecommendations(Arrays.asList(
+            new GovernanceInsightDTO.Recommendation("demo-risk", "P0", "演示高危事件闭环", "建议演示一次事件签收与处置全过程", "/risk-event-manage", "1 条高危事件"),
+            new GovernanceInsightDTO.Recommendation("demo-desense", "P1", "演示一键脱敏", "展示预览与执行接口联动，强化合规可视化", "/desense-preview", "建议演示手机号/邮箱样例")
+        ));
+        return dto;
+        }
+
+        private TrustPulseDTO buildDemoTrustPulse(User user) {
+        Role role = currentUserService.getCurrentRole(user);
+        TrustPulseDTO dto = new TrustPulseDTO();
+        dto.setScore(84);
+        dto.setPulseLevel("可控推进");
+        dto.setMission((role == null ? "演示角色" : role.getCode()) + " 当前处于演示治理脉冲，适合展示跨模块闭环能力。");
+        dto.setInnovationLabel("治理脉冲引擎 · Demo Mode");
+        dto.setDimensions(Arrays.asList(
+            new TrustPulseDTO.Dimension("data", "数据边界", 82, "演示资产和脱敏策略形成可观察闭环"),
+            new TrustPulseDTO.Dimension("model", "模型可信", 86, "演示模型风险等级与配额控制正常"),
+            new TrustPulseDTO.Dimension("process", "流程闭环", 80, "演示审批和主体工单可完整流转"),
+            new TrustPulseDTO.Dimension("audit", "审计准备度", 88, "演示审计链路持续写入，支持回放")
+        ));
+        dto.setSignals(Arrays.asList(
+            new TrustPulseDTO.Signal("演示高危风险", "1", "warning", "进入风险事件页执行闭环"),
+            new TrustPulseDTO.Signal("演示审批积压", "2", "warning", "在审批管理中完成处理"),
+            new TrustPulseDTO.Signal("审计留痕", "87", "safe", "可导出并复盘证据链")
+        ));
+        return dto;
         }
 
         private int calcDelta(long current, long previous) {

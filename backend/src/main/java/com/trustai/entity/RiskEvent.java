@@ -10,6 +10,7 @@ import java.util.Date;
 public class RiskEvent {
     @TableId
     private Long id;
+    private Long companyId;
     private String type;
     private String level;
     private Long relatedLogId;

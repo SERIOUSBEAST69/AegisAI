@@ -1,11 +1,15 @@
 package com.trustai.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trustai.client.AiInferenceClient;
 import com.trustai.controller.AiGatewayController.ChatReq;
 import com.trustai.controller.AiGatewayController.Message;
 import com.trustai.entity.AiCallLog;
 import com.trustai.entity.AiModel;
+import com.trustai.entity.AuditLog;
+import com.trustai.entity.RiskEvent;
+import com.trustai.entity.SecurityEvent;
 import com.trustai.service.AiCallAuditService;
 import com.trustai.service.AiModelService;
 import org.springframework.stereotype.Service;
@@ -17,7 +21,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -34,15 +41,27 @@ public class AiGatewayService {
     private final AiModelService aiModelService;
     private final AiModelAccessGuardService aiModelAccessGuardService;
     private final AiInferenceClient aiInferenceClient;
+    private final SecurityEventService securityEventService;
+    private final RiskEventService riskEventService;
+    private final AuditLogService auditLogService;
+    private final CompanyScopeService companyScopeService;
 
     public AiGatewayService(AiCallAuditService aiCallAuditService,
                             AiModelService aiModelService,
                             AiModelAccessGuardService aiModelAccessGuardService,
-                            AiInferenceClient aiInferenceClient) {
+                            AiInferenceClient aiInferenceClient,
+                            SecurityEventService securityEventService,
+                            RiskEventService riskEventService,
+                            AuditLogService auditLogService,
+                            CompanyScopeService companyScopeService) {
         this.aiCallAuditService = aiCallAuditService;
         this.aiModelService = aiModelService;
         this.aiModelAccessGuardService = aiModelAccessGuardService;
         this.aiInferenceClient = aiInferenceClient;
+        this.securityEventService = securityEventService;
+        this.riskEventService = riskEventService;
+        this.auditLogService = auditLogService;
+        this.companyScopeService = companyScopeService;
     }
 
     public Map<String, Object> modelMetrics() {
@@ -104,6 +123,78 @@ public class AiGatewayService {
             persistLog(req, model, provider, mock, begin, "fail");
             return mock;
         }
+    }
+
+    public List<Map<String, Object>> modelCatalog() {
+        return aiModelService.lambdaQuery()
+            .eq(AiModel::getStatus, "enabled")
+            .list()
+            .stream()
+            .map(item -> {
+                Map<String, Object> model = new HashMap<>();
+                model.put("id", item.getId());
+                model.put("modelCode", item.getModelCode());
+                model.put("modelName", item.getModelName());
+                model.put("provider", item.getProvider());
+                model.put("riskLevel", item.getRiskLevel());
+                model.put("status", item.getStatus());
+                return model;
+            })
+            .collect(Collectors.toList());
+    }
+
+    public Map<String, Object> adversarialMeta() {
+        return buildThreatAssessment(false);
+    }
+
+    public Map<String, Object> adversarialRun() {
+        return buildThreatAssessment(true);
+    }
+
+    private Map<String, Object> buildThreatAssessment(boolean immediateCheck) {
+        Long companyId = companyScopeService.requireCompanyId();
+        Date oneDayAgo = Date.from(LocalDate.now().minusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        long securityCritical = securityEventService.count(new QueryWrapper<SecurityEvent>()
+            .eq("company_id", companyId)
+            .in("severity", List.of("critical", "high"))
+            .in("status", List.of("pending", "reviewing")));
+        long securityPending = securityEventService.count(new QueryWrapper<SecurityEvent>()
+            .eq("company_id", companyId)
+            .eq("status", "pending"));
+        long openRisk = riskEventService.count(new QueryWrapper<RiskEvent>()
+            .eq("company_id", companyId)
+            .in("status", List.of("open", "processing")));
+        List<Long> userIds = companyScopeService.companyUserIds();
+        long highRiskAudit = userIds.isEmpty() ? 0L : auditLogService.count(new QueryWrapper<AuditLog>()
+            .in("user_id", userIds)
+            .in("risk_level", List.of("HIGH", "high", "MEDIUM", "medium"))
+            .ge("operation_time", oneDayAgo));
+
+        List<SecurityEvent> latestEvents = securityEventService.list(new QueryWrapper<SecurityEvent>()
+            .eq("company_id", companyId)
+            .orderByDesc("event_time")
+            .last("limit 8"));
+
+        long weightedPressure = securityCritical * 4 + securityPending * 2 + openRisk * 3 + highRiskAudit;
+        long normalized = Math.min(100, weightedPressure * 3);
+        String level = normalized >= 70 ? "high" : (normalized >= 40 ? "medium" : "low");
+
+        Map<String, Object> assessment = new HashMap<>();
+        assessment.put("companyId", companyId);
+        assessment.put("mode", "real-threat-assessment");
+        assessment.put("immediateCheck", immediateCheck);
+        assessment.put("threatLevel", level);
+        assessment.put("riskScore", normalized);
+        assessment.put("checkedAt", System.currentTimeMillis());
+        assessment.put("signals", Map.of(
+            "securityCritical", securityCritical,
+            "securityPending", securityPending,
+            "openRiskEvents", openRisk,
+            "highRiskAudit24h", highRiskAudit
+        ));
+        assessment.put("recentSecurityEvents", latestEvents);
+        return assessment;
     }
 
     private Map<String, Object> mock(String reason, List<Message> messages) {

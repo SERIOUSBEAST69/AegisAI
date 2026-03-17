@@ -55,10 +55,30 @@ public class DesenseController {
     @PostMapping("/preview")
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN','AI_BUILDER')")
     public R<Map<String, String>> preview(@RequestBody PreviewReq req) {
-        String masked = applyMask(req.getSample(), req.getMask());
+        String source = req.getSample();
+        if (source == null) {
+            source = req.getText();
+        }
+        String masked = applyMask(source, req.getMask());
         Map<String, String> map = new HashMap<>();
-        map.put("raw", req.getSample());
+        map.put("raw", source == null ? "" : source);
         map.put("masked", masked);
+        return R.ok(map);
+    }
+
+    @PostMapping("/execute")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN')")
+    public R<Map<String, Object>> execute(@RequestBody ExecuteReq req) {
+        String source = req.getSample();
+        if (source == null) {
+            source = req.getText();
+        }
+        String masked = applyMask(source, req.getMask());
+        Map<String, Object> map = new HashMap<>();
+        map.put("raw", source == null ? "" : source);
+        map.put("masked", masked);
+        map.put("ruleId", req.getRuleId());
+        map.put("executedAt", System.currentTimeMillis());
         return R.ok(map);
     }
 
@@ -76,9 +96,16 @@ public class DesenseController {
     }
 
     public static class PreviewReq {
-        private String sample; private String mask;
+        private String sample; private String text; private String mask;
         public String getSample(){return sample;} public void setSample(String s){this.sample=s;}
+        public String getText(){return text;} public void setText(String text){this.text=text;}
         public String getMask(){return mask;} public void setMask(String m){this.mask=m;}
+    }
+
+    public static class ExecuteReq extends PreviewReq {
+        private Long ruleId;
+        public Long getRuleId(){return ruleId;}
+        public void setRuleId(Long ruleId){this.ruleId=ruleId;}
     }
 
     public static class RecommendReq {

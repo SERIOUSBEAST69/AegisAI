@@ -85,6 +85,24 @@ export const desenseApi = {
     }
   },
 
+  /** 一键脱敏执行 */
+  async execute(payload) {
+    const raw = payload?.text || payload?.sample || '';
+    const maskChar = (payload?.mask || '*').charAt(0) || '*';
+    const masked = raw.replace(/./g, maskChar);
+    if (isMockSession()) {
+      return { raw, masked, executedAt: Date.now(), ruleId: payload?.ruleId || null };
+    }
+    try {
+      return await request.post('/desense/execute', payload);
+    } catch (error) {
+      if (shouldUseApiFallback(error)) {
+        return { raw, masked, executedAt: Date.now(), ruleId: payload?.ruleId || null };
+      }
+      throw error;
+    }
+  },
+
   /** 保存或更新脱敏规则 */
   async saveRule(rule) {
     return request.post('/desense/save', rule);

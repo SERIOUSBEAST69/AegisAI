@@ -227,46 +227,40 @@
         </el-card>
       </el-tab-pane>
 
-      <!-- ── 模拟说明 Tab ── -->
-      <el-tab-pane label="恶意AI模拟器" name="simulator">
+      <!-- ── 攻防演练 Tab ── -->
+      <el-tab-pane v-if="canRunThreatDrill" label="攻防演练" name="drill">
         <el-card class="card-glass" style="margin-top: 0">
           <div class="simulator-info">
-            <h3>恶意AI代理窃取模拟器</h3>
+            <h3>真实安全态势攻防演练</h3>
             <p>
-              项目提供了一个 Python 模拟程序，可以模拟恶意代理软件在员工电脑上窃取文件的行为，
-              并通过 HTTP 向本系统实时上报事件，用于测试告警和阻拦功能。
+              当前演练不再注入模拟攻击数据，完全基于真实审计日志、风险事件与威胁监控事件进行状态检测。
+              点击“立即检测”将实时刷新当前公司的安全态势评分。
             </p>
 
-            <el-divider>使用方法</el-divider>
+            <div class="drill-actions">
+              <el-button type="primary" :loading="drillLoading" @click="runImmediateThreatDrill">立即检测</el-button>
+              <el-tag :type="threatDrill.threatLevel === 'high' ? 'danger' : (threatDrill.threatLevel === 'medium' ? 'warning' : 'success')" size="large">
+                当前态势：{{ threatDrill.threatLevel || 'unknown' }}
+              </el-tag>
+            </div>
 
-            <div class="code-block">
-              <div class="code-label">1. 一次性生成 1200 条历史事件（批量模式）</div>
-              <pre>cd python-service
-python openclaw_simulator.py --count 1200 --url http://localhost:8080</pre>
+            <div class="code-block" style="margin-top: 14px">
+              <div class="code-label">风险评分</div>
+              <pre>{{ threatDrill.riskScore ?? 0 }}</pre>
             </div>
 
             <div class="code-block">
-              <div class="code-label">2. 实时模式（持续生成，按 Ctrl+C 停止）</div>
-              <pre>python openclaw_simulator.py --realtime --rps 3 --url http://localhost:8080</pre>
+              <div class="code-label">检测信号</div>
+              <pre>{{ JSON.stringify(threatDrill.signals || {}, null, 2) }}</pre>
             </div>
 
-            <div class="code-block">
-              <div class="code-label">3. 参数说明</div>
-              <pre>--url      后端地址（默认 http://localhost:8080）
---count    批量模式生成事件总数（默认 1200）
---batch    每批上报数量（默认 50）
---delay    批次间隔秒数（默认 0.05）
---realtime 启用实时模式（持续生成）
---rps      实时模式每秒事件数（默认 2.0）</pre>
-            </div>
-
-            <el-alert type="info" show-icon :closable="false" style="margin-top: 16px">
-              <template #title>上报接口说明</template>
-              <template #default>
-                模拟程序通过 <code>POST /api/security/events/report</code>
-                上报事件，该接口无需登录 token，专供客户端代理和模拟程序使用。
-              </template>
-            </el-alert>
+            <el-table :data="threatDrill.recentSecurityEvents || []" style="margin-top: 12px">
+              <el-table-column prop="eventType" label="事件类型" width="180" />
+              <el-table-column prop="employeeId" label="员工" width="140" />
+              <el-table-column prop="severity" label="严重级别" width="120" />
+              <el-table-column prop="status" label="状态" width="120" />
+              <el-table-column prop="eventTime" label="时间" min-width="180" />
+            </el-table>
           </div>
         </el-card>
       </el-tab-pane>
@@ -316,46 +310,6 @@ python openclaw_simulator.py --count 1200 --url http://localhost:8080</pre>
         <el-button type="primary" :loading="savingRule" @click="saveRule">保存</el-button>
       </template>
     </el-dialog>
-
-    <button
-      v-if="canRunThreatSimulation"
-      class="simulator-fab"
-      :disabled="simulatorRunning"
-      @click="toggleSimulatorPanel"
-    >
-      {{ simulatorRunning ? '执行中' : '模拟攻防' }}
-    </button>
-
-    <transition name="fade-slide">
-      <div v-if="canRunThreatSimulation && simulatorPanelVisible" class="simulator-fab-panel card-glass">
-        <div class="fab-panel-header">
-          <strong>恶意AI模拟器</strong>
-          <el-button size="small" type="primary" :loading="simulatorRunning" @click="triggerSimulatorProbe">
-            触发一次模拟攻击
-          </el-button>
-        </div>
-        <p class="fab-panel-hint">用于管理员快速验证当前防护链路是否正常，包含最近攻击记录与防御响应。</p>
-        <div class="fab-panel-block">
-          <div class="fab-panel-title">最近攻击记录</div>
-          <ul>
-            <li v-for="item in simulatorInsight.attackEvents" :key="`atk-${item.id}`">
-              #{{ item.id }} · {{ eventTypeLabel(item.eventType) }} · {{ item.hostname || 'unknown-host' }}
-            </li>
-            <li v-if="simulatorInsight.attackEvents.length === 0">暂无攻击记录</li>
-          </ul>
-        </div>
-        <div class="fab-panel-block">
-          <div class="fab-panel-title">最近防御响应</div>
-          <ul>
-            <li v-for="item in simulatorInsight.defenseEvents" :key="`def-${item.id}`">
-              #{{ item.id }} · {{ statusLabel(item.status) }} · {{ item.employeeId || 'unknown-user' }}
-            </li>
-            <li v-if="simulatorInsight.defenseEvents.length === 0">暂无防御响应</li>
-          </ul>
-        </div>
-      </div>
-    </transition>
-
   </div>
 </template>
 
@@ -378,7 +332,7 @@ function hasAnyRole(...roleCodes) {
 const canViewThreatMonitor = computed(() => hasAnyRole('ADMIN', 'SECOPS', 'EXECUTIVE'));
 const canHandleThreats = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
 const canManageThreatRules = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
-const canRunThreatSimulation = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
+const canRunThreatDrill = computed(() => hasAnyRole('ADMIN'));
 
 // ── 统计 ──────────────────────────────────────────────────────────────────────
 const stats = ref({});
@@ -534,11 +488,12 @@ async function deleteRule(id) {
 const autoRefresh = ref(true);
 let refreshTimer = null;
 
-const simulatorPanelVisible = ref(false);
-const simulatorRunning = ref(false);
-const simulatorInsight = ref({
-  attackEvents: [],
-  defenseEvents: [],
+const drillLoading = ref(false);
+const threatDrill = ref({
+  threatLevel: 'low',
+  riskScore: 0,
+  signals: {},
+  recentSecurityEvents: [],
 });
 
 function startAutoRefresh() {
@@ -575,55 +530,33 @@ async function refresh() {
   await Promise.all([refreshEvents(), fetchStats()]);
 }
 
-async function loadSimulatorInsights() {
-  if (!canRunThreatSimulation.value) {
-    simulatorInsight.value = { attackEvents: [], defenseEvents: [] };
+async function fetchThreatDrillMeta() {
+  if (!canRunThreatDrill.value) {
     return;
   }
   try {
-    const data = await request.get('/security/events', {
-      params: { page: 1, pageSize: 30 },
-    });
-    const list = data?.list || [];
-    simulatorInsight.value = {
-      attackEvents: list.slice(0, 6),
-      defenseEvents: list.filter(item => ['blocked', 'ignored', 'reviewing'].includes(item.status)).slice(0, 6),
-    };
+    threatDrill.value = await request.get('/ai/adversarial/meta');
   } catch (e) {
-    console.warn('[ThreatMonitor] simulator insight error:', e.message);
+    ElMessage.error('攻防态势加载失败：' + (e.message || '未知错误'));
   }
 }
 
-function toggleSimulatorPanel() {
-  simulatorPanelVisible.value = !simulatorPanelVisible.value;
-  if (simulatorPanelVisible.value) {
-    loadSimulatorInsights();
-  }
-}
-
-async function triggerSimulatorProbe() {
-  if (!canRunThreatSimulation.value) {
+async function runImmediateThreatDrill() {
+  if (!canRunThreatDrill.value) {
     return;
   }
-  simulatorRunning.value = true;
+  drillLoading.value = true;
   try {
-    await request.post('/security/events/report', {
-      eventType: 'EXFILTRATION',
-      filePath: 'C:/Users/Public/Documents/simulated_sensitive_file.docx',
-      targetAddr: 'https://malicious-ai-simulator.local/upload',
-      employeeId: userStore.userInfo?.username || 'simulator-admin',
-      hostname: 'simulator-host',
-      fileSize: 7340032,
-      severity: 'high',
-      source: 'malicious-ai-simulator',
+    threatDrill.value = await request.post('/ai/adversarial/run', {
+      scenario: 'real-threat-check',
+      rounds: 1,
     });
-    ElMessage.success('模拟攻击已触发，请观察下方防御响应。');
+    ElMessage.success('已完成实时检测');
     await refresh();
-    await loadSimulatorInsights();
   } catch (e) {
-    ElMessage.error('模拟触发失败：' + (e.message || '未知错误'));
+    ElMessage.error('立即检测失败：' + (e.message || '未知错误'));
   } finally {
-    simulatorRunning.value = false;
+    drillLoading.value = false;
   }
 }
 
@@ -686,8 +619,8 @@ onMounted(() => {
     fetchRules();
   }
   if (autoRefresh.value) startAutoRefresh();
-  if (canRunThreatSimulation.value) {
-    loadSimulatorInsights();
+  if (canRunThreatDrill.value) {
+    fetchThreatDrillMeta();
   }
 });
 
@@ -897,71 +830,11 @@ code {
   color: #90caf9;
 }
 
-.simulator-fab {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 40;
-  border: none;
-  border-radius: 999px;
-  padding: 12px 18px;
-  background: linear-gradient(135deg, #2d8cff, #00c2ff);
-  color: #001326;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 10px 30px rgba(0, 168, 255, 0.35);
-}
-
-.simulator-fab:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.simulator-fab-panel {
-  position: fixed;
-  right: 24px;
-  bottom: 78px;
-  width: min(420px, calc(100vw - 32px));
-  z-index: 39;
-  padding: 14px;
-  border-radius: 14px;
-}
-
-.fab-panel-header {
+.drill-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
-  margin-bottom: 8px;
-}
-
-.fab-panel-hint {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: rgba(200, 220, 255, 0.75);
-}
-
-.fab-panel-block {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(100, 180, 255, 0.1);
-  border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 8px;
-}
-
-.fab-panel-title {
-  font-size: 12px;
-  color: #7fd0ff;
-  margin-bottom: 6px;
-  font-weight: 700;
-}
-
-.fab-panel-block ul {
-  margin: 0;
-  padding-left: 16px;
-  color: rgba(220, 234, 255, 0.9);
-  font-size: 12px;
-  line-height: 1.6;
+  margin: 12px 0;
 }
 
 .fade-slide-enter-active,

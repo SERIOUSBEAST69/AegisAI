@@ -640,17 +640,16 @@ function setLane(lane) {
 async function loadAll() {
   loading.value = true;
   try {
-    const [approvalResult, riskResult, shareResult] = await Promise.allSettled([
+    const [approvalResult, riskResult] = await Promise.allSettled([
       request.get('/approval/list'),
       request.get('/risk-event/list'),
-      request.get('/data-share/list'),
     ]);
 
     approvals.value = approvalResult.status === 'fulfilled' ? (approvalResult.value || []) : [];
     risks.value = riskResult.status === 'fulfilled' ? (riskResult.value || []) : [];
-    shares.value = shareResult.status === 'fulfilled' ? (shareResult.value || []) : [];
+    shares.value = [];
 
-    const failed = [approvalResult, riskResult, shareResult].filter(item => item.status === 'rejected');
+    const failed = [approvalResult, riskResult].filter(item => item.status === 'rejected');
     const hardFailure = failed.find(item => item.status === 'rejected' && item.reason?.code !== 40300);
     if (hardFailure && hardFailure.status === 'rejected') {
       throw hardFailure.reason;
@@ -699,30 +698,7 @@ function submitApproval() {
 }
 
 function submitShare() {
-  const assetId = String(shareForm.value.assetId || '').trim();
-  const reason = String(shareForm.value.reason || '').trim();
-  if (!assetId || !reason) {
-    ElMessage.warning('请填写资产ID和共享原因');
-    return;
-  }
-  submitLoading.value = 'share';
-  request.post('/data-share/apply', {
-    assetId,
-    collaborators: shareForm.value.collaborators,
-    reason,
-  })
-    .then(async () => {
-      ElMessage.success('共享申请已提交');
-      shareForm.value = { assetId: '', collaborators: '', reason: '' };
-      composerLane.value = 'share';
-      await loadAll();
-    })
-    .catch(error => {
-      ElMessage.error(error?.message || '共享申请提交失败');
-    })
-    .finally(() => {
-      submitLoading.value = '';
-    });
+  ElMessage.warning('数据共享模块已下线，请使用审批管理流程');
 }
 
 function submitRisk() {
@@ -783,18 +759,13 @@ function deleteRisk(id) {
 }
 
 function approveShare(id, status) {
-  return withAction(`share-${id}-${status}`, async () => {
-    await request.post('/data-share/approve', { id, status });
-    ElMessage.success(status === 'approved' ? '共享请求已放行' : '共享请求已拒绝');
-  });
+  ElMessage.warning('数据共享模块已下线，请使用审批管理流程');
+  return Promise.resolve();
 }
 
 function deleteShare(id) {
-  return withAction(`share-delete-${id}`, async () => {
-    await ElMessageBox.confirm('确认删除该共享申请吗？', '提示', { type: 'warning' });
-    await request.post('/data-share/delete', { id });
-    ElMessage.success('共享申请已删除');
-  });
+  ElMessage.warning('数据共享模块已下线');
+  return Promise.resolve();
 }
 
 async function copyShareToken(token) {

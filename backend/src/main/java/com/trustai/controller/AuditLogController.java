@@ -2,6 +2,7 @@ package com.trustai.controller;
 
 import com.trustai.document.AuditLogDocument;
 import com.trustai.service.AuditLogService;
+import com.trustai.service.CompanyScopeService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -10,6 +11,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import jakarta.validation.constraints.NotNull;
 
 @RestController
@@ -17,6 +20,7 @@ import jakarta.validation.constraints.NotNull;
 @Validated
 public class AuditLogController {
     @Autowired private AuditLogService auditLogService;
+    @Autowired private CompanyScopeService companyScopeService;
 
     @GetMapping("/search")
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
@@ -24,7 +28,12 @@ public class AuditLogController {
                                             @RequestParam(required = false) String operation,
                                             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date from,
                                             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date to) {
-        return R.ok(auditLogService.search(userId, operation, from, to));
+        Set<Long> scopedUserIds = companyScopeService.companyUserIds().stream().collect(Collectors.toSet());
+        List<AuditLogDocument> logs = auditLogService.search(userId, operation, from, to)
+            .stream()
+            .filter(item -> item.getUserId() != null && scopedUserIds.contains(item.getUserId()))
+            .collect(Collectors.toList());
+        return R.ok(logs);
     }
 
     @PostMapping("/delete")

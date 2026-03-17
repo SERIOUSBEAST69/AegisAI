@@ -7,6 +7,7 @@
         <el-form-item label="样例数据"><el-input v-model="sample" style="width:260px" /></el-form-item>
         <el-form-item label="掩码符"><el-input v-model="mask" style="width:100px" /></el-form-item>
         <el-button type="primary" @click="preview">预览</el-button>
+        <el-button type="success" :loading="executing" @click="executeDesense">一键脱敏</el-button>
         <el-button @click="loadRules">加载规则</el-button>
       </el-form>
       <el-divider />
@@ -118,6 +119,7 @@ const mask = ref('*');
 const result = ref(null);
 const rules = ref([]);
 const loading = ref(false);
+const executing = ref(false);
 const savingRule = ref(false);
 const newRule = ref({ name: '', pattern: '', mask: '***', example: '' });
 
@@ -134,6 +136,18 @@ async function preview() {
     result.value = await desenseApi.preview({ text: sample.value, mask: mask.value });
   } catch (err) {
     ElMessage.error(err?.message || '预览失败');
+  }
+}
+
+async function executeDesense() {
+  executing.value = true;
+  try {
+    result.value = await desenseApi.execute({ text: sample.value, mask: mask.value });
+    ElMessage.success('脱敏执行成功');
+  } catch (err) {
+    ElMessage.error(err?.message || '脱敏执行失败');
+  } finally {
+    executing.value = false;
   }
 }
 

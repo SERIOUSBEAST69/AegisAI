@@ -10,6 +10,7 @@ import java.util.Date;
 public class DataAsset {
     @TableId
     private Long id;
+    private Long companyId;
     private String name;
     private String type;
     private String sensitivityLevel;

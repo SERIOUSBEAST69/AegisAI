@@ -128,6 +128,7 @@ async function saveBasicSettings() {
       systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.apiUrl, settings.value.basic.apiUrl, '后端 API 地址'),
       systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.backupFrequency, settings.value.basic.backupFrequency, '数据备份频率')
     ]);
+    await loadSettings();
     ElMessage.success('基本设置保存成功');
   } catch (error) {
     ElMessage.error(error?.message || '基本设置保存失败');
@@ -141,6 +142,7 @@ async function saveSecuritySettings() {
       systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.loginAttempts, settings.value.security.loginAttempts, '登录失败限制'),
       systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.sessionTimeout, settings.value.security.sessionTimeout, '会话超时时间（分钟）')
     ]);
+    await loadSettings();
     ElMessage.success('安全设置保存成功');
   } catch (error) {
     ElMessage.error(error?.message || '安全设置保存失败');
@@ -154,6 +156,7 @@ async function saveNotificationSettings() {
       systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.notificationSms, settings.value.notification.sms, '短信通知开关'),
       systemConfigApi.upsert(SYSTEM_CONFIG_KEYS.notificationSystem, settings.value.notification.system, '系统通知开关')
     ]);
+    await loadSettings();
     ElMessage.success('通知设置保存成功');
   } catch (error) {
     ElMessage.error(error?.message || '通知设置保存失败');
