@@ -53,6 +53,8 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/privacy/events").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/privacy/config/public").permitAll()
                     .requestMatchers(
                         "/api/auth/login",
                         "/api/auth/login-phone",

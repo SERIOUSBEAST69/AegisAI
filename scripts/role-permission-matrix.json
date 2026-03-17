@@ -124,10 +124,34 @@
       "allow": ["ADMIN", "SECOPS", "AI_BUILDER"]
     },
     {
+      "name": "ANOMALY_CHECK",
+      "method": "POST",
+      "path": "/api/anomaly/check",
+      "allow": ["ADMIN", "SECOPS", "DATA_ADMIN", "AI_BUILDER", "BUSINESS_OWNER", "EMPLOYEE"]
+    },
+    {
       "name": "ANOMALY_EVENTS",
       "method": "GET",
       "path": "/api/anomaly/events",
       "allow": ["ADMIN", "EXECUTIVE", "SECOPS", "DATA_ADMIN", "AI_BUILDER", "BUSINESS_OWNER", "EMPLOYEE"]
+    },
+    {
+      "name": "PRIVACY_EVENTS",
+      "method": "GET",
+      "path": "/api/privacy/events?page=1&pageSize=5",
+      "allow": ["ADMIN", "EXECUTIVE", "SECOPS", "DATA_ADMIN", "AI_BUILDER", "BUSINESS_OWNER", "EMPLOYEE"]
+    },
+    {
+      "name": "PRIVACY_CONFIG_GET",
+      "method": "GET",
+      "path": "/api/privacy/config",
+      "allow": ["ADMIN", "SECOPS"]
+    },
+    {
+      "name": "PRIVACY_CONFIG_UPDATE",
+      "method": "POST",
+      "path": "/api/privacy/config",
+      "allow": ["ADMIN", "SECOPS"]
     },
     {
       "name": "SYSTEM_CONFIG_LIST",

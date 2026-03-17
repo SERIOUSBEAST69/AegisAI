@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
   nickname VARCHAR(50),
   avatar VARCHAR(255),
   role_id BIGINT,
+  device_id VARCHAR(128),
   department VARCHAR(50),
   organization_type VARCHAR(50),
   login_type VARCHAR(20) DEFAULT 'password',
@@ -389,6 +390,22 @@ CREATE TABLE IF NOT EXISTS security_detection_rule (
   alert_threshold_bytes BIGINT DEFAULT 1048576,
   enabled BOOLEAN DEFAULT TRUE,
   description VARCHAR(500),
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS privacy_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(128) NOT NULL,
+  event_type VARCHAR(64) DEFAULT 'SENSITIVE_TEXT',
+  content_masked CLOB,
+  source VARCHAR(32) DEFAULT 'extension',
+  action VARCHAR(32) DEFAULT 'detect',
+  device_id VARCHAR(128),
+  hostname VARCHAR(128),
+  window_title VARCHAR(255),
+  matched_types VARCHAR(255),
+  event_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

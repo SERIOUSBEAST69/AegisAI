@@ -19,5 +19,6 @@ public class UserProfileDTO {
     private String loginType;
     private String roleName;
     private String roleCode;
+    private String deviceId;
     private LocalDateTime lastActiveAt;
 }

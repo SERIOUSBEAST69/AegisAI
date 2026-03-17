@@ -16,6 +16,7 @@ public class User {
     private String nickname;
     private String avatar;
     private Long roleId;
+    private String deviceId;
     private String department;
     private String organizationType;
     private String loginType;

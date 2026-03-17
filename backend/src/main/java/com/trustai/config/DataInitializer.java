@@ -93,6 +93,7 @@ public class DataInitializer implements CommandLineRunner {
         user.setRealName(realName);
         user.setNickname(realName);
         user.setRoleId(role == null ? null : role.getId());
+        user.setDeviceId(username + "-device");
         user.setOrganizationType(organizationType);
         user.setDepartment(department);
         user.setPhone(phone);

@@ -8,6 +8,7 @@ CREATE TABLE `sys_user` (
   `nickname` VARCHAR(50) COMMENT '昵称',
   `avatar` VARCHAR(255) COMMENT '头像地址',
   `role_id` BIGINT COMMENT '角色ID',
+  `device_id` VARCHAR(128) COMMENT '设备ID',
   `department` VARCHAR(50) COMMENT '部门',
   `phone` VARCHAR(20) COMMENT '联系方式',
   `email` VARCHAR(100) COMMENT '邮箱',
@@ -271,6 +272,25 @@ CREATE TABLE `security_event` (
   INDEX idx_event_employee(`employee_id`),
   INDEX idx_event_time(`event_time`)
 ) COMMENT='安全事件表';
+
+CREATE TABLE `privacy_event` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` VARCHAR(128) NOT NULL COMMENT '用户标识（用户名）',
+  `event_type` VARCHAR(64) DEFAULT 'SENSITIVE_TEXT' COMMENT '事件类型',
+  `content_masked` TEXT COMMENT '脱敏后的内容',
+  `source` VARCHAR(32) DEFAULT 'extension' COMMENT '来源：extension/clipboard',
+  `action` VARCHAR(32) DEFAULT 'detect' COMMENT '动作：ignore/desensitize/detect',
+  `device_id` VARCHAR(128) COMMENT '设备ID',
+  `hostname` VARCHAR(128) COMMENT '主机名',
+  `window_title` VARCHAR(255) COMMENT '窗口标题',
+  `matched_types` VARCHAR(255) COMMENT '命中的敏感类型',
+  `event_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '事件时间',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_privacy_user(`user_id`),
+  INDEX idx_privacy_source(`source`),
+  INDEX idx_privacy_time(`event_time`)
+) COMMENT='隐私盾事件表';
 
 CREATE TABLE `security_detection_rule` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,

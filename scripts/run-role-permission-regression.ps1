@@ -22,7 +22,12 @@ function Invoke-ApiSafe {
   )
 
   try {
-    $resp = Invoke-RestMethod -Uri $Uri -Method $Method -Headers $Headers
+    $verb = ([string]$Method).ToUpperInvariant()
+    if ($verb -in @('POST', 'PUT', 'PATCH')) {
+      $resp = Invoke-RestMethod -Uri $Uri -Method $Method -Headers $Headers -ContentType "application/json" -Body "{}"
+    } else {
+      $resp = Invoke-RestMethod -Uri $Uri -Method $Method -Headers $Headers
+    }
     return [pscustomobject]@{
       HttpStatus = 200
       BodyCode = Get-JsonCode -Obj $resp

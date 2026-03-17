@@ -141,7 +141,7 @@ const menuDescriptions = {
   '/shadow-ai': '影子AI发现与治理',
   '/threat-monitor': '恶意AI模拟攻击实时检测与阻拦',
   '/ai/risk-rating': 'AI服务风险评级',
-  '/ai/anomaly': '员工AI行为异常检测',
+  '/ai/anomaly': '员工AI行为监控',
   '/alerts': '高危告警闭环',
   '/audit-log': '证据链与还原',
   '/audit-report': '审计报告输出',

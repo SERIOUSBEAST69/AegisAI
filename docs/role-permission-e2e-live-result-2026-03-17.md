@@ -1,49 +1,64 @@
 # Role Permission E2E Live Result (2026-03-17)
 
 ## Scope
-- Environment under test: running backend on `http://localhost:8080` (live listener).
-- Token source: real login accounts shown in login UI and backend demo seeds.
+- Environment under test: Docker backend on http://localhost:8080.
+- Token source: demo seed accounts via /api/auth/login.
 - Roles tested: ADMIN, EXECUTIVE, SECOPS, DATA_ADMIN, AI_BUILDER, BUSINESS_OWNER, EMPLOYEE.
-- Check size: 21 endpoints x 7 roles = 147 checks.
+- Permission matrix size: 25 endpoints x 7 roles = 175 checks.
+- Extra smoke scope: privacy shield endpoints + anomaly check role behavior.
 
 ## Summary
-- Total checks: 147
-- Mismatches: 69
+- Total checks: 175
+- Mismatches: 0
 - Login failures: none
-- Raw matrix CSV: docs/role-permission-e2e-results.csv
+- Matrix summary: docs/role-permission-e2e-summary.json
+- Matrix details: docs/role-permission-e2e-results.csv
 
-## High-Severity Findings
-1. Broad authorization mismatch in live backend runtime.
-- Many endpoints expected to be forbidden are currently callable by non-target roles.
-- Representative examples:
-  - `GET /api/user/list` callable by DATA_ADMIN.
-  - `GET /api/data-asset/list` callable by EXECUTIVE/SECOPS/AI_BUILDER/BUSINESS_OWNER/EMPLOYEE.
-  - `GET /api/alert/list` callable by EXECUTIVE/DATA_ADMIN/AI_BUILDER/BUSINESS_OWNER/EMPLOYEE.
-  - `GET /api/security/events` callable by EXECUTIVE/DATA_ADMIN/AI_BUILDER/BUSINESS_OWNER/EMPLOYEE.
+## Runtime Alignment Status
+1. Docker backend image rebuilt and container recreated on 2026-03-17 21:51 local time.
+2. Initial immediate run showed full login failure (startup warm-up timing); rerun after readiness passed with 0 mismatches.
+3. Method-security denials now map correctly in API body as 40300/40100 via global exception mapping.
 
-2. Employee identity was incomplete in runtime data.
-- EMPLOYEE role was missing and had to be created manually for full 7-role test.
-- Employee account was then registered to complete the matrix run.
+## Targeted Privacy Shield Smoke Validation
+Evidence file: docs/privacy-shield-smoke-2026-03-17.json
 
-## Root Cause Notes
-1. Runtime/deployment mismatch.
-- The live backend on `8080` appears not fully aligned with current repository changes (method security behavior and seeded role set differ from expected state).
+1. Public config read (no token)
+- GET /api/privacy/config/public => code 20000
 
-2. Confirmed code-level privilege issue fixed in repository.
-- `CurrentUserService.requireAdmin()` previously allowed roles whose role name contains "管理员".
-- This would incorrectly grant admin privileges to DATA_ADMIN.
-- Fixed by restricting admin check to:
-  - username `admin`, or
-  - role code strictly `ADMIN`.
+2. Event reporting (no token)
+- POST /api/privacy/events => code 20000 (employee.demo sample)
+- POST /api/privacy/events => code 20000 (biz.demo sample)
 
-## What Was Changed During This Run
-1. Added missing EMPLOYEE role in live runtime (for test completeness).
-2. Registered `employee.demo` account in live runtime (for test completeness).
-3. Patched code to prevent admin escalation in:
-- backend/src/main/java/com/trustai/service/CurrentUserService.java
+3. Role-scoped event visibility
+- EMPLOYEE GET /api/privacy/events => summaryOnly false, firstUserId employee.demo
+- BUSINESS_OWNER GET /api/privacy/events => summaryOnly false, firstUserId biz.demo
+- EXECUTIVE GET /api/privacy/events => summaryOnly true, listCount 0
+- ADMIN GET /api/privacy/events => summaryOnly false, listCount 4
 
-## Recommendation
-1. Redeploy backend from current repository commit and rerun the same matrix.
-2. Ensure method security is active in deployed runtime (`@EnableMethodSecurity`).
-3. Re-seed role catalog to include EMPLOYEE and remove deprecated SCHOOL_ADMIN.
-4. Re-run checklist in docs/role-permission-e2e-checklist.md and compare mismatch count target: 0.
+4. Config management access
+- ADMIN GET /api/privacy/config => 20000
+- SECOPS GET /api/privacy/config => 20000
+- EXECUTIVE GET /api/privacy/config => 40300
+
+5. Anomaly check role gate
+- EXECUTIVE POST /api/anomaly/check => 40300
+- EMPLOYEE POST /api/anomaly/check => 50000 with "请求体不能为空" (expected auth pass + business validation fail)
+
+## Remaining Manual Desktop Checks
+The following items require interactive desktop operations and cannot be fully automated in this CLI-only run:
+
+Checklist file: docs/privacy-shield-desktop-checklist-2026-03-17.md
+
+1. Word/Notepad copy scenario
+- Expectation: no popup warning; audit-only event allowed.
+
+2. AI active-window copy scenario (ChatGPT/豆包/文心一言 window focused)
+- Expectation: system notification shown and event uploaded.
+
+3. Browser extension banner interaction
+- Expectation: sensitive input shows floating banner, one-click desensitize rewrites input, ignore action writes event.
+
+## Final Verdict
+- Role-permission enforcement target is met (mismatchCount = 0 on live 8080).
+- Privacy shield API and role-view logic are validated via targeted smoke tests.
+- Desktop interaction checks are documented and ready for operator execution.

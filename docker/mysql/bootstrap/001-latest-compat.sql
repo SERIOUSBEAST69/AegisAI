@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS `sys_user` (
   `nickname` VARCHAR(50) COMMENT '昵称',
   `avatar` VARCHAR(255) COMMENT '头像地址',
   `role_id` BIGINT COMMENT '角色ID',
+  `device_id` VARCHAR(128) COMMENT '设备ID',
   `department` VARCHAR(50) COMMENT '部门',
   `phone` VARCHAR(20) COMMENT '联系方式',
   `email` VARCHAR(100) COMMENT '邮箱',
@@ -44,6 +45,20 @@ PREPARE stmt FROM @sql_add_sys_user_avatar;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+SET @has_sys_user_device_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'sys_user' AND column_name = 'device_id'
+);
+SET @sql_add_sys_user_device_id := IF(
+  @has_sys_user_device_id = 0,
+  'ALTER TABLE sys_user ADD COLUMN device_id VARCHAR(128) COMMENT ''设备ID'' AFTER role_id',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_sys_user_device_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 SET @legacy_user_exists := (
   SELECT COUNT(*)
   FROM information_schema.tables
@@ -52,8 +67,8 @@ SET @legacy_user_exists := (
 
 SET @sync_user_sql := IF(
   @legacy_user_exists > 0,
-  'INSERT INTO sys_user (id, username, password, real_name, nickname, avatar, role_id, department, phone, email, status, create_time, update_time) '
-  'SELECT u.id, u.username, u.password, u.real_name, COALESCE(NULLIF(u.real_name, ""), u.username), NULL, u.role_id, u.department, u.phone, u.email, u.status, u.create_time, u.update_time '
+  'INSERT INTO sys_user (id, username, password, real_name, nickname, avatar, role_id, device_id, department, phone, email, status, create_time, update_time) '
+  'SELECT u.id, u.username, u.password, u.real_name, COALESCE(NULLIF(u.real_name, ""), u.username), NULL, u.role_id, CONCAT(u.username, ''-device''), u.department, u.phone, u.email, u.status, u.create_time, u.update_time '
   'FROM user u '
   'INNER JOIN ( '
   '  SELECT username, COALESCE(MAX(CASE WHEN password LIKE ''$2a$%%'' THEN id END), MAX(id)) AS keep_id '
@@ -149,6 +164,25 @@ CREATE TABLE IF NOT EXISTS `security_detection_rule` (
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) COMMENT='安全检测规则表';
+
+CREATE TABLE IF NOT EXISTS `privacy_event` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` VARCHAR(128) NOT NULL COMMENT '用户标识（用户名）',
+  `event_type` VARCHAR(64) DEFAULT 'SENSITIVE_TEXT' COMMENT '事件类型',
+  `content_masked` TEXT COMMENT '脱敏后的内容',
+  `source` VARCHAR(32) DEFAULT 'extension' COMMENT '来源：extension/clipboard',
+  `action` VARCHAR(32) DEFAULT 'detect' COMMENT '动作：ignore/desensitize/detect',
+  `device_id` VARCHAR(128) COMMENT '设备ID',
+  `hostname` VARCHAR(128) COMMENT '主机名',
+  `window_title` VARCHAR(255) COMMENT '窗口标题',
+  `matched_types` VARCHAR(255) COMMENT '命中的敏感类型',
+  `event_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_privacy_user(`user_id`),
+  INDEX idx_privacy_source(`source`),
+  INDEX idx_privacy_time(`event_time`)
+) COMMENT='隐私盾事件表';
 
 -- AI 调用审计日志表（含 data_asset_id）
 CREATE TABLE IF NOT EXISTS `ai_call_log` (

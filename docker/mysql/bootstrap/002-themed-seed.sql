@@ -175,3 +175,17 @@ WHERE NOT EXISTS (SELECT 1 FROM system_config WHERE config_key = 'security.sessi
 INSERT INTO system_config (config_key, config_value, description, created_at, updated_at)
 SELECT 'notification.system.enabled', 'true', '是否启用系统通知', NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM system_config WHERE config_key = 'notification.system.enabled');
+
+INSERT INTO system_config (config_key, config_value, description, created_at, updated_at)
+SELECT 'privacy.shield.config',
+       '{"monitorEnabled":true,"predictEnabled":true,"dedupeSeconds":60,"sensitiveKeywords":["身份证","银行卡","手机号","公司代码"],"siteSelectors":[{"siteId":"chatgpt","hosts":["chat.openai.com","chatgpt.com"],"inputSelectors":["#prompt-textarea","textarea[data-testid=prompt-textarea]","textarea"]},{"siteId":"doubao","hosts":["doubao.com","www.doubao.com"],"inputSelectors":["textarea","div[contenteditable=true]","[data-testid=chat-input]"]},{"siteId":"yiyan","hosts":["yiyan.baidu.com"],"inputSelectors":["textarea","div[contenteditable=true]","#chat-input"]}],"aiWindowRules":{"titleKeywords":["ChatGPT","豆包","文心一言","Kimi","通义千问"],"processNames":["chrome","msedge","firefox","doubao","qqbrowser"]}}',
+       '隐私盾配置', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM system_config WHERE config_key = 'privacy.shield.config');
+
+INSERT INTO privacy_event (user_id, event_type, content_masked, source, action, device_id, hostname, window_title, matched_types, event_time, create_time, update_time)
+SELECT 'employee.demo', 'SENSITIVE_TEXT', '客户身份证 410101******1234 与手机号 138****8000', 'extension', 'desensitize', 'employee.demo-device', 'demo-host', 'ChatGPT', 'id_card,phone', DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 2 HOUR)
+WHERE NOT EXISTS (SELECT 1 FROM privacy_event WHERE user_id = 'employee.demo' AND source = 'extension');
+
+INSERT INTO privacy_event (user_id, event_type, content_masked, source, action, device_id, hostname, window_title, matched_types, event_time, create_time, update_time)
+SELECT 'employee.demo', 'SENSITIVE_TEXT', '银行卡 6222****2021 准备粘贴到外部AI', 'clipboard', 'ignore', 'employee.demo-device', 'demo-host', '豆包', 'bank_card', DATE_SUB(NOW(), INTERVAL 1 HOUR), DATE_SUB(NOW(), INTERVAL 1 HOUR), DATE_SUB(NOW(), INTERVAL 1 HOUR)
+WHERE NOT EXISTS (SELECT 1 FROM privacy_event WHERE user_id = 'employee.demo' AND source = 'clipboard');

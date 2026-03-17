@@ -18,6 +18,7 @@ const os   = require('os');
 const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
 const scanner = require('./scanner/index');
+const { createClipboardMonitor } = require('./scanner/clipboardMonitor');
 
 // ── 配置 ────────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ let config       = loadConfig();
 const CLIENT_ID  = getOrCreateClientId();
 let lastScanResult = null;
 let scanJob      = null;
+let clipboardMonitor = null;
 let authState    = {
   authenticated: false,
   user: null,
@@ -440,6 +442,9 @@ ipcMain.handle('save-config', (event, newConfig) => {
   if (newConfig.serverUrl && newConfig.serverUrl !== prevServerUrl && mainWindow) {
     mainWindow.loadURL(newConfig.serverUrl).catch(console.error);
   }
+  if (clipboardMonitor) {
+    clipboardMonitor.refreshConfig(true).catch(() => {});
+  }
   updateTrayMenu();
   return config;
 });
@@ -457,6 +462,11 @@ app.whenReady().then(async () => {
 
   createTray();
   startScheduledScan();
+  clipboardMonitor = createClipboardMonitor({
+    getBackendUrl: () => config.backendUrl || config.serverUrl,
+    getAuthState: () => authState,
+  });
+  clipboardMonitor.start().catch(() => {});
 });
 
 app.on('window-all-closed', () => {
@@ -477,4 +487,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  if (clipboardMonitor) {
+    clipboardMonitor.stop();
+  }
 });

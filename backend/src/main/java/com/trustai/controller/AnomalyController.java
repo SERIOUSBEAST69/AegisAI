@@ -72,8 +72,8 @@ public class AnomalyController {
      * </pre>
      */
     @PostMapping("/check")
-    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','EXECUTIVE','SECOPS','DATA_ADMIN','AI_BUILDER','BUSINESS_OWNER','EMPLOYEE')")
-    public R<Map<String, Object>> check(@RequestBody Map<String, Object> payload) {
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN','AI_BUILDER','BUSINESS_OWNER','EMPLOYEE')")
+    public R<Map<String, Object>> check(@RequestBody(required = false) Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) {
             return R.error("请求体不能为空");
         }
@@ -99,6 +99,9 @@ public class AnomalyController {
     public R<Map<String, Object>> events() {
         try {
             Map<String, Object> result = aiInferenceClient.anomalyEvents();
+            if (currentUserService.hasRole("EXECUTIVE")) {
+                return R.ok(summaryForExecutive(result));
+            }
             if (!currentUserService.hasAnyRole("ADMIN", "SECOPS")) {
                 result = filterEventsForEmployee(result, currentUserService.requireCurrentUser().getUsername());
             }
@@ -154,5 +157,35 @@ public class AnomalyController {
         safe.put("events", filtered);
         safe.put("count", filtered.size());
         return safe;
+    }
+
+    private Map<String, Object> summaryForExecutive(Map<String, Object> result) {
+        Map<String, Object> source = result == null ? Map.of() : result;
+        Object rawEvents = source.get("events");
+        int total = 0;
+        int anomaly = 0;
+        if (rawEvents instanceof List<?> eventList) {
+            total = eventList.size();
+            for (Object item : eventList) {
+                if (item instanceof Map<?, ?> map) {
+                    Object flag = map.get("is_anomaly");
+                    if (Boolean.TRUE.equals(flag)
+                            || "true".equalsIgnoreCase(String.valueOf(flag))
+                            || "1".equals(String.valueOf(flag))) {
+                        anomaly++;
+                    }
+                }
+            }
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("summaryOnly", true);
+        summary.put("total", total);
+        summary.put("anomalyCount", anomaly);
+        summary.put("normalCount", Math.max(0, total - anomaly));
+        summary.put("anomalyRate", total == 0 ? 0 : (double) anomaly / (double) total);
+        summary.put("events", List.of());
+        summary.put("count", 0);
+        return summary;
     }
 }

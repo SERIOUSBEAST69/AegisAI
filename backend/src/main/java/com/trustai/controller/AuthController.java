@@ -237,6 +237,7 @@ public class AuthController {
         user.setRealName(seed.realName());
         user.setNickname(seed.realName());
         user.setRoleId(role.getId());
+        user.setDeviceId(seed.username() + "-device");
         user.setOrganizationType(seed.organizationType());
         user.setDepartment(seed.department());
         user.setPhone(seed.phone());
@@ -311,6 +312,7 @@ public class AuthController {
         user.setRealName(StringUtils.hasText(req.getRealName()) ? req.getRealName() : req.getNickname());
         user.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : req.getRealName());
         user.setRoleId(role.getId());
+        user.setDeviceId(username + "-device");
         user.setDepartment(req.getDepartment());
         user.setOrganizationType(req.getOrganizationType());
         user.setPhone(req.getPhone());
@@ -392,6 +394,7 @@ public class AuthController {
             .loginType(user.getLoginType())
             .roleName(role == null ? null : role.getName())
             .roleCode(role == null ? null : role.getCode())
+                .deviceId(user.getDeviceId())
             .lastActiveAt(user.getUpdateTime() == null ? null : user.getUpdateTime().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime())
             .build();
     }
