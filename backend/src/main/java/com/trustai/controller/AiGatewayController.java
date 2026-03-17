@@ -1,9 +1,11 @@
 package com.trustai.controller;
 
+import com.trustai.client.AiInferenceClient;
 import com.trustai.service.AiGatewayService;
 import com.trustai.service.AiModelAccessGuardService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +26,9 @@ public class AiGatewayController {
 
     @Autowired
     private AiModelAccessGuardService aiModelAccessGuardService;
+
+    @Autowired
+    private AiInferenceClient aiInferenceClient;
 
     @PostMapping("/chat")
     public R<Map<String, Object>> chat(@RequestBody @Valid ChatReq req) {
@@ -58,6 +63,22 @@ public class AiGatewayController {
             result.put("message", "✅ 未检测到个人隐私信息，可安全发送。");
         }
         return R.ok(result);
+    }
+
+    @GetMapping("/adversarial/meta")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    public R<Map<String, Object>> adversarialMeta() {
+        return R.ok(aiInferenceClient.adversarialMeta());
+    }
+
+    @PostMapping("/adversarial/run")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    public R<Map<String, Object>> adversarialRun(@RequestBody BattleReq req) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("scenario", req.getScenario());
+        payload.put("rounds", req.getRounds());
+        payload.put("seed", req.getSeed());
+        return R.ok(aiInferenceClient.adversarialRun(payload));
     }
 
     public static class ChatReq {
@@ -98,6 +119,19 @@ public class AiGatewayController {
         private String text;
         public String getText() { return text; }
         public void setText(String text) { this.text = text; }
+    }
+
+    public static class BattleReq {
+        private String scenario;
+        private Integer rounds;
+        private Integer seed;
+
+        public String getScenario() { return scenario; }
+        public void setScenario(String scenario) { this.scenario = scenario; }
+        public Integer getRounds() { return rounds; }
+        public void setRounds(Integer rounds) { this.rounds = rounds; }
+        public Integer getSeed() { return seed; }
+        public void setSeed(Integer seed) { this.seed = seed; }
     }
 }
 

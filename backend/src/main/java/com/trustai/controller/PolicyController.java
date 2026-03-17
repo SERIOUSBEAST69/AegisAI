@@ -6,6 +6,7 @@ import com.trustai.service.CurrentUserService;
 import com.trustai.service.CompliancePolicyService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.Date;
 import java.util.List;
@@ -17,6 +18,7 @@ public class PolicyController {
     @Autowired private CurrentUserService currentUserService;
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN','AI_BUILDER')")
     public R<List<CompliancePolicy>> list(@RequestParam(required = false) String name) {
         QueryWrapper<CompliancePolicy> qw = new QueryWrapper<>();
         if (name != null && !name.isEmpty()) qw.like("name", name);
@@ -24,8 +26,8 @@ public class PolicyController {
     }
 
     @PostMapping("/save")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> save(@RequestBody CompliancePolicy policy) {
-        currentUserService.requireAnyRole("ADMIN", "DATA_ADMIN", "SECOPS");
         policy.setUpdateTime(new Date());
         if (policy.getId() == null) {
             policy.setCreateTime(new Date());
@@ -37,8 +39,8 @@ public class PolicyController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> delete(@RequestBody IdReq req) {
-        currentUserService.requireAnyRole("ADMIN", "DATA_ADMIN", "SECOPS");
         compliancePolicyService.removeById(req.getId());
         return R.okMsg("删除成功");
     }

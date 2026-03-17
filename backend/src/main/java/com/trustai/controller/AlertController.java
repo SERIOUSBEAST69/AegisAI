@@ -5,6 +5,7 @@ import com.trustai.entity.AlertRecord;
 import com.trustai.service.AlertRecordService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
@@ -23,6 +24,7 @@ public class AlertController {
     private static final Set<String> ALLOWED_STATUS = new HashSet<>(Arrays.asList("open", "claimed", "resolved", "archived"));
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<List<AlertRecord>> list(@RequestParam(required = false) String status) {
         QueryWrapper<AlertRecord> qw = new QueryWrapper<>();
         if (status != null && !status.isEmpty()) qw.eq("status", status);
@@ -30,6 +32,7 @@ public class AlertController {
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<?> create(@RequestBody AlertRecord record) {
         record.setStatus("open");
         record.setCreateTime(new Date());
@@ -38,6 +41,7 @@ public class AlertController {
     }
 
     @PostMapping("/update")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<?> update(@RequestBody AlertRecord record) {
         if (record.getId() == null) return R.error(40000, "缺少ID");
         AlertRecord current = alertService.getById(record.getId());
@@ -54,6 +58,7 @@ public class AlertController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<?> delete(@RequestBody IdReq req) {
         alertService.removeById(req.getId());
         return R.okMsg("删除成功");

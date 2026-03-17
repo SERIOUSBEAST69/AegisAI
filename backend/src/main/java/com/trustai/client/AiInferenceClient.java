@@ -55,4 +55,12 @@ public interface AiInferenceClient {
     /** 获取异常检测模型状态。 */
     @GetMapping("/api/anomaly/status")
     Map<String, Object> anomalyStatus();
+
+    // ── OpenClaw 攻防对弈 API ───────────────────────────────────────────────
+
+    @GetMapping("/api/adversarial/meta")
+    Map<String, Object> adversarialMeta();
+
+    @PostMapping("/api/adversarial/run")
+    Map<String, Object> adversarialRun(@RequestBody Map<String, Object> payload);
 }

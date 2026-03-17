@@ -2,8 +2,11 @@ package com.trustai.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.entity.SubjectRequest;
+import com.trustai.entity.User;
+import com.trustai.service.CurrentUserService;
 import com.trustai.service.SubjectRequestService;
 import com.trustai.utils.R;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,11 +27,15 @@ public class SubjectRequestController {
     @Autowired
     private SubjectRequestService subjectRequestService;
 
+    @Autowired
+    private CurrentUserService currentUserService;
+
     private static final Set<String> ALLOWED_STATUS = new HashSet<>(Arrays.asList("pending", "processing", "done", "rejected"));
     private static final Set<String> FINAL_STATUS = new HashSet<>(Arrays.asList("done", "rejected"));
     private static final Set<String> ALLOWED_TYPE = new HashSet<>(Arrays.asList("access", "export", "delete"));
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<List<SubjectRequest>> list(@RequestParam(required = false) String status) {
         QueryWrapper<SubjectRequest> qw = new QueryWrapper<>();
         if (status != null && !status.isEmpty()) qw.eq("status", status);
@@ -36,10 +43,12 @@ public class SubjectRequestController {
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> create(@RequestBody @Validated ApplyReq req) {
         if (!ALLOWED_TYPE.contains(req.getType())) return R.error(40000, "不支持的类型");
+        User currentUser = currentUserService.requireCurrentUser();
         SubjectRequest entity = new SubjectRequest();
-        entity.setUserId(req.getUserId());
+        entity.setUserId(req.getUserId() == null ? currentUser.getId() : req.getUserId());
         entity.setType(req.getType());
         entity.setComment(req.getComment());
         entity.setStatus("pending");
@@ -51,6 +60,7 @@ public class SubjectRequestController {
     }
 
     @PostMapping("/process")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> process(@RequestBody @Validated ProcessReq req) {
         SubjectRequest sr = subjectRequestService.getById(req.getId());
         if (sr == null) return R.error(40000, "申请不存在");
@@ -66,6 +76,7 @@ public class SubjectRequestController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> delete(@RequestBody @Validated IdReq req) {
         SubjectRequest existing = subjectRequestService.getById(req.getId());
         if (existing == null) {

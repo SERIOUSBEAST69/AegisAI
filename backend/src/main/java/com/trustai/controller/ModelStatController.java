@@ -5,6 +5,7 @@ import com.trustai.entity.ModelCallStat;
 import com.trustai.service.ModelCallStatService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -20,6 +21,7 @@ public class ModelStatController {
     private ModelCallStatService statService;
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','EXECUTIVE','AI_BUILDER','BUSINESS_OWNER')")
     public R<List<ModelCallStat>> list(@RequestParam(required = false) Long modelId,
                                        @RequestParam(required = false) Long userId) {
         QueryWrapper<ModelCallStat> qw = new QueryWrapper<>();
@@ -29,6 +31,7 @@ public class ModelStatController {
     }
 
     @GetMapping("/summary")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','EXECUTIVE','AI_BUILDER','BUSINESS_OWNER')")
     public R<Map<String, Object>> summary(@RequestParam(required = false) Long modelId,
                                           @RequestParam(required = false) Long userId) {
         QueryWrapper<ModelCallStat> qw = new QueryWrapper<>();

@@ -236,8 +236,9 @@ const shareForm = ref({ assetId: '', collaborators: '', reason: '' });
 const riskForm = ref({ type: '', level: 'high', status: 'open', processLog: '' });
 
 const currentRoleCode = computed(() => String(userStore.userInfo?.roleCode || '').toUpperCase());
-const canManageRisk = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'SECOPS', 'DATA_ADMIN'));
-const canApproveFlow = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'SECOPS', 'DATA_ADMIN', 'EXECUTIVE'));
+const canManageRisk = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'SECOPS'));
+const canApproveApprovalFlow = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'DATA_ADMIN', 'BUSINESS_OWNER'));
+const canApproveShareFlow = computed(() => hasAnyRole(userStore.userInfo, 'ADMIN', 'DATA_ADMIN'));
 const composerOptions = computed(() => ([
   { key: 'risk', label: '风险事件', enabled: canManageRisk.value },
   { key: 'approval', label: '审批申请', enabled: true },
@@ -382,7 +383,7 @@ const mappedApprovals = computed(() => filteredApprovals.value.map(item => ({
   ],
   order: approvalPriority(item.status),
   actions: [
-    ...(!canApproveFlow.value || approvalState(item.status) !== 'pending' ? [] : [{
+    ...(!canApproveApprovalFlow.value || approvalState(item.status) !== 'pending' ? [] : [{
       key: `approval-pass-${item.id}`,
       label: '通过',
       type: 'success',
@@ -418,7 +419,7 @@ const mappedShares = computed(() => filteredShares.value.map(item => ({
   ],
   order: sharePriority(item.status),
   actions: [
-    ...(!canApproveFlow.value || shareState(item.status) !== 'pending' ? [] : [{
+    ...(!canApproveShareFlow.value || shareState(item.status) !== 'pending' ? [] : [{
       key: `share-pass-${item.id}`,
       label: '放行',
       type: 'success',
@@ -639,14 +640,21 @@ function setLane(lane) {
 async function loadAll() {
   loading.value = true;
   try {
-    const [approvalData, riskData, shareData] = await Promise.all([
+    const [approvalResult, riskResult, shareResult] = await Promise.allSettled([
       request.get('/approval/list'),
       request.get('/risk-event/list'),
       request.get('/data-share/list'),
     ]);
-    approvals.value = approvalData || [];
-    risks.value = riskData || [];
-    shares.value = shareData || [];
+
+    approvals.value = approvalResult.status === 'fulfilled' ? (approvalResult.value || []) : [];
+    risks.value = riskResult.status === 'fulfilled' ? (riskResult.value || []) : [];
+    shares.value = shareResult.status === 'fulfilled' ? (shareResult.value || []) : [];
+
+    const failed = [approvalResult, riskResult, shareResult].filter(item => item.status === 'rejected');
+    const hardFailure = failed.find(item => item.status === 'rejected' && item.reason?.code !== 40300);
+    if (hardFailure && hardFailure.status === 'rejected') {
+      throw hardFailure.reason;
+    }
     lastRefresh.value = new Date();
   } catch (error) {
     ElMessage.error(error?.message || '运营指挥台加载失败');

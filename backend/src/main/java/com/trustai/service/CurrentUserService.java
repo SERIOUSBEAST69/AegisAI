@@ -36,7 +36,7 @@ public class CurrentUserService {
         User user = requireCurrentUser();
         Role role = getCurrentRole(user);
         boolean isAdmin = "admin".equalsIgnoreCase(user.getUsername())
-                || (role != null && (ADMIN_ROLE_CODE.equalsIgnoreCase(role.getCode()) || role.getName().contains("管理员")));
+                || (role != null && ADMIN_ROLE_CODE.equalsIgnoreCase(role.getCode()));
         if (!isAdmin) {
             throw new BizException(40300, "仅管理员可操作");
         }
@@ -76,8 +76,35 @@ public class CurrentUserService {
         return getCurrentRoleCode(user, getCurrentRole(user));
     }
 
+    public boolean hasRole(String roleCode) {
+        if (!StringUtils.hasText(roleCode)) {
+            return false;
+        }
+        String current = safeCurrentRoleCode();
+        return StringUtils.hasText(current) && roleCode.equalsIgnoreCase(current);
+    }
+
+    public boolean hasAnyRole(String... roleCodes) {
+        String current = safeCurrentRoleCode();
+        if (!StringUtils.hasText(current) || roleCodes == null || roleCodes.length == 0) {
+            return false;
+        }
+        return Arrays.stream(roleCodes)
+            .filter(StringUtils::hasText)
+            .anyMatch(code -> code.equalsIgnoreCase(current));
+    }
+
     public boolean isEmployeeUser() {
         return EMPLOYEE_ROLE_CODE.equalsIgnoreCase(currentRoleCode());
+    }
+
+    private String safeCurrentRoleCode() {
+        try {
+            User user = requireCurrentUser();
+            return getCurrentRoleCode(user, getCurrentRole(user));
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private String getCurrentRoleCode(User user, Role role) {

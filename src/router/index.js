@@ -75,7 +75,7 @@ router.beforeEach((to, from, next) => {
 
   const session = getSession();
   if (!canAccessPath(to.path, session?.user)) {
-    return next(isEmployeeUser(session?.user) ? '/shadow-ai' : '/');
+    return next(isEmployeeUser(session?.user) ? '/ai/anomaly' : '/');
   }
 
   // 根据路由深度自动设置转场方向（供 usePageTransition 读取）

@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +42,7 @@ public class UserController {
     @Autowired private CurrentUserService currentUserService;
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<List<User>> list(@RequestParam(required = false) String username) {
         currentUserService.requireAdmin();
         QueryWrapper<User> qw = new QueryWrapper<>();
@@ -51,6 +53,7 @@ public class UserController {
     }
 
     @PostMapping("/register")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> register(@RequestBody User user) {
         currentUserService.requireAdmin();
         user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -61,6 +64,7 @@ public class UserController {
     }
 
     @PostMapping("/update")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> update(@RequestBody User user) {
         currentUserService.requireAdmin();
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
@@ -72,6 +76,7 @@ public class UserController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> delete(@RequestBody IdReq req) {
         currentUserService.requireAdmin();
         userService.removeById(req.getId());
@@ -81,12 +86,14 @@ public class UserController {
     public static class IdReq { public Long getId(){return id;} public void setId(Long id){this.id=id;} private Long id; }
 
     @GetMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
     public R<UserProfileDTO> profile() {
         User user = currentUserService.requireCurrentUser();
         return R.ok(toProfile(user));
     }
 
     @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
     public R<UserProfileDTO> updateProfile(@ModelAttribute UserUpdateDTO req) {
         User user = currentUserService.requireCurrentUser();
         if (req.getNickname() != null) user.setNickname(req.getNickname());
@@ -104,6 +111,7 @@ public class UserController {
     }
 
     @PostMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
     public R<?> changePassword(@Validated @RequestBody ChangePasswordDTO req) {
         User user = currentUserService.requireCurrentUser();
         if (!passwordEncoder.matches(req.getOldPassword(), user.getPassword())) {

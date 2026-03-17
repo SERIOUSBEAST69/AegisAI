@@ -9,6 +9,7 @@ import com.trustai.service.CurrentUserService;
 import com.trustai.utils.R;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -94,8 +95,9 @@ public class ClientReportController {
      * 返回所有客户端的最新一条扫描报告（按 client_id 去重，取最新）。
      */
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<List<ClientReport>> list() {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "BUSINESS_OWNER");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
         // 取全部报告，按 clientId 分组，每组保留最新一条
         List<ClientReport> all = clientReportService.list(
                 new QueryWrapper<ClientReport>().orderByDesc("scan_time")
@@ -113,8 +115,9 @@ public class ClientReportController {
      * 查询指定客户端的历史报告（最近 50 条）。
      */
     @GetMapping("/history")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<List<ClientReport>> history(@RequestParam String clientId) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "BUSINESS_OWNER");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
         List<ClientReport> records = clientReportService.list(
                 new QueryWrapper<ClientReport>()
                         .eq("client_id", clientId)
@@ -130,8 +133,9 @@ public class ClientReportController {
      * 返回影子AI治理摘要，供工作台首页和 ShadowAiDiscovery 视图使用。
      */
     @GetMapping("/stats")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<Map<String, Object>> stats() {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "BUSINESS_OWNER");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
         List<ClientReport> all = clientReportService.list(
                 new QueryWrapper<ClientReport>().orderByDesc("scan_time")
         );
@@ -180,8 +184,9 @@ public class ClientReportController {
      * 当用户通过Web界面下载客户端并开启本地扫描时，相应记录将出现在此队列中。
      */
     @GetMapping("/queue")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<List<ClientScanQueue>> queue() {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "BUSINESS_OWNER");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
         List<ClientScanQueue> items = clientScanQueueService.list(
                 new QueryWrapper<ClientScanQueue>()
                         .orderByDesc("download_time")
@@ -197,8 +202,9 @@ public class ClientReportController {
      * @param req 平台信息及发起下载的设备信息
      */
     @PostMapping("/queue")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<ClientScanQueue> enqueue(@RequestBody QueueReq req, HttpServletRequest servletReq) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "BUSINESS_OWNER");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
         ClientScanQueue entry = new ClientScanQueue();
         entry.setPlatform(req.getPlatform() != null ? req.getPlatform() : "unknown");
         entry.setHostname(req.getHostname());
@@ -216,8 +222,9 @@ public class ClientReportController {
      * 更新队列中某条记录的扫描状态（由安装后的客户端或调度任务调用）。
      */
     @PostMapping("/queue/{id}/status")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<?> updateQueueStatus(@PathVariable Long id, @RequestBody QueueStatusReq req) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE", "BUSINESS_OWNER");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
         ClientScanQueue entry = clientScanQueueService.getById(id);
         if (entry == null) return R.error(40000, "队列记录不存在");
         entry.setStatus(req.getStatus());

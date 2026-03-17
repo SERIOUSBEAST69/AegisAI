@@ -11,6 +11,7 @@ import com.trustai.service.AiCallAuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,12 +40,14 @@ public class AiCallController {
     }
 
     @PostMapping("/quota/reset/{modelCode}")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<?> resetQuota(@PathVariable String modelCode) {
         rateLimiterService.reset(modelCode, LocalDate.now());
         return R.okMsg("已重置今日配额");
     }
 
     @GetMapping("/monitor/summary")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<?> monitorSummary() {
         try {
             List<AiCallLog> logs = aiCallAuditService.list(new QueryWrapper<AiCallLog>().orderByDesc("create_time").last("limit 500"));
@@ -65,6 +68,7 @@ public class AiCallController {
     }
 
     @GetMapping("/monitor/trend")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<?> monitorTrend() {
         try {
             LocalDate today = LocalDate.now();

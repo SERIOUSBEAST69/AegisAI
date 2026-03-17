@@ -326,6 +326,76 @@
       </div>
     </el-card>
 
+    <div v-if="isAdmin" class="adversarial-floating-wrap">
+      <button
+        class="floating-btn adversarial-orb"
+        type="button"
+        :disabled="adversarialRunning"
+        @click="toggleAdversarialPanel"
+      >
+        <span class="orb-label">OpenClaw</span>
+        <strong>{{ adversarialRunning ? '对弈中' : '攻防演练' }}</strong>
+      </button>
+
+      <Transition name="fade-slide">
+        <section v-if="adversarialPanelOpen" class="adversarial-panel card-glass">
+          <header class="adversarial-head">
+            <div>
+              <div class="card-header">OpenClaw 攻防实战面板</div>
+              <p class="panel-subtitle">真实调用 python-service 的 BattleArena，引擎每轮结果按时间轴实时回放。</p>
+            </div>
+            <button class="adversarial-close" type="button" @click="adversarialPanelOpen = false">关闭</button>
+          </header>
+
+          <div class="adversarial-config">
+            <select v-model="adversarialConfig.scenario" :disabled="adversarialRunning">
+              <option v-for="scene in adversarialMeta.scenarios" :key="scene.code" :value="scene.code">
+                {{ scene.code }}
+              </option>
+            </select>
+            <input v-model.number="adversarialConfig.rounds" type="number" min="1" max="100" :disabled="adversarialRunning" />
+            <input v-model="adversarialConfig.seed" type="number" placeholder="seed(可选)" :disabled="adversarialRunning" />
+            <button class="adversarial-run" type="button" :disabled="adversarialRunning" @click="runAdversarialBattle">
+              {{ adversarialRunning ? '运行中...' : '启动对弈' }}
+            </button>
+          </div>
+
+          <p v-if="adversarialError" class="adversarial-error">{{ adversarialError }}</p>
+
+          <div v-if="adversarialBattle" class="adversarial-summary-grid">
+            <article>
+              <span>胜方</span>
+              <strong>{{ adversarialBattle.winner }}</strong>
+            </article>
+            <article>
+              <span>攻击成功率</span>
+              <strong>{{ Math.round((adversarialBattle.attack_success_rate || 0) * 100) }}%</strong>
+            </article>
+            <article>
+              <span>最终比分</span>
+              <strong>{{ adversarialBattle.attacker_final_score }} : {{ adversarialBattle.defender_final_score }}</strong>
+            </article>
+          </div>
+
+          <div v-if="adversarialVisibleRounds.length" class="adversarial-stream">
+            <article v-for="round in adversarialVisibleRounds" :key="`adver-${round.round_num}`" class="adversarial-round">
+              <div class="adversarial-round-top">
+                <strong>第 {{ round.round_num }} 轮</strong>
+                <span :class="round.attack_success ? 'hit' : 'block'">{{ round.attack_success ? '突破' : '阻断' }}</span>
+              </div>
+              <p>{{ round.attack_strategy }} vs {{ round.defense_strategy }} · 突破率 {{ Math.round((round.final_effectiveness || 0) * 100) }}%</p>
+              <em>{{ round.narrative }}</em>
+            </article>
+          </div>
+
+          <div v-if="adversarialBattle?.recommendations?.length" class="adversarial-recommendations">
+            <h4>防御优化建议</h4>
+            <p v-for="tip in adversarialBattle.recommendations" :key="tip">{{ tip }}</p>
+          </div>
+        </section>
+      </Transition>
+    </div>
+
     <!-- 浮动隐私盾组件（全局） -->
     <AIPrivacyShield ref="privacyShieldRef" />
   </div>
@@ -411,6 +481,19 @@ const aiModelStack = ref({
   benchmark: null,
   message: ''
 });
+const adversarialPanelOpen = ref(false);
+const adversarialRunning = ref(false);
+const adversarialMeta = ref({ scenarios: [] });
+const adversarialBattle = ref(null);
+const adversarialVisibleRounds = ref([]);
+const adversarialError = ref('');
+const adversarialConfig = ref({
+  scenario: 'random',
+  rounds: 10,
+  seed: ''
+});
+const isAdmin = computed(() => String(userStore.userInfo?.roleCode || '').toUpperCase() === 'ADMIN');
+let adversarialPlaybackTimer = null;
 
 let privacyCheckDebounceTimer = null;
 function onAiDraftInput() {
@@ -582,6 +665,80 @@ async function fetchAiModelStack() {
       benchmark: null,
       message: error?.message || '训练模型指标拉取失败'
     };
+  }
+}
+
+function stopAdversarialPlayback() {
+  if (adversarialPlaybackTimer) {
+    clearInterval(adversarialPlaybackTimer);
+    adversarialPlaybackTimer = null;
+  }
+}
+
+function startAdversarialPlayback(rounds) {
+  stopAdversarialPlayback();
+  adversarialVisibleRounds.value = [];
+  if (!Array.isArray(rounds) || rounds.length === 0) {
+    return;
+  }
+  let cursor = 0;
+  adversarialPlaybackTimer = window.setInterval(() => {
+    adversarialVisibleRounds.value = rounds.slice(0, cursor + 1);
+    cursor += 1;
+    if (cursor >= rounds.length) {
+      stopAdversarialPlayback();
+    }
+  }, 520);
+}
+
+async function fetchAdversarialMeta() {
+  if (!isAdmin.value || adversarialMeta.value.scenarios.length > 0) {
+    return;
+  }
+  const data = await request.get('/ai/adversarial/meta');
+  adversarialMeta.value = data || { scenarios: [] };
+  if (Array.isArray(adversarialMeta.value.scenarios) && adversarialMeta.value.scenarios.length > 0) {
+    adversarialConfig.value.scenario = adversarialMeta.value.scenarios[0].code;
+  }
+}
+
+async function toggleAdversarialPanel() {
+  adversarialPanelOpen.value = !adversarialPanelOpen.value;
+  if (adversarialPanelOpen.value) {
+    adversarialError.value = '';
+    try {
+      await fetchAdversarialMeta();
+    } catch (error) {
+      adversarialError.value = error?.message || '攻防元数据加载失败';
+    }
+  }
+}
+
+async function runAdversarialBattle() {
+  adversarialError.value = '';
+  adversarialRunning.value = true;
+  stopAdversarialPlayback();
+  try {
+    const payload = {
+      scenario: adversarialConfig.value.scenario || 'random',
+      rounds: Math.max(1, Math.min(100, Number(adversarialConfig.value.rounds || 10))),
+    };
+    if (String(adversarialConfig.value.seed || '').trim()) {
+      payload.seed = Number(adversarialConfig.value.seed);
+    }
+    const data = await request.post('/ai/adversarial/run', payload);
+    if (!data?.ok || !data?.battle) {
+      throw new Error(data?.error || '对弈执行失败');
+    }
+    adversarialBattle.value = data.battle;
+    if (data.meta) {
+      adversarialMeta.value = data.meta;
+    }
+    startAdversarialPlayback(data.battle.rounds || []);
+  } catch (error) {
+    adversarialError.value = error?.message || '攻防对弈失败';
+  } finally {
+    adversarialRunning.value = false;
   }
 }
 
@@ -900,6 +1057,7 @@ onBeforeUnmount(() => {
   if (securityStatusTimer) {
     clearInterval(securityStatusTimer);
   }
+  stopAdversarialPlayback();
   trendChart?.dispose();
   riskChart?.dispose();
 });
@@ -1923,6 +2081,202 @@ onBeforeUnmount(() => {
   line-height: 1.55;
 }
 
+.adversarial-floating-wrap {
+  position: fixed;
+  right: 24px;
+  bottom: 36px;
+  z-index: 1100;
+}
+
+.adversarial-orb {
+  min-width: 132px;
+  border: 1px solid rgba(125, 190, 255, 0.28);
+  background: linear-gradient(135deg, rgba(27, 58, 116, 0.92), rgba(12, 30, 74, 0.94));
+  color: #e8f1ff;
+  box-shadow: 0 18px 38px rgba(13, 41, 94, 0.42);
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.adversarial-orb .orb-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9cc3ff;
+}
+
+.adversarial-orb strong {
+  font-size: 14px;
+}
+
+.adversarial-panel {
+  width: min(480px, calc(100vw - 28px));
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(110, 162, 255, 0.24);
+  max-height: min(72vh, 760px);
+  overflow: auto;
+}
+
+.adversarial-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.adversarial-close {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+  color: #d5e4ff;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.adversarial-config {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 86px 96px auto;
+  gap: 8px;
+}
+
+.adversarial-config select,
+.adversarial-config input {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #d6e7ff;
+  padding: 8px 10px;
+}
+
+.adversarial-run {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2d8eff, #1859d6);
+  color: #f8fbff;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.adversarial-run:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+}
+
+.adversarial-error {
+  margin: 10px 0 0;
+  color: #ffb9b9;
+  font-size: 12px;
+}
+
+.adversarial-summary-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.adversarial-summary-grid article {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 9px;
+  display: grid;
+  gap: 4px;
+}
+
+.adversarial-summary-grid span {
+  color: #90a5c8;
+  font-size: 11px;
+}
+
+.adversarial-summary-grid strong {
+  color: #f4f8ff;
+  font-size: 13px;
+}
+
+.adversarial-stream {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.adversarial-round {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+}
+
+.adversarial-round-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.adversarial-round-top strong {
+  color: #ecf3ff;
+  font-size: 13px;
+}
+
+.adversarial-round-top span {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.adversarial-round-top span.hit {
+  background: rgba(255, 92, 92, 0.16);
+  color: #ffd7d7;
+}
+
+.adversarial-round-top span.block {
+  background: rgba(49, 196, 136, 0.16);
+  color: #c8ffe6;
+}
+
+.adversarial-round p {
+  margin: 8px 0 0;
+  color: #a4b7d8;
+  font-size: 12px;
+}
+
+.adversarial-round em {
+  margin-top: 6px;
+  color: #d9e7ff;
+  font-style: normal;
+  display: block;
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+.adversarial-recommendations {
+  margin-top: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+}
+
+.adversarial-recommendations h4 {
+  margin: 0 0 8px;
+  color: #ecf3ff;
+  font-size: 13px;
+}
+
+.adversarial-recommendations p {
+  margin: 6px 0 0;
+  color: #9cb1d4;
+  line-height: 1.6;
+  font-size: 12px;
+}
+
 @media (max-width: 768px) {
   .ai-config-row,
   .security-surface {
@@ -1937,6 +2291,21 @@ onBeforeUnmount(() => {
 
   .ai-send-btn {
     width: 100%;
+  }
+
+  .adversarial-floating-wrap {
+    right: 10px;
+    bottom: 14px;
+  }
+
+  .adversarial-panel {
+    width: calc(100vw - 20px);
+    max-height: 74vh;
+  }
+
+  .adversarial-config,
+  .adversarial-summary-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

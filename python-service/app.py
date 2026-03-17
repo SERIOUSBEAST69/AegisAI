@@ -1,6 +1,7 @@
 import collections
 import csv
 import datetime
+from dataclasses import asdict
 import hashlib
 import json
 import logging
@@ -23,6 +24,8 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from torch import nn
+
+from openclaw_adversarial import AttackAgent, BattleArena, DefenseAgent, EFFECTIVENESS_MATRIX, SCENARIOS
 
 app = Flask(__name__)
 # CORS：读取环境变量 CORS_ORIGINS（逗号分隔），默认仅允许本地开发地址。
@@ -1275,6 +1278,71 @@ def anomaly_status():
             "模型未训练。请先运行: python gen_behavior_data.py && python train_anomaly.py"
         ),
     })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODULE: OpenClaw 攻防对弈接口 (/api/adversarial/*)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _adversarial_meta() -> Dict[str, Any]:
+    attack_agent = AttackAgent()
+    defense_agent = DefenseAgent()
+
+    attack_strategies = [
+        {"code": strategy.value, "name": desc}
+        for strategy, desc in attack_agent.strategy_pool.items()
+    ]
+    defense_strategies = [
+        {"code": strategy.value, "name": desc}
+        for strategy, desc in defense_agent.strategy_pool.items()
+    ]
+
+    matrix: Dict[str, Dict[str, float]] = {}
+    for attack, row in EFFECTIVENESS_MATRIX.items():
+        matrix[attack.value] = {defense.value: float(value) for defense, value in row.items()}
+
+    scenarios = [
+        {"code": code, "description": config.get("description", "")}
+        for code, config in SCENARIOS.items()
+    ]
+
+    return {
+        "attack_strategies": attack_strategies,
+        "defense_strategies": defense_strategies,
+        "effectiveness_matrix": matrix,
+        "scenarios": scenarios,
+    }
+
+
+@app.route("/api/adversarial/meta", methods=["GET"])
+def adversarial_meta():
+    return jsonify(_adversarial_meta())
+
+
+@app.route("/api/adversarial/run", methods=["POST"])
+def adversarial_run():
+    payload = request.get_json(force=True) or {}
+    scenario = str(payload.get("scenario", "random")).strip()
+    rounds = int(payload.get("rounds", 10) or 10)
+    seed = payload.get("seed")
+
+    if scenario not in SCENARIOS:
+        scenario = "random"
+    rounds = max(1, min(100, rounds))
+
+    try:
+        if seed is not None:
+            seed = int(seed)
+        arena = BattleArena(scenario=scenario, rounds=rounds, seed=seed, verbose=False)
+        report = arena.run()
+        return jsonify({
+            "ok": True,
+            "battle": asdict(report),
+            "meta": _adversarial_meta(),
+        })
+    except Exception as exc:
+        logger.error("[Adversarial] 对弈执行失败: %s", exc)
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 
 if __name__ == "__main__":

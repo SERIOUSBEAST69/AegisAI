@@ -11,6 +11,7 @@ import com.trustai.service.DataAssetService;
 import com.trustai.service.DataShareRequestService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.constraints.NotBlank;
@@ -39,8 +40,13 @@ public class DataShareController {
     private CurrentUserService currentUserService;
 
     private static final Set<String> APPROVE_STATUS = new HashSet<>(Arrays.asList("approved", "rejected"));
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_DATA_ADMIN = "DATA_ADMIN";
+    private static final String ROLE_BUSINESS_OWNER = "BUSINESS_OWNER";
+    private static final String ROLE_EMPLOYEE = "EMPLOYEE";
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN','BUSINESS_OWNER','EMPLOYEE')")
     public R<List<DataShareRequest>> list(@RequestParam(required = false) String status) {
         User currentUser = currentUserService.requireCurrentUser();
         QueryWrapper<DataShareRequest> qw = new QueryWrapper<>();
@@ -52,13 +58,14 @@ public class DataShareController {
     }
 
     @PostMapping("/apply")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN','BUSINESS_OWNER','EMPLOYEE')")
     public R<?> apply(@RequestBody @Validated ApplyReq req) {
         User currentUser = currentUserService.requireCurrentUser();
         DataShareRequest entity = new DataShareRequest();
         entity.setAssetId(req.getAssetId());
         entity.setApplicantId(currentUser.getId());
         entity.setCollaborators(req.getCollaborators());
-        entity.setReason(req.getReason());
+        entity.setReason(normalizeApplyReason(req.getReason(), currentUserService.currentRoleCode()));
         entity.setStatus("pending");
         entity.setCreateTime(new Date());
         entity.setUpdateTime(new Date());
@@ -67,8 +74,8 @@ public class DataShareController {
     }
 
     @PostMapping("/approve")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN')")
     public R<?> approve(@RequestBody @Validated ApproveReq req) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE");
         User currentUser = currentUserService.requireCurrentUser();
         DataShareRequest ds = dataShareRequestService.getById(req.getId());
         if (ds == null) return R.error(40000, "申请不存在");
@@ -89,6 +96,7 @@ public class DataShareController {
     }
 
     @GetMapping("/access")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN','BUSINESS_OWNER','EMPLOYEE')")
     public R<?> access(@RequestParam String token) {
         QueryWrapper<DataShareRequest> qw = new QueryWrapper<>();
         qw.eq("share_token", token);
@@ -104,6 +112,7 @@ public class DataShareController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN','BUSINESS_OWNER','EMPLOYEE')")
     public R<?> delete(@RequestBody @Validated IdReq req) {
         User currentUser = currentUserService.requireCurrentUser();
         DataShareRequest request = dataShareRequestService.getById(req.getId());
@@ -139,7 +148,25 @@ public class DataShareController {
         if (role == null || role.getCode() == null) {
             return false;
         }
-        return Arrays.asList("ADMIN", "SECOPS", "DATA_ADMIN", "EXECUTIVE").contains(role.getCode().toUpperCase());
+        return Arrays.asList(ROLE_ADMIN, ROLE_DATA_ADMIN).contains(role.getCode().toUpperCase());
+    }
+
+    private String normalizeApplyReason(String reason, String roleCode) {
+        String base = reason == null ? "" : reason.trim();
+        String upper = base.toUpperCase();
+        if (upper.startsWith("[PERSONAL]") || upper.startsWith("[BUSINESS]") || upper.startsWith("[DATA]")) {
+            return base;
+        }
+        if (ROLE_EMPLOYEE.equalsIgnoreCase(roleCode)) {
+            return "[PERSONAL] " + base;
+        }
+        if (ROLE_BUSINESS_OWNER.equalsIgnoreCase(roleCode)) {
+            return "[BUSINESS] " + base;
+        }
+        if (ROLE_DATA_ADMIN.equalsIgnoreCase(roleCode)) {
+            return "[DATA] " + base;
+        }
+        return "[DATA] " + base;
     }
 
     private String generateToken() {

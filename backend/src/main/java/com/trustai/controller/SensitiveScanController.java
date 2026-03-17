@@ -9,6 +9,7 @@ import com.trustai.service.SensitiveScanTaskService;
 import com.trustai.utils.R;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.constraints.NotNull;
@@ -35,6 +36,7 @@ public class SensitiveScanController {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @PostMapping("/create")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN')")
     public R<SensitiveScanTask> create(@RequestBody @Validated CreateReq req) {
         SensitiveScanTask task = new SensitiveScanTask();
         task.setAssetId(req.getAssetId());
@@ -47,6 +49,7 @@ public class SensitiveScanController {
     }
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN')")
     public R<List<SensitiveScanTask>> list(@RequestParam(required = false) String status) {
         QueryWrapper<SensitiveScanTask> qw = new QueryWrapper<>();
         if (status != null && !status.isEmpty()) qw.eq("status", status);
@@ -54,6 +57,7 @@ public class SensitiveScanController {
     }
 
     @PostMapping("/run")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN')")
     public R<SensitiveScanTask> run(@RequestBody @Validated IdReq req) {
         SensitiveScanTask task = taskService.getById(req.getId());
         if (task == null) return R.error(40000, "任务不存在");
@@ -89,6 +93,7 @@ public class SensitiveScanController {
     }
 
     @GetMapping("/{id}/report")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN')")
     public R<?> report(@PathVariable Long id) {
         SensitiveScanTask task = taskService.getById(id);
         if (task == null) return R.error(40000, "任务不存在");
@@ -97,6 +102,7 @@ public class SensitiveScanController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN')")
     public R<?> delete(@RequestBody @Validated IdReq req) {
         taskService.removeById(req.getId());
         return R.okMsg("删除成功");

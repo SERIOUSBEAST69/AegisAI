@@ -5,6 +5,7 @@ import com.trustai.utils.R;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,6 +45,7 @@ public class AiRiskRatingController {
      * <p>GET /api/ai-risk/list
      */
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<Map<String, Object>> listServices() {
         try {
             Map<String, Object> result = aiInferenceClient.riskList();
@@ -62,6 +64,7 @@ public class AiRiskRatingController {
      * @param serviceId 服务 ID（小写，如 chatgpt / wenxin / doubao 等）
      */
     @GetMapping("/score")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<Map<String, Object>> serviceScore(@RequestParam("service") String serviceId) {
         if (serviceId == null || serviceId.isBlank()) {
             return R.error("缺少参数 service");
@@ -84,6 +87,7 @@ public class AiRiskRatingController {
      * <p>带 services 数组：合并更新指定服务的评分数据并持久化。
      */
     @PostMapping("/refresh")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<Map<String, Object>> refresh(@RequestBody(required = false) Map<String, Object> payload) {
         try {
             Map<String, Object> body = payload != null ? payload : Collections.emptyMap();

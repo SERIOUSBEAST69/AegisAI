@@ -17,6 +17,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Date;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +35,7 @@ public class DataAssetController {
     @Autowired private AssetContentExtractor assetContentExtractor;
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN')")
     public R<List<DataAsset>> list(@RequestParam(required = false) String name) {
         QueryWrapper<DataAsset> qw = new QueryWrapper<>();
         if (name != null && !name.isEmpty()) qw.like("name", name);
@@ -43,6 +45,7 @@ public class DataAssetController {
     }
 
     @PostMapping("/register")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN')")
     public R<?> register(@RequestBody @Validated DataAssetReq asset) {
         DataAsset entity = new DataAsset();
         entity.setName(asset.getName());
@@ -56,6 +59,7 @@ public class DataAssetController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN')")
     public R<DataAsset> upload(
         @RequestParam("file") MultipartFile file,
         @RequestParam(required = false) String assetName,
@@ -84,6 +88,7 @@ public class DataAssetController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN')")
     public R<DataAssetDetailDto> detail(@PathVariable Long id) {
         DataAssetDetailDto detail = dataAssetService.detailWithCalls(id);
         hydrateReadableDescription(detail);
@@ -91,6 +96,7 @@ public class DataAssetController {
     }
 
     @PostMapping("/update")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN')")
     public R<?> update(@RequestBody @Validated DataAssetUpdateReq asset) {
         DataAsset entity = new DataAsset();
         entity.setId(asset.getId());
@@ -105,6 +111,7 @@ public class DataAssetController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN')")
     public R<?> delete(@RequestBody @Validated IdReq req) {
         dataAssetService.removeById(req.getId());
         return R.okMsg("删除成功");

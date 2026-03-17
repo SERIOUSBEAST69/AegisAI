@@ -7,6 +7,7 @@ import com.trustai.service.CurrentUserService;
 import com.trustai.service.RiskEventService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.Date;
 import java.util.List;
@@ -18,6 +19,7 @@ public class RiskEventController {
     @Autowired private CurrentUserService currentUserService;
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<List<RiskEvent>> list(@RequestParam(required = false) String type) {
         QueryWrapper<RiskEvent> qw = new QueryWrapper<>();
         if (type != null && !type.isEmpty()) qw.like("type", type);
@@ -25,8 +27,9 @@ public class RiskEventController {
     }
 
     @PostMapping("/add")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<?> add(@RequestBody RiskEvent event) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS");
         User currentUser = currentUserService.requireCurrentUser();
         event.setId(null);
         event.setHandlerId(currentUser.getId());
@@ -37,8 +40,9 @@ public class RiskEventController {
     }
 
     @PostMapping("/update")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<?> update(@RequestBody RiskEvent event) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS");
         User currentUser = currentUserService.requireCurrentUser();
         event.setHandlerId(currentUser.getId());
         event.setUpdateTime(new Date());
@@ -47,8 +51,9 @@ public class RiskEventController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<?> delete(@RequestBody IdReq req) {
-        currentUserService.requireAnyRole("ADMIN", "SECOPS", "DATA_ADMIN");
+        currentUserService.requireAnyRole("ADMIN", "SECOPS");
         riskEventService.removeById(req.getId());
         return R.okMsg("删除成功");
     }

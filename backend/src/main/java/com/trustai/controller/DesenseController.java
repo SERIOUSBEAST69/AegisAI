@@ -6,6 +6,7 @@ import com.trustai.service.RecommendationService;
 import com.trustai.utils.R;
 import com.trustai.service.DesensitizeRuleService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,29 +26,34 @@ public class DesenseController {
     private RecommendationService recommendationService;
 
     @GetMapping("/rules")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN','AI_BUILDER')")
     public R<List<DesensitizeRule>> rules() {
         return R.ok(ruleService.list());
     }
 
     @PostMapping("/save")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN','AI_BUILDER')")
     public R<?> save(@RequestBody DesensitizeRule rule) {
         if (rule.getId() == null) ruleService.save(rule); else ruleService.updateById(rule);
         return R.ok(rule);
     }
 
     @PostMapping("/recommend")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN','AI_BUILDER')")
     public R<List<DesenseRecommendationDto>> recommend(@RequestBody RecommendReq req) {
         List<DesenseRecommendationDto> data = recommendationService.recommend(req.getDataCategory(), req.getUserRole(), req.getSensitivityLevel());
         return R.ok(data);
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN','AI_BUILDER')")
     public R<?> delete(@RequestBody @Validated IdReq req) {
         ruleService.removeById(req.getId());
         return R.okMsg("删除成功");
     }
 
     @PostMapping("/preview")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','DATA_ADMIN','AI_BUILDER')")
     public R<Map<String, String>> preview(@RequestBody PreviewReq req) {
         String masked = applyMask(req.getSample(), req.getMask());
         Map<String, String> map = new HashMap<>();

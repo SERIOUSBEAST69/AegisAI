@@ -6,6 +6,7 @@ import com.trustai.service.CurrentUserService;
 import com.trustai.service.RoleService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.Date;
 import java.util.List;
@@ -20,6 +21,7 @@ public class RoleController {
     private CurrentUserService currentUserService;
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<List<Role>> list(@RequestParam(required = false) String name) {
         QueryWrapper<Role> qw = new QueryWrapper<>();
         if (name != null && !name.isEmpty()) {
@@ -29,6 +31,7 @@ public class RoleController {
     }
 
     @PostMapping("/add")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> add(@RequestBody Role role) {
         currentUserService.requireAdmin();
         role.setCreateTime(new Date());
@@ -38,6 +41,7 @@ public class RoleController {
     }
 
     @PostMapping("/update")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> update(@RequestBody Role role) {
         currentUserService.requireAdmin();
         role.setUpdateTime(new Date());
@@ -46,6 +50,7 @@ public class RoleController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> delete(@RequestBody IdReq req) {
         currentUserService.requireAdmin();
         roleService.removeById(req.getId());

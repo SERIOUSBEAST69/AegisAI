@@ -5,6 +5,7 @@ import com.trustai.service.AuditLogService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.Date;
@@ -18,6 +19,7 @@ public class AuditLogController {
     @Autowired private AuditLogService auditLogService;
 
     @GetMapping("/search")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<List<AuditLogDocument>> search(@RequestParam(required = false) Long userId,
                                             @RequestParam(required = false) String operation,
                                             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date from,
@@ -26,6 +28,7 @@ public class AuditLogController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> delete(@RequestBody @Validated IdReq req) {
         auditLogService.removeById(req.getId());
         return R.okMsg("删除成功");

@@ -6,6 +6,7 @@ import com.trustai.utils.R;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -71,9 +72,13 @@ public class AnomalyController {
      * </pre>
      */
     @PostMapping("/check")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','EXECUTIVE','SECOPS','DATA_ADMIN','AI_BUILDER','BUSINESS_OWNER','EMPLOYEE')")
     public R<Map<String, Object>> check(@RequestBody Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) {
             return R.error("请求体不能为空");
+        }
+        if (!currentUserService.hasAnyRole("ADMIN", "SECOPS")) {
+            payload.put("employee_id", currentUserService.requireCurrentUser().getUsername());
         }
         try {
             Map<String, Object> result = aiInferenceClient.anomalyCheck(payload);
@@ -90,10 +95,11 @@ public class AnomalyController {
      * <p>GET /api/anomaly/events
      */
     @GetMapping("/events")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','EXECUTIVE','SECOPS','DATA_ADMIN','AI_BUILDER','BUSINESS_OWNER','EMPLOYEE')")
     public R<Map<String, Object>> events() {
         try {
             Map<String, Object> result = aiInferenceClient.anomalyEvents();
-            if (currentUserService.isEmployeeUser()) {
+            if (!currentUserService.hasAnyRole("ADMIN", "SECOPS")) {
                 result = filterEventsForEmployee(result, currentUserService.requireCurrentUser().getUsername());
             }
             return R.ok(result);
@@ -109,6 +115,7 @@ public class AnomalyController {
      * <p>GET /api/anomaly/status
      */
     @GetMapping("/status")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','EXECUTIVE','SECOPS','DATA_ADMIN','AI_BUILDER','BUSINESS_OWNER','EMPLOYEE')")
     public R<Map<String, Object>> status() {
         try {
             Map<String, Object> result = aiInferenceClient.anomalyStatus();

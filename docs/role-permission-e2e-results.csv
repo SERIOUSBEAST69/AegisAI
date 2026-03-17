@@ -1,0 +1,344 @@
+﻿"Endpoint","Method","Path","Role","Username","ExpectedAllowed","ActualAllowed","HttpStatus","ResponseCode","Note"
+"DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","ADMIN","admin","True","True","200","20000","success"
+"DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","EXECUTIVE","exec.demo","True","True","200","20000","success"
+"DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","SECOPS","secops.demo","True","True","200","20000","success"
+"DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","DATA_ADMIN","data.demo","True","True","200","20000","success"
+"DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
+"DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","EMPLOYEE","employee.demo","True","True","200","20000","success"
+"GLOBAL_SEARCH","GET","/api/search/global?keyword=test","ADMIN","admin","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (reason LIKE ? OR status LIKE ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"GLOBAL_SEARCH","GET","/api/search/global?keyword=test","EXECUTIVE","exec.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (reason LIKE ? OR status LIKE ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"GLOBAL_SEARCH","GET","/api/search/global?keyword=test","SECOPS","secops.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (reason LIKE ? OR status LIKE ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"GLOBAL_SEARCH","GET","/api/search/global?keyword=test","DATA_ADMIN","data.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (reason LIKE ? OR status LIKE ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"GLOBAL_SEARCH","GET","/api/search/global?keyword=test","AI_BUILDER","builder.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (reason LIKE ? OR status LIKE ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"GLOBAL_SEARCH","GET","/api/search/global?keyword=test","BUSINESS_OWNER","biz.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (reason LIKE ? OR status LIKE ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"GLOBAL_SEARCH","GET","/api/search/global?keyword=test","EMPLOYEE","employee.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (reason LIKE ? OR status LIKE ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","ADMIN","admin","True","True","200","50000","No static resource api/ai/adversarial/meta."
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","EXECUTIVE","exec.demo","False","True","200","50000","No static resource api/ai/adversarial/meta."
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","SECOPS","secops.demo","False","True","200","50000","No static resource api/ai/adversarial/meta."
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","DATA_ADMIN","data.demo","False","True","200","50000","No static resource api/ai/adversarial/meta."
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","AI_BUILDER","builder.demo","False","True","200","50000","No static resource api/ai/adversarial/meta."
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","BUSINESS_OWNER","biz.demo","False","True","200","50000","No static resource api/ai/adversarial/meta."
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","EMPLOYEE","employee.demo","False","True","200","50000","No static resource api/ai/adversarial/meta."
+"USER_LIST","GET","/api/user/list","ADMIN","admin","True","True","200","20000","success"
+"USER_LIST","GET","/api/user/list","EXECUTIVE","exec.demo","False","False","200","40300","ä»ç®¡çåå¯æä½"
+"USER_LIST","GET","/api/user/list","SECOPS","secops.demo","False","False","200","40300","ä»ç®¡çåå¯æä½"
+"USER_LIST","GET","/api/user/list","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"USER_LIST","GET","/api/user/list","AI_BUILDER","builder.demo","False","False","200","40300","ä»ç®¡çåå¯æä½"
+"USER_LIST","GET","/api/user/list","BUSINESS_OWNER","biz.demo","False","False","200","40300","ä»ç®¡çåå¯æä½"
+"USER_LIST","GET","/api/user/list","EMPLOYEE","employee.demo","False","False","200","40300","ä»ç®¡çåå¯æä½"
+"DATA_ASSET_LIST","GET","/api/data-asset/list","ADMIN","admin","True","True","200","20000","success"
+"DATA_ASSET_LIST","GET","/api/data-asset/list","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"DATA_ASSET_LIST","GET","/api/data-asset/list","SECOPS","secops.demo","False","True","200","20000","success"
+"DATA_ASSET_LIST","GET","/api/data-asset/list","DATA_ADMIN","data.demo","True","True","200","20000","success"
+"DATA_ASSET_LIST","GET","/api/data-asset/list","AI_BUILDER","builder.demo","False","True","200","20000","success"
+"DATA_ASSET_LIST","GET","/api/data-asset/list","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"DATA_ASSET_LIST","GET","/api/data-asset/list","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"AI_MODEL_LIST","GET","/api/ai-model/list","ADMIN","admin","True","True","200","20000","success"
+"AI_MODEL_LIST","GET","/api/ai-model/list","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"AI_MODEL_LIST","GET","/api/ai-model/list","SECOPS","secops.demo","True","True","200","20000","success"
+"AI_MODEL_LIST","GET","/api/ai-model/list","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"AI_MODEL_LIST","GET","/api/ai-model/list","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"AI_MODEL_LIST","GET","/api/ai-model/list","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"AI_MODEL_LIST","GET","/api/ai-model/list","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"MODEL_STAT_SUMMARY","GET","/api/model-stat/summary","ADMIN","admin","True","True","200","20000","success"
+"MODEL_STAT_SUMMARY","GET","/api/model-stat/summary","EXECUTIVE","exec.demo","True","True","200","20000","success"
+"MODEL_STAT_SUMMARY","GET","/api/model-stat/summary","SECOPS","secops.demo","False","True","200","20000","success"
+"MODEL_STAT_SUMMARY","GET","/api/model-stat/summary","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"MODEL_STAT_SUMMARY","GET","/api/model-stat/summary","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"MODEL_STAT_SUMMARY","GET","/api/model-stat/summary","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
+"MODEL_STAT_SUMMARY","GET","/api/model-stat/summary","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"ALERT_LIST","GET","/api/alert/list","ADMIN","admin","True","True","200","20000","success"
+"ALERT_LIST","GET","/api/alert/list","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"ALERT_LIST","GET","/api/alert/list","SECOPS","secops.demo","True","True","200","20000","success"
+"ALERT_LIST","GET","/api/alert/list","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"ALERT_LIST","GET","/api/alert/list","AI_BUILDER","builder.demo","False","True","200","20000","success"
+"ALERT_LIST","GET","/api/alert/list","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"ALERT_LIST","GET","/api/alert/list","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"AUDIT_LOG_SEARCH","GET","/api/audit-log/search","ADMIN","admin","True","True","200","20000","success"
+"AUDIT_LOG_SEARCH","GET","/api/audit-log/search","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"AUDIT_LOG_SEARCH","GET","/api/audit-log/search","SECOPS","secops.demo","True","True","200","20000","success"
+"AUDIT_LOG_SEARCH","GET","/api/audit-log/search","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"AUDIT_LOG_SEARCH","GET","/api/audit-log/search","AI_BUILDER","builder.demo","False","True","200","20000","success"
+"AUDIT_LOG_SEARCH","GET","/api/audit-log/search","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"AUDIT_LOG_SEARCH","GET","/api/audit-log/search","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"AUDIT_REPORT_COMPARE","GET","/api/audit-report/compare?from=2026-03-01&to=2026-03-10","ADMIN","admin","True","True","200","20000","success"
+"AUDIT_REPORT_COMPARE","GET","/api/audit-report/compare?from=2026-03-01&to=2026-03-10","EXECUTIVE","exec.demo","True","True","200","20000","success"
+"AUDIT_REPORT_COMPARE","GET","/api/audit-report/compare?from=2026-03-01&to=2026-03-10","SECOPS","secops.demo","True","True","200","20000","success"
+"AUDIT_REPORT_COMPARE","GET","/api/audit-report/compare?from=2026-03-01&to=2026-03-10","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"AUDIT_REPORT_COMPARE","GET","/api/audit-report/compare?from=2026-03-01&to=2026-03-10","AI_BUILDER","builder.demo","False","True","200","20000","success"
+"AUDIT_REPORT_COMPARE","GET","/api/audit-report/compare?from=2026-03-01&to=2026-03-10","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"AUDIT_REPORT_COMPARE","GET","/api/audit-report/compare?from=2026-03-01&to=2026-03-10","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"SENSITIVE_SCAN_LIST","GET","/api/sensitive-scan/list","ADMIN","admin","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+### The error may exist in com/trustai/mapper/SensitiveScanTaskMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,source_type,source_path,status,sensitive_ratio,report_path,report_data,create_time,update_time  FROM sensitive_scan_task
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+; bad SQL grammar []"
+"SENSITIVE_SCAN_LIST","GET","/api/sensitive-scan/list","EXECUTIVE","exec.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+### The error may exist in com/trustai/mapper/SensitiveScanTaskMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,source_type,source_path,status,sensitive_ratio,report_path,report_data,create_time,update_time  FROM sensitive_scan_task
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+; bad SQL grammar []"
+"SENSITIVE_SCAN_LIST","GET","/api/sensitive-scan/list","SECOPS","secops.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+### The error may exist in com/trustai/mapper/SensitiveScanTaskMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,source_type,source_path,status,sensitive_ratio,report_path,report_data,create_time,update_time  FROM sensitive_scan_task
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+; bad SQL grammar []"
+"SENSITIVE_SCAN_LIST","GET","/api/sensitive-scan/list","DATA_ADMIN","data.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+### The error may exist in com/trustai/mapper/SensitiveScanTaskMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,source_type,source_path,status,sensitive_ratio,report_path,report_data,create_time,update_time  FROM sensitive_scan_task
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+; bad SQL grammar []"
+"SENSITIVE_SCAN_LIST","GET","/api/sensitive-scan/list","AI_BUILDER","builder.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+### The error may exist in com/trustai/mapper/SensitiveScanTaskMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,source_type,source_path,status,sensitive_ratio,report_path,report_data,create_time,update_time  FROM sensitive_scan_task
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+; bad SQL grammar []"
+"SENSITIVE_SCAN_LIST","GET","/api/sensitive-scan/list","BUSINESS_OWNER","biz.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+### The error may exist in com/trustai/mapper/SensitiveScanTaskMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,source_type,source_path,status,sensitive_ratio,report_path,report_data,create_time,update_time  FROM sensitive_scan_task
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+; bad SQL grammar []"
+"SENSITIVE_SCAN_LIST","GET","/api/sensitive-scan/list","EMPLOYEE","employee.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+### The error may exist in com/trustai/mapper/SensitiveScanTaskMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,source_type,source_path,status,sensitive_ratio,report_path,report_data,create_time,update_time  FROM sensitive_scan_task
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'asset_id' in 'field list'
+; bad SQL grammar []"
+"RISK_EVENT_LIST","GET","/api/risk-event/list","ADMIN","admin","True","True","200","20000","success"
+"RISK_EVENT_LIST","GET","/api/risk-event/list","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"RISK_EVENT_LIST","GET","/api/risk-event/list","SECOPS","secops.demo","True","True","200","20000","success"
+"RISK_EVENT_LIST","GET","/api/risk-event/list","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"RISK_EVENT_LIST","GET","/api/risk-event/list","AI_BUILDER","builder.demo","False","True","200","20000","success"
+"RISK_EVENT_LIST","GET","/api/risk-event/list","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"RISK_EVENT_LIST","GET","/api/risk-event/list","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"APPROVAL_LIST","GET","/api/approval/list","ADMIN","admin","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","EXECUTIVE","exec.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","SECOPS","secops.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","DATA_ADMIN","data.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","AI_BUILDER","builder.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (applicant_id = ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","BUSINESS_OWNER","biz.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (applicant_id = ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","EMPLOYEE","employee.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (applicant_id = ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
+; bad SQL grammar []"
+"DATA_SHARE_LIST","GET","/api/data-share/list","ADMIN","admin","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+### The error may exist in com/trustai/mapper/DataShareRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,applicant_id,collaborators,reason,status,approver_id,share_token,expire_time,create_time,update_time  FROM data_share_request
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+; bad SQL grammar []"
+"DATA_SHARE_LIST","GET","/api/data-share/list","EXECUTIVE","exec.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+### The error may exist in com/trustai/mapper/DataShareRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,applicant_id,collaborators,reason,status,approver_id,share_token,expire_time,create_time,update_time  FROM data_share_request
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+; bad SQL grammar []"
+"DATA_SHARE_LIST","GET","/api/data-share/list","SECOPS","secops.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+### The error may exist in com/trustai/mapper/DataShareRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,applicant_id,collaborators,reason,status,approver_id,share_token,expire_time,create_time,update_time  FROM data_share_request
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+; bad SQL grammar []"
+"DATA_SHARE_LIST","GET","/api/data-share/list","DATA_ADMIN","data.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+### The error may exist in com/trustai/mapper/DataShareRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,applicant_id,collaborators,reason,status,approver_id,share_token,expire_time,create_time,update_time  FROM data_share_request
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+; bad SQL grammar []"
+"DATA_SHARE_LIST","GET","/api/data-share/list","AI_BUILDER","builder.demo","False","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+### The error may exist in com/trustai/mapper/DataShareRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,applicant_id,collaborators,reason,status,approver_id,share_token,expire_time,create_time,update_time  FROM data_share_request      WHERE  (applicant_id = ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+; bad SQL grammar []"
+"DATA_SHARE_LIST","GET","/api/data-share/list","BUSINESS_OWNER","biz.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+### The error may exist in com/trustai/mapper/DataShareRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,applicant_id,collaborators,reason,status,approver_id,share_token,expire_time,create_time,update_time  FROM data_share_request      WHERE  (applicant_id = ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+; bad SQL grammar []"
+"DATA_SHARE_LIST","GET","/api/data-share/list","EMPLOYEE","employee.demo","True","True","200","50000","
+### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+### The error may exist in com/trustai/mapper/DataShareRequestMapper.java (best guess)
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: SELECT  id,asset_id,applicant_id,collaborators,reason,status,approver_id,share_token,expire_time,create_time,update_time  FROM data_share_request      WHERE  (applicant_id = ?)
+### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'share_token' in 'field list'
+; bad SQL grammar []"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","ADMIN","admin","True","True","200","20000","success"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","SECOPS","secops.demo","False","True","200","20000","success"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","AI_BUILDER","builder.demo","False","True","200","20000","success"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"POLICY_LIST","GET","/api/policy/list","ADMIN","admin","True","True","200","20000","success"
+"POLICY_LIST","GET","/api/policy/list","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"POLICY_LIST","GET","/api/policy/list","SECOPS","secops.demo","True","True","200","20000","success"
+"POLICY_LIST","GET","/api/policy/list","DATA_ADMIN","data.demo","True","True","200","20000","success"
+"POLICY_LIST","GET","/api/policy/list","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"POLICY_LIST","GET","/api/policy/list","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"POLICY_LIST","GET","/api/policy/list","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"DESENSE_RULES","GET","/api/desense/rules","ADMIN","admin","True","True","200","20000","success"
+"DESENSE_RULES","GET","/api/desense/rules","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"DESENSE_RULES","GET","/api/desense/rules","SECOPS","secops.demo","True","True","200","20000","success"
+"DESENSE_RULES","GET","/api/desense/rules","DATA_ADMIN","data.demo","True","True","200","20000","success"
+"DESENSE_RULES","GET","/api/desense/rules","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"DESENSE_RULES","GET","/api/desense/rules","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"DESENSE_RULES","GET","/api/desense/rules","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"SECURITY_EVENTS","GET","/api/security/events?page=1&pageSize=5","ADMIN","admin","True","True","200","20000","success"
+"SECURITY_EVENTS","GET","/api/security/events?page=1&pageSize=5","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"SECURITY_EVENTS","GET","/api/security/events?page=1&pageSize=5","SECOPS","secops.demo","True","True","200","20000","success"
+"SECURITY_EVENTS","GET","/api/security/events?page=1&pageSize=5","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"SECURITY_EVENTS","GET","/api/security/events?page=1&pageSize=5","AI_BUILDER","builder.demo","False","True","200","20000","success"
+"SECURITY_EVENTS","GET","/api/security/events?page=1&pageSize=5","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"SECURITY_EVENTS","GET","/api/security/events?page=1&pageSize=5","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"AI_MONITOR_SUMMARY","GET","/api/ai/monitor/summary","ADMIN","admin","True","True","200","20000","success"
+"AI_MONITOR_SUMMARY","GET","/api/ai/monitor/summary","EXECUTIVE","exec.demo","False","True","200","20000","success"
+"AI_MONITOR_SUMMARY","GET","/api/ai/monitor/summary","SECOPS","secops.demo","True","True","200","20000","success"
+"AI_MONITOR_SUMMARY","GET","/api/ai/monitor/summary","DATA_ADMIN","data.demo","False","True","200","20000","success"
+"AI_MONITOR_SUMMARY","GET","/api/ai/monitor/summary","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"AI_MONITOR_SUMMARY","GET","/api/ai/monitor/summary","BUSINESS_OWNER","biz.demo","False","True","200","20000","success"
+"AI_MONITOR_SUMMARY","GET","/api/ai/monitor/summary","EMPLOYEE","employee.demo","False","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","ADMIN","admin","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","EXECUTIVE","exec.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","SECOPS","secops.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","DATA_ADMIN","data.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","EMPLOYEE","employee.demo","True","True","200","20000","success"
+"SYSTEM_CONFIG_LIST","GET","/api/system/config","ADMIN","admin","True","True","200","20000","success"
+"SYSTEM_CONFIG_LIST","GET","/api/system/config","EXECUTIVE","exec.demo","True","True","200","20000","success"
+"SYSTEM_CONFIG_LIST","GET","/api/system/config","SECOPS","secops.demo","True","True","200","20000","success"
+"SYSTEM_CONFIG_LIST","GET","/api/system/config","DATA_ADMIN","data.demo","True","True","200","20000","success"
+"SYSTEM_CONFIG_LIST","GET","/api/system/config","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"SYSTEM_CONFIG_LIST","GET","/api/system/config","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
+"SYSTEM_CONFIG_LIST","GET","/api/system/config","EMPLOYEE","employee.demo","True","True","200","20000","success"

@@ -6,6 +6,7 @@ import com.trustai.service.AiModelService;
 import com.trustai.utils.R;
 import com.trustai.utils.AesEncryptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +23,7 @@ public class AiModelController {
     @Autowired private AesEncryptor aesEncryptor;
 
     @GetMapping("/list")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<List<AiModel>> list(@RequestParam(required = false) String keyword,
                                  @RequestParam(required = false, name = "name") String legacyName) {
         QueryWrapper<AiModel> qw = new QueryWrapper<>();
@@ -35,6 +37,7 @@ public class AiModelController {
     }
 
     @PostMapping("/add")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','AI_BUILDER')")
     public R<?> add(@RequestBody @Validated ModelReq model) {
         boolean exists = aiModelService.count(new QueryWrapper<AiModel>().eq("model_code", model.getModelCode())) > 0;
         if (exists) return R.error(40000, "模型编码已存在");
@@ -57,6 +60,7 @@ public class AiModelController {
     }
 
     @PostMapping("/update")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','AI_BUILDER')")
     public R<?> update(@RequestBody @Validated ModelUpdateReq model) {
         AiModel existing = aiModelService.getById(model.getId());
         if (existing == null) return R.error(40000, "模型不存在");
@@ -80,6 +84,7 @@ public class AiModelController {
     }
 
     @PostMapping("/delete")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','AI_BUILDER')")
     public R<?> delete(@RequestBody @Validated IdReq req) {
         AiModel existing = aiModelService.getById(req.getId());
         if (existing == null) {
