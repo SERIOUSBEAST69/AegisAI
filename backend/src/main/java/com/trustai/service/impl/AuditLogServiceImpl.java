@@ -1,5 +1,6 @@
 package com.trustai.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trustai.config.RabbitConfig;
@@ -11,6 +12,7 @@ import com.trustai.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
@@ -35,8 +37,8 @@ public class AuditLogServiceImpl extends ServiceImpl<AuditLogMapper, AuditLog> i
 	private static final int MAX_RESULTS = 1000;
 
 	private final RabbitTemplate rabbitTemplate;
-	private final AuditLogEsRepository auditLogEsRepository;
-	private final ElasticsearchOperations elasticsearchOperations;
+	private final ObjectProvider<AuditLogEsRepository> auditLogEsRepositoryProvider;
+	private final ObjectProvider<ElasticsearchOperations> elasticsearchOperationsProvider;
 
 	@Override
 	public boolean save(AuditLog entity) {
@@ -95,6 +97,11 @@ public class AuditLogServiceImpl extends ServiceImpl<AuditLogMapper, AuditLog> i
 				PageRequest.of(0, MAX_RESULTS)
 		);
 
+		ElasticsearchOperations elasticsearchOperations = elasticsearchOperationsProvider.getIfAvailable();
+		if (elasticsearchOperations == null) {
+			return fallbackSearch(userId, keyword, from, to);
+		}
+
 		try {
 			return elasticsearchOperations.search(query, AuditLogDocument.class)
 					.stream()
@@ -108,6 +115,11 @@ public class AuditLogServiceImpl extends ServiceImpl<AuditLogMapper, AuditLog> i
 	}
 
 	private List<AuditLogDocument> fallbackSearch(Long userId, String normalizedOperation, Date from, Date to) {
+		AuditLogEsRepository auditLogEsRepository = auditLogEsRepositoryProvider.getIfAvailable();
+		if (auditLogEsRepository == null) {
+			return dbFallbackSearch(userId, normalizedOperation, from, to);
+		}
+
 		try {
 			return StreamSupport.stream(auditLogEsRepository.findAll().spliterator(), false)
 					.filter(doc -> userId == null || userId.equals(doc.getUserId()))
@@ -124,6 +136,50 @@ public class AuditLogServiceImpl extends ServiceImpl<AuditLogMapper, AuditLog> i
 			log.warn("ES fallback search failed (Elasticsearch 可能未启动), 返回空结果", e);
 			return List.of();
 		}
+	}
+
+	private List<AuditLogDocument> dbFallbackSearch(Long userId, String normalizedOperation, Date from, Date to) {
+		LambdaQueryWrapper<AuditLog> qw = new LambdaQueryWrapper<>();
+		if (userId != null) {
+			qw.eq(AuditLog::getUserId, userId);
+		}
+		if (StringUtils.hasText(normalizedOperation)) {
+			qw.and(w -> w.like(AuditLog::getOperation, normalizedOperation)
+				.or().like(AuditLog::getInputOverview, normalizedOperation)
+				.or().like(AuditLog::getOutputOverview, normalizedOperation)
+				.or().like(AuditLog::getResult, normalizedOperation));
+		}
+		if (from != null) {
+			qw.ge(AuditLog::getOperationTime, from);
+		}
+		if (to != null) {
+			qw.le(AuditLog::getOperationTime, to);
+		}
+		qw.orderByDesc(AuditLog::getOperationTime).last("LIMIT " + MAX_RESULTS);
+
+		return this.list(qw)
+			.stream()
+			.map(this::toDocument)
+			.collect(Collectors.toList());
+	}
+
+	private AuditLogDocument toDocument(AuditLog entity) {
+		AuditLogDocument doc = new AuditLogDocument();
+		doc.setId(entity.getId() == null ? null : String.valueOf(entity.getId()));
+		doc.setLogId(entity.getId());
+		doc.setUserId(entity.getUserId());
+		doc.setAssetId(entity.getAssetId());
+		doc.setOperation(entity.getOperation());
+		doc.setOperationTime(entity.getOperationTime());
+		doc.setIp(entity.getIp());
+		doc.setDevice(entity.getDevice());
+		doc.setInputOverview(entity.getInputOverview());
+		doc.setOutputOverview(entity.getOutputOverview());
+		doc.setResult(entity.getResult());
+		doc.setRiskLevel(entity.getRiskLevel());
+		doc.setHash(entity.getHash());
+		doc.setCreateTime(entity.getCreateTime());
+		return doc;
 	}
 
 	private boolean containsIgnoreCase(String source, String normalizedKeyword) {

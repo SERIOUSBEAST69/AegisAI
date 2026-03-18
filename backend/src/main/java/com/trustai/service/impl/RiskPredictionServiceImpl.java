@@ -5,6 +5,7 @@ import com.trustai.client.AiInferenceClient;
 import com.trustai.dto.ai.RiskForecastRequest;
 import com.trustai.dto.ai.RiskForecastResponse;
 import com.trustai.entity.RiskEvent;
+import com.trustai.service.CompanyScopeService;
 import com.trustai.service.RiskEventService;
 import com.trustai.service.RiskPredictionService;
 import java.time.LocalDate;
@@ -26,6 +27,7 @@ public class RiskPredictionServiceImpl implements RiskPredictionService {
 
     private final RiskEventService riskEventService;
     private final AiInferenceClient aiInferenceClient;
+    private final CompanyScopeService companyScopeService;
 
     @Override
     public List<Double> forecastNext7Days() {
@@ -48,7 +50,12 @@ public class RiskPredictionServiceImpl implements RiskPredictionService {
     }
 
     private List<Double> loadHistory() {
-        List<RiskEvent> events = riskEventService.list(new LambdaQueryWrapper<RiskEvent>().orderByAsc(RiskEvent::getCreateTime));
+        Long companyId = companyScopeService.requireCompanyId();
+        List<RiskEvent> events = riskEventService.list(
+            new LambdaQueryWrapper<RiskEvent>()
+                .eq(RiskEvent::getCompanyId, companyId)
+                .orderByAsc(RiskEvent::getCreateTime)
+        );
         if (events.isEmpty()) {
             return List.of();
         }

@@ -17,6 +17,9 @@ public class ClientReport {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 公司ID（租户隔离） */
+    private Long companyId;
+
     /** 客户端唯一标识（客户端首次启动时生成并持久化的 UUID） */
     private String clientId;
 

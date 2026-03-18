@@ -267,6 +267,18 @@
 
     </el-tabs>
 
+    <button
+      v-if="canHandleThreats"
+      class="adversarial-fab"
+      type="button"
+      :disabled="floatingDrillLoading"
+      @click="runFloatingDrill"
+      :title="floatingDrillLoading ? '攻防检测进行中' : '启动攻防检测'"
+    >
+      <span class="fab-icon">⚔</span>
+      <span class="fab-label">{{ floatingDrillLoading ? '检测中' : '模拟攻防' }}</span>
+    </button>
+
     <!-- 规则编辑弹窗 -->
     <el-dialog
       v-model="showRuleDialog"
@@ -332,7 +344,7 @@ function hasAnyRole(...roleCodes) {
 const canViewThreatMonitor = computed(() => hasAnyRole('ADMIN', 'SECOPS', 'EXECUTIVE'));
 const canHandleThreats = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
 const canManageThreatRules = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
-const canRunThreatDrill = computed(() => hasAnyRole('ADMIN'));
+const canRunThreatDrill = computed(() => hasAnyRole('ADMIN', 'SECOPS'));
 
 // ── 统计 ──────────────────────────────────────────────────────────────────────
 const stats = ref({});
@@ -489,6 +501,7 @@ const autoRefresh = ref(true);
 let refreshTimer = null;
 
 const drillLoading = ref(false);
+const floatingDrillLoading = ref(false);
 const threatDrill = ref({
   threatLevel: 'low',
   riskScore: 0,
@@ -557,6 +570,27 @@ async function runImmediateThreatDrill() {
     ElMessage.error('立即检测失败：' + (e.message || '未知错误'));
   } finally {
     drillLoading.value = false;
+  }
+}
+
+async function runFloatingDrill() {
+  if (!canHandleThreats.value || floatingDrillLoading.value) {
+    return;
+  }
+  floatingDrillLoading.value = true;
+  try {
+    const data = await request.post('/ai/adversarial/start', {
+      scenario: 'real-threat-check',
+      rounds: 1,
+    });
+    threatDrill.value = data?.assessment || data || threatDrill.value;
+    activeTab.value = 'drill';
+    ElMessage.success('攻防检测已触发，态势面板已更新');
+    await refresh();
+  } catch (e) {
+    ElMessage.error('攻防检测触发失败：' + (e.message || '未知错误'));
+  } finally {
+    floatingDrillLoading.value = false;
   }
 }
 
@@ -837,6 +871,46 @@ code {
   margin: 12px 0;
 }
 
+.adversarial-fab {
+  position: fixed;
+  right: 28px;
+  bottom: 34px;
+  width: 128px;
+  height: 56px;
+  border-radius: 28px;
+  border: 1px solid rgba(120, 210, 255, 0.45);
+  background: radial-gradient(circle at 20% 20%, rgba(80, 220, 255, 0.82), rgba(24, 88, 180, 0.92));
+  color: #f2f9ff;
+  box-shadow: 0 14px 34px rgba(32, 118, 224, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  z-index: 41;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.adversarial-fab:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 18px 38px rgba(32, 118, 224, 0.52);
+}
+
+.adversarial-fab:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.fab-icon {
+  font-size: 19px;
+}
+
+.fab-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition: all 0.25s ease;
@@ -857,6 +931,13 @@ code {
 @media (max-width: 900px) {
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .adversarial-fab {
+    right: 18px;
+    bottom: 22px;
+    width: 114px;
+    height: 50px;
   }
 }
 </style>

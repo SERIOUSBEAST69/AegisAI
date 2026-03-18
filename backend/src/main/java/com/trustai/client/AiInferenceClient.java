@@ -63,4 +63,7 @@ public interface AiInferenceClient {
 
     @PostMapping("/api/adversarial/run")
     Map<String, Object> adversarialRun(@RequestBody Map<String, Object> payload);
+
+    @PostMapping("/api/adversarial/start")
+    Map<String, Object> adversarialStart(@RequestBody Map<String, Object> payload);
 }

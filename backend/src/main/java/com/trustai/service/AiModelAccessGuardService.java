@@ -1,5 +1,9 @@
 package com.trustai.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trustai.entity.CompliancePolicy;
 import com.trustai.entity.AiModel;
 import com.trustai.entity.DataAsset;
 import com.trustai.entity.RiskEvent;
@@ -8,10 +12,12 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Matcher;
+import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * AI 模型访问守卫 + 隐私盾
@@ -30,6 +36,8 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class AiModelAccessGuardService {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     // ── 隐私输入检测模式（扩展版） ─────────────────────────────────────────────
     /** 中国大陆 18 位身份证号 */
@@ -54,6 +62,8 @@ public class AiModelAccessGuardService {
 
     private final DataAssetService dataAssetService;
     private final RiskEventService riskEventService;
+    private final CompliancePolicyService compliancePolicyService;
+    private final CompanyScopeService companyScopeService;
 
     // ── 公共校验入口 ───────────────────────────────────────────────────────────
 
@@ -147,13 +157,78 @@ public class AiModelAccessGuardService {
         if (EMAIL.matcher(text).find())            found.add("电子邮箱");
         if (BANK_CARD.matcher(text).find())        found.add("银行卡号");
         if (SENSITIVE_KEYWORDS.matcher(text).find()) found.add("隐私关键词");
-        return found;
+        List<String> customKeywords = loadTenantSensitiveKeywords();
+        if (!customKeywords.isEmpty() && containsAnyKeyword(text, customKeywords)) {
+            found.add("策略敏感词");
+        }
+        return new ArrayList<>(new LinkedHashSet<>(found));
+    }
+
+    private boolean containsAnyKeyword(String text, List<String> keywords) {
+        String lowered = text.toLowerCase(Locale.ROOT);
+        for (String item : keywords) {
+            if (item == null || item.isBlank()) {
+                continue;
+            }
+            if (lowered.contains(item.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<String> loadTenantSensitiveKeywords() {
+        try {
+            Long companyId = companyScopeService.requireCompanyId();
+            List<CompliancePolicy> policies = compliancePolicyService.list(new QueryWrapper<CompliancePolicy>()
+                .eq("company_id", companyId)
+                .eq("status", 1)
+                .and(wrapper -> wrapper.eq("scope", "ai_prompt").or().like("name", "敏感词"))
+                .orderByDesc("update_time"));
+            if (policies.isEmpty()) {
+                return List.of();
+            }
+            LinkedHashSet<String> merged = new LinkedHashSet<>();
+            for (CompliancePolicy policy : policies) {
+                merged.addAll(extractKeywords(policy.getRuleContent()));
+            }
+            return merged.stream().filter(item -> item != null && !item.isBlank()).collect(Collectors.toList());
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private List<String> extractKeywords(String ruleContent) {
+        if (ruleContent == null || ruleContent.isBlank()) {
+            return List.of();
+        }
+        String content = ruleContent.trim();
+        try {
+            if (content.startsWith("{")) {
+                Map<String, Object> parsed = JSON.readValue(content, new TypeReference<Map<String, Object>>() { });
+                Object keywords = parsed.get("keywords");
+                if (keywords instanceof List<?> list) {
+                    return list.stream().map(String::valueOf).collect(Collectors.toList());
+                }
+            }
+        } catch (Exception ignored) {
+            // fallback to delimiter split
+        }
+        return java.util.Arrays.stream(content.split("[,，\\n\\r\\t;；|]"))
+            .map(String::trim)
+            .filter(item -> !item.isEmpty())
+            .collect(Collectors.toList());
     }
 
     // ── 内部工具 ───────────────────────────────────────────────────────────────
 
     private void block(String type, String level, String modelCode, Long assetId, String reason) {
         RiskEvent event = new RiskEvent();
+        try {
+            event.setCompanyId(companyScopeService.requireCompanyId());
+        } catch (Exception ignored) {
+            event.setCompanyId(1L);
+        }
         event.setType(type);
         event.setLevel(level);
         event.setStatus("open");

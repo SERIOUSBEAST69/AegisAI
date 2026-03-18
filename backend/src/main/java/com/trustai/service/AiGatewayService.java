@@ -3,6 +3,7 @@ package com.trustai.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trustai.client.AiInferenceClient;
+import com.trustai.controller.AiGatewayController.BattleReq;
 import com.trustai.controller.AiGatewayController.ChatReq;
 import com.trustai.controller.AiGatewayController.Message;
 import com.trustai.entity.AiCallLog;
@@ -10,8 +11,6 @@ import com.trustai.entity.AiModel;
 import com.trustai.entity.AuditLog;
 import com.trustai.entity.RiskEvent;
 import com.trustai.entity.SecurityEvent;
-import com.trustai.service.AiCallAuditService;
-import com.trustai.service.AiModelService;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -144,11 +143,59 @@ public class AiGatewayService {
     }
 
     public Map<String, Object> adversarialMeta() {
-        return buildThreatAssessment(false);
+        Map<String, Object> assessment = buildThreatAssessment(false);
+        try {
+            Map<String, Object> meta = aiInferenceClient.adversarialMeta();
+            if (meta != null) {
+                assessment.putAll(meta);
+            }
+            assessment.put("adversarialAvailable", true);
+        } catch (Exception ex) {
+            assessment.put("adversarialAvailable", false);
+            assessment.put("adversarialError", ex.getMessage());
+            assessment.putIfAbsent("scenarios", List.of(
+                Map.of("code", "real-threat-check", "description", "基于当前真实日志做实时态势评估")
+            ));
+        }
+        return assessment;
     }
 
-    public Map<String, Object> adversarialRun() {
-        return buildThreatAssessment(true);
+    public Map<String, Object> adversarialRun(BattleReq req) {
+        String scenario = req == null || req.getScenario() == null || req.getScenario().isBlank()
+            ? "real-threat-check"
+            : req.getScenario().trim();
+        int rounds = req == null || req.getRounds() == null ? 10 : Math.max(1, Math.min(100, req.getRounds()));
+        Integer seed = req == null ? null : req.getSeed();
+
+        Map<String, Object> assessment = buildThreatAssessment(true);
+        if ("real-threat-check".equalsIgnoreCase(scenario)) {
+            assessment.put("ok", true);
+            assessment.put("mode", "real-threat-assessment");
+            assessment.put("scenario", "real-threat-check");
+            return assessment;
+        }
+
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("scenario", scenario);
+            payload.put("rounds", rounds);
+            if (seed != null) {
+                payload.put("seed", seed);
+            }
+            Map<String, Object> remote = aiInferenceClient.adversarialRun(payload);
+            Map<String, Object> merged = new HashMap<>(assessment);
+            if (remote != null) {
+                merged.putAll(remote);
+            }
+            merged.put("assessment", assessment);
+            merged.putIfAbsent("ok", true);
+            return merged;
+        } catch (Exception ex) {
+            Map<String, Object> fallback = new HashMap<>(assessment);
+            fallback.put("ok", false);
+            fallback.put("error", "攻防引擎暂不可用: " + ex.getMessage());
+            return fallback;
+        }
     }
 
     private Map<String, Object> buildThreatAssessment(boolean immediateCheck) {

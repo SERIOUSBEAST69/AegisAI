@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS company (
 
 CREATE TABLE IF NOT EXISTS role (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   name VARCHAR(50) NOT NULL,
   code VARCHAR(50) NOT NULL,
   description VARCHAR(200),
@@ -155,17 +156,21 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE TABLE IF NOT EXISTS approval_request (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   applicant_id BIGINT,
   asset_id BIGINT,
   reason VARCHAR(200),
   status VARCHAR(20),
   approver_id BIGINT,
+  process_instance_id VARCHAR(64),
+  task_id VARCHAR(64),
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS compliance_policy (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   name VARCHAR(100) NOT NULL,
   rule_content CLOB,
   scope VARCHAR(200),
@@ -233,6 +238,7 @@ CREATE TABLE IF NOT EXISTS sensitive_scan_task (
 
 CREATE TABLE IF NOT EXISTS subject_request (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   user_id BIGINT,
   type VARCHAR(50),
   comment VARCHAR(500),
@@ -273,10 +279,11 @@ INSERT INTO data_asset (company_id, name, type, sensitivity_level, location, dis
 (1, '产品目录', 'file', 'low', '/data/products/catalog.xlsx', CURRENT_TIMESTAMP, 1, '产品管理系统', '产品基本信息', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Default compliance policies
-INSERT INTO compliance_policy (name, rule_content, scope, status, version, create_time, update_time) VALUES
-('数据分类分级规范', '所有数据必须按照敏感程度分为高、中、低三级', '全公司', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('个人信息保护政策', '收集个人信息需获得用户明确同意', '业务部门', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('数据出境安全评估', '涉及跨境数据传输需进行安全评估', '技术部门', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO compliance_policy (company_id, name, rule_content, scope, status, version, create_time, update_time) VALUES
+(1, '数据分类分级规范', '所有数据必须按照敏感程度分为高、中、低三级', '全公司', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(1, '个人信息保护政策', '收集个人信息需获得用户明确同意', '业务部门', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(1, '提示词敏感词拦截策略', '{"keywords":["身份证号","银行卡号","工资条","病历","家庭住址","private key"],"mode":"contains"}', 'ai_prompt', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(1, '数据出境安全评估', '涉及跨境数据传输需进行安全评估', '技术部门', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Default desensitize rules
 INSERT INTO desensitize_rule (name, pattern, mask, example, create_time, update_time) VALUES
@@ -303,16 +310,16 @@ INSERT INTO sensitive_scan_task (source_type, source_path, status, sensitive_rat
 ('database', 'mysql://localhost:3306/erp', 'pending', null, null, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Default approval requests
-INSERT INTO approval_request (applicant_id, asset_id, reason, status, approver_id, create_time, update_time) VALUES
-(1, 1, '需要导出客户数据进行营销活动', 'pending', null, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(1, 2, '申请访问订单数据用于财务分析', 'approved', 1, CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP - INTERVAL '12' HOUR);
+INSERT INTO approval_request (company_id, applicant_id, asset_id, reason, status, approver_id, process_instance_id, task_id, create_time, update_time) VALUES
+(1, 1, 1, '需要导出客户数据进行营销活动', 'pending', null, null, null, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(1, 1, 2, '申请访问订单数据用于财务分析', 'approved', 1, 'PI_DEMO_001', null, CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP - INTERVAL '12' HOUR);
 
 -- Default subject requests
-INSERT INTO subject_request (user_id, type, comment, status, handler_id, result, create_time, update_time) VALUES
-(1, 'access', '申请查看我的个人数据', 'done', 1, '已提供数据副本', CURRENT_TIMESTAMP - INTERVAL '2' DAY, CURRENT_TIMESTAMP - INTERVAL '1' DAY),
-(1, 'delete', '请求删除我的账户数据', 'processing', 1, null, CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP),
-(1, 'export', '申请导出近三个月模型调用记录', 'pending', 1, null, CURRENT_TIMESTAMP - INTERVAL '5' HOUR, CURRENT_TIMESTAMP),
-(1, 'access', '需要查看跨境共享涉及的数据副本', 'processing', 1, '正在生成脱敏副本', CURRENT_TIMESTAMP - INTERVAL '3' DAY, CURRENT_TIMESTAMP - INTERVAL '2' DAY);
+INSERT INTO subject_request (company_id, user_id, type, comment, status, handler_id, result, create_time, update_time) VALUES
+(1, 1, 'access', '申请查看我的个人数据', 'done', 1, '已提供数据副本', CURRENT_TIMESTAMP - INTERVAL '2' DAY, CURRENT_TIMESTAMP - INTERVAL '1' DAY),
+(1, 1, 'delete', '请求删除我的账户数据', 'processing', 1, null, CURRENT_TIMESTAMP - INTERVAL '1' DAY, CURRENT_TIMESTAMP),
+(1, 1, 'export', '申请导出近三个月模型调用记录', 'pending', 1, null, CURRENT_TIMESTAMP - INTERVAL '5' HOUR, CURRENT_TIMESTAMP),
+(1, 1, 'access', '需要查看跨境共享涉及的数据副本', 'processing', 1, '正在生成脱敏副本', CURRENT_TIMESTAMP - INTERVAL '3' DAY, CURRENT_TIMESTAMP - INTERVAL '2' DAY);
 
 -- Default audit logs
 INSERT INTO audit_log (user_id, asset_id, operation, operation_time, ip, device, input_overview, output_overview, result, risk_level, hash, create_time) VALUES

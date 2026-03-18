@@ -38,11 +38,14 @@ CREATE TABLE `company` (
 
 CREATE TABLE `role` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '角色ID',
+  `company_id` BIGINT COMMENT '公司ID',
   `name` VARCHAR(50) NOT NULL COMMENT '角色名称',
   `code` VARCHAR(50) NOT NULL COMMENT '角色编码',
   `description` VARCHAR(200) COMMENT '描述',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  INDEX idx_role_company(`company_id`),
+  INDEX idx_role_company_code(`company_id`,`code`)
 ) COMMENT='角色表';
 
 CREATE TABLE `permission` (
@@ -137,26 +140,32 @@ CREATE TABLE `audit_log` (
 
 CREATE TABLE `approval_request` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '审批单ID',
+  `company_id` BIGINT COMMENT '公司ID',
   `applicant_id` BIGINT COMMENT '申请人ID',
   `asset_id` BIGINT COMMENT '资产ID',
   `reason` VARCHAR(200) COMMENT '申请理由',
   `status` VARCHAR(20) COMMENT '状态（待审批/通过/拒绝）',
   `approver_id` BIGINT COMMENT '审批人ID',
+  `process_instance_id` VARCHAR(64) COMMENT '流程实例ID',
+  `task_id` VARCHAR(64) COMMENT '当前任务ID',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  INDEX idx_approval_company(`company_id`),
   INDEX idx_applicant(`applicant_id`),
   INDEX idx_asset(`asset_id`)
 ) COMMENT='访问审批单表';
 
 CREATE TABLE `compliance_policy` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '策略ID',
+  `company_id` BIGINT COMMENT '公司ID',
   `name` VARCHAR(100) NOT NULL COMMENT '策略名称',
   `rule_content` TEXT COMMENT '规则内容（JSON/IF-THEN）',
   `scope` VARCHAR(50) COMMENT '生效范围（全局/指定资产/模型）',
   `status` TINYINT DEFAULT 1 COMMENT '状态 1-启用 0-停用',
   `version` INT DEFAULT 1 COMMENT '版本号',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  INDEX idx_policy_company(`company_id`)
 ) COMMENT='合规策略表';
 
 CREATE TABLE `risk_event` (
@@ -203,6 +212,7 @@ CREATE TABLE `model_call_stat` (
 -- 数据主体权利申请工单
 CREATE TABLE `subject_request` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `company_id` BIGINT COMMENT '公司ID',
   `user_id` BIGINT,
   `type` VARCHAR(30) COMMENT 'access/export/delete',
   `status` VARCHAR(20) COMMENT 'pending/processing/done/rejected',
@@ -210,7 +220,8 @@ CREATE TABLE `subject_request` (
   `handler_id` BIGINT,
   `result` TEXT,
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_subject_company(`company_id`)
 ) COMMENT='数据主体权利申请工单';
 
 -- 脱敏规则

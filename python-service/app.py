@@ -1345,6 +1345,12 @@ def adversarial_run():
         return jsonify({"ok": False, "error": str(exc)}), 500
 
 
+@app.route("/api/adversarial/start", methods=["POST"])
+def adversarial_start():
+    """向后兼容：start 与 run 语义一致。"""
+    return adversarial_run()
+
+
 if __name__ == "__main__":
     # ── 自动训练异常检测模型（如模型文件不存在）────────────────────────────────
     required_model_files = [_ANOMALY_MODEL_FILE, _ANOMALY_ENC_FILE, _ANOMALY_SCALER_FILE]

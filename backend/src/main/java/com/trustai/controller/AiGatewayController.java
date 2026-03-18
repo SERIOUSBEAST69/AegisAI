@@ -36,7 +36,7 @@ public class AiGatewayController {
         return R.ok(aiGatewayService.modelMetrics());
     }
 
-    @GetMapping("/catalog")
+    @GetMapping({"/catalog", "/catalog/list"})
     public R<List<Map<String, Object>>> modelCatalog() {
         return R.ok(aiGatewayService.modelCatalog());
     }
@@ -67,15 +67,21 @@ public class AiGatewayController {
     }
 
     @GetMapping("/adversarial/meta")
-    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<Map<String, Object>> adversarialMeta() {
         return R.ok(aiGatewayService.adversarialMeta());
     }
 
     @PostMapping("/adversarial/run")
-    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<Map<String, Object>> adversarialRun(@RequestBody BattleReq req) {
-        return R.ok(aiGatewayService.adversarialRun());
+        return R.ok(aiGatewayService.adversarialRun(req));
+    }
+
+    @PostMapping("/adversarial/start")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
+    public R<Map<String, Object>> adversarialStart(@RequestBody BattleReq req) {
+        return R.ok(aiGatewayService.adversarialRun(req));
     }
 
     public static class ChatReq {

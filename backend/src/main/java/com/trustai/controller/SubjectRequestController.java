@@ -3,6 +3,7 @@ package com.trustai.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.entity.SubjectRequest;
 import com.trustai.entity.User;
+import com.trustai.service.CompanyScopeService;
 import com.trustai.service.CurrentUserService;
 import com.trustai.service.SubjectRequestService;
 import com.trustai.utils.R;
@@ -30,24 +31,39 @@ public class SubjectRequestController {
     @Autowired
     private CurrentUserService currentUserService;
 
+    @Autowired
+    private CompanyScopeService companyScopeService;
+
     private static final Set<String> ALLOWED_STATUS = new HashSet<>(Arrays.asList("pending", "processing", "done", "rejected"));
     private static final Set<String> FINAL_STATUS = new HashSet<>(Arrays.asList("done", "rejected"));
     private static final Set<String> ALLOWED_TYPE = new HashSet<>(Arrays.asList("access", "export", "delete"));
+    private static final Set<String> OPERATOR_ROLES = new HashSet<>(Arrays.asList("ADMIN", "DATA_ADMIN", "BUSINESS_OWNER"));
 
     @GetMapping("/list")
-    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN','BUSINESS_OWNER','EMPLOYEE')")
     public R<List<SubjectRequest>> list(@RequestParam(required = false) String status) {
-        QueryWrapper<SubjectRequest> qw = new QueryWrapper<>();
-        if (status != null && !status.isEmpty()) qw.eq("status", status);
+        User currentUser = currentUserService.requireCurrentUser();
+        String roleCode = currentUserService.currentRoleCode();
+        QueryWrapper<SubjectRequest> qw = companyScopeService.withCompany(new QueryWrapper<>());
+        if (status != null && !status.isEmpty() && ALLOWED_STATUS.contains(status)) {
+            qw.eq("status", status);
+        } else {
+            qw.in("status", ALLOWED_STATUS);
+        }
+        if (!OPERATOR_ROLES.contains(roleCode == null ? "" : roleCode.toUpperCase())) {
+            qw.eq("user_id", currentUser.getId());
+        }
+        qw.isNotNull("user_id").orderByDesc("create_time");
         return R.ok(subjectRequestService.list(qw));
     }
 
     @PostMapping("/create")
-    @PreAuthorize("@currentUserService.hasRole('ADMIN')")
+    @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','DATA_ADMIN','BUSINESS_OWNER','EMPLOYEE')")
     public R<?> create(@RequestBody @Validated ApplyReq req) {
         if (!ALLOWED_TYPE.contains(req.getType())) return R.error(40000, "不支持的类型");
         User currentUser = currentUserService.requireCurrentUser();
         SubjectRequest entity = new SubjectRequest();
+        entity.setCompanyId(companyScopeService.requireCompanyId());
         entity.setUserId(req.getUserId() == null ? currentUser.getId() : req.getUserId());
         entity.setType(req.getType());
         entity.setComment(req.getComment());
@@ -62,7 +78,9 @@ public class SubjectRequestController {
     @PostMapping("/process")
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> process(@RequestBody @Validated ProcessReq req) {
-        SubjectRequest sr = subjectRequestService.getById(req.getId());
+        SubjectRequest sr = subjectRequestService.getOne(
+            companyScopeService.withCompany(new QueryWrapper<SubjectRequest>()).eq("id", req.getId())
+        );
         if (sr == null) return R.error(40000, "申请不存在");
         if (!ALLOWED_STATUS.contains(req.getStatus())) return R.error(40000, "不支持的状态");
         if (FINAL_STATUS.contains(sr.getStatus())) return R.error(40000, "已完结的工单不可再次处理");
@@ -78,7 +96,9 @@ public class SubjectRequestController {
     @PostMapping("/delete")
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> delete(@RequestBody @Validated IdReq req) {
-        SubjectRequest existing = subjectRequestService.getById(req.getId());
+        SubjectRequest existing = subjectRequestService.getOne(
+            companyScopeService.withCompany(new QueryWrapper<SubjectRequest>()).eq("id", req.getId())
+        );
         if (existing == null) {
             return R.error(40000, "工单不存在或已删除");
         }
@@ -90,7 +110,7 @@ public class SubjectRequestController {
     }
 
     public static class ApplyReq {
-        @NotNull private Long userId;
+        private Long userId;
         @NotBlank private String type;
         private String comment;
         public Long getUserId(){return userId;}

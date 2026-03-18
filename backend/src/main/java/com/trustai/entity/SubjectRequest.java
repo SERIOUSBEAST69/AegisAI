@@ -10,6 +10,7 @@ import java.util.Date;
 public class SubjectRequest {
     @TableId
     private Long id;
+    private Long companyId;
     private Long userId;
     private String type; // access/export/delete
     private String status; // pending/processing/done/rejected

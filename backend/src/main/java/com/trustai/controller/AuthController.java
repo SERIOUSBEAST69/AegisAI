@@ -14,6 +14,7 @@ import com.trustai.service.RoleService;
 import com.trustai.service.UserService;
 import com.trustai.utils.R;
 import java.util.Date;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -217,12 +218,12 @@ public class AuthController {
         if (seed == null) {
             return;
         }
-        Role role = resolveOrCreateRole(seed.roleCode());
+        Role role = resolveOrCreateRoleForCompany(seed.roleCode(), 1L);
         if (role == null) {
             return;
         }
 
-        User user = userService.lambdaQuery().eq(User::getUsername, seed.username()).one();
+        User user = findUserByUsername(seed.username());
         boolean isNew = user == null;
         if (isNew) {
             user = new User();
@@ -262,8 +263,14 @@ public class AuthController {
         }
     }
 
-    private Role resolveOrCreateRole(String roleCode) {
-        Role role = roleService.lambdaQuery().eq(Role::getCode, roleCode).one();
+    private Role resolveOrCreateRoleForCompany(String roleCode, Long companyId) {
+        Role role = roleService.lambdaQuery()
+            .eq(Role::getCode, roleCode)
+            .eq(companyId != null, Role::getCompanyId, companyId)
+            .list()
+            .stream()
+            .min(Comparator.comparing(Role::getId))
+            .orElse(null);
         if (role != null) {
             return role;
         }
@@ -272,6 +279,7 @@ public class AuthController {
             return null;
         }
         Role created = new Role();
+        created.setCompanyId(companyId);
         created.setCode(roleCode);
         created.setName(roleName);
         created.setDescription("系统默认角色: " + roleName);
@@ -289,7 +297,11 @@ public class AuthController {
         if (!StringUtils.hasText(req.getRoleCode())) {
             throw new BizException(40000, "请选择身份");
         }
-        Role role = roleService.lambdaQuery().eq(Role::getCode, req.getRoleCode()).one();
+
+        String accountType = resolveAccountType(req);
+        boolean realAccount = ACCOUNT_TYPE_REAL.equals(accountType);
+        Long companyId = resolveCompanyId(req, accountType);
+        Role role = resolveOrCreateRoleForCompany(req.getRoleCode(), companyId);
         if (role == null) {
             throw new BizException(40000, "身份不存在，请联系管理员");
         }
@@ -311,16 +323,13 @@ public class AuthController {
             authVerificationService.verifyPhoneCode(req.getPhone(), req.getPhoneCode());
         }
 
-        String accountType = resolveAccountType(req);
-        boolean realAccount = ACCOUNT_TYPE_REAL.equals(accountType);
-
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(resolvePassword(req, loginType)));
         user.setRealName(StringUtils.hasText(req.getRealName()) ? req.getRealName() : req.getNickname());
         user.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : req.getRealName());
         user.setRoleId(role.getId());
-        user.setCompanyId(resolveCompanyId(req, accountType));
+        user.setCompanyId(companyId);
         user.setDeviceId(username + "-device");
         user.setDepartment(req.getDepartment());
         user.setOrganizationType(req.getOrganizationType());
@@ -359,7 +368,12 @@ public class AuthController {
             throw new BizException(40000, "真实账号注册必须填写公司名称");
         }
         String companyName = req.getCompanyName().trim();
-        Company existing = companyService.lambdaQuery().eq(Company::getCompanyName, companyName).one();
+        Company existing = companyService.lambdaQuery()
+            .eq(Company::getCompanyName, companyName)
+            .list()
+            .stream()
+            .min(Comparator.comparing(Company::getId))
+            .orElse(null);
         if (existing != null) {
             return existing.getId();
         }

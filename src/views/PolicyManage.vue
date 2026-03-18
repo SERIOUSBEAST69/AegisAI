@@ -1,6 +1,13 @@
 <template>
   <el-card>
     <h2>合规策略管理</h2>
+    <el-alert
+      type="info"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 12px"
+      title="生效说明"
+      :description="policyHint"/>
     <el-form :inline="true" @submit.prevent>
       <el-form-item label="策略名称">
         <el-input v-model="query.name" placeholder="输入策略名称" />
@@ -27,7 +34,14 @@
       <el-form :model="addForm" :rules="rules" ref="addFormRef">
         <el-form-item label="策略名称" prop="name"><el-input v-model="addForm.name" /></el-form-item>
         <el-form-item label="规则内容" prop="ruleContent"><el-input v-model="addForm.ruleContent" /></el-form-item>
-        <el-form-item label="生效范围" prop="scope"><el-input v-model="addForm.scope" /></el-form-item>
+        <el-form-item label="生效范围" prop="scope">
+          <el-select v-model="addForm.scope" style="width: 220px">
+            <el-option label="ai_prompt（提示词拦截）" value="ai_prompt" />
+            <el-option label="全局" value="全局" />
+            <el-option label="业务部门" value="业务部门" />
+            <el-option label="技术部门" value="技术部门" />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAdd = false">取消</el-button>
@@ -38,7 +52,14 @@
       <el-form :model="editForm" :rules="editRules" ref="editFormRef">
         <el-form-item label="策略名称" prop="name"><el-input v-model="editForm.name" /></el-form-item>
         <el-form-item label="规则内容" prop="ruleContent"><el-input v-model="editForm.ruleContent" /></el-form-item>
-        <el-form-item label="生效范围" prop="scope"><el-input v-model="editForm.scope" /></el-form-item>
+        <el-form-item label="生效范围" prop="scope">
+          <el-select v-model="editForm.scope" style="width: 220px">
+            <el-option label="ai_prompt（提示词拦截）" value="ai_prompt" />
+            <el-option label="全局" value="全局" />
+            <el-option label="业务部门" value="业务部门" />
+            <el-option label="技术部门" value="技术部门" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态" prop="status"><el-input v-model="editForm.status" /></el-form-item>
       </el-form>
       <template #footer>
@@ -57,7 +78,8 @@ const loading = ref(false);
 const showAdd = ref(false);
 const showEdit = ref(false);
 const saving = ref(false);
-const addForm = ref({ name: '', ruleContent: '', scope: '' });
+const policyHint = '当 scope=ai_prompt 且策略启用时，系统会把 ruleContent 中定义的敏感词应用到 AI 提示词拦截链路。推荐 ruleContent 使用 JSON：{"keywords":["身份证号","银行卡号"]}';
+const addForm = ref({ name: '', ruleContent: '{"keywords":[]}', scope: 'ai_prompt' });
 const editForm = ref({});
 const query = ref({ name: '' });
 const addFormRef = ref();
@@ -80,7 +102,7 @@ async function fetchPolicies() {
   }
 }
 function openAdd() {
-  addForm.value = { name: '', ruleContent: '', scope: '' };
+  addForm.value = { name: '', ruleContent: '{"keywords":[]}', scope: 'ai_prompt' };
   showAdd.value = true;
 }
 async function addPolicy() {

@@ -50,7 +50,6 @@ const saving = ref(false);
 const formRef = ref();
 const userStore = useUserStore();
 const rules = {
-  userId: [{ required: true, message: '用户ID不能为空', trigger: 'blur' }],
   type: [{ required: true, message: '类型不能为空', trigger: 'change' }],
   comment: [{ required: true, message: '备注不能为空', trigger: 'blur' }]
 };
@@ -76,7 +75,11 @@ async function create() {
     if (!valid) return;
     saving.value = true;
     try {
-      await request.post('/subject-request/create', form.value);
+      const payload = {
+        ...form.value,
+        userId: form.value.userId || userStore.userInfo?.id || null,
+      };
+      await request.post('/subject-request/create', payload);
       ElMessage.success('提交成功');
       await load();
     } catch (err) {
@@ -114,6 +117,10 @@ async function remove(id) {
 }
 
 load();
+
+if (!form.value.userId && userStore.userInfo?.id) {
+  form.value.userId = userStore.userInfo.id;
+}
 </script>
 
 <style scoped>

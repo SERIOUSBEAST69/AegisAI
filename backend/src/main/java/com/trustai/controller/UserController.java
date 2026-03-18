@@ -12,6 +12,7 @@ import com.trustai.exception.BizException;
 import com.trustai.service.AuditLogService;
 import com.trustai.service.CompanyService;
 import com.trustai.service.CurrentUserService;
+import com.trustai.service.RoleService;
 import com.trustai.service.UserService;
 import com.trustai.utils.R;
 import java.io.IOException;
@@ -52,6 +53,7 @@ public class UserController {
     @Autowired private CurrentUserService currentUserService;
     @Autowired private CompanyService companyService;
     @Autowired private AuditLogService auditLogService;
+    @Autowired private RoleService roleService;
 
     @GetMapping("/list")
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
@@ -125,7 +127,9 @@ public class UserController {
     @PreAuthorize("@currentUserService.hasRole('ADMIN')")
     public R<?> register(@RequestBody User user) {
         currentUserService.requireAdmin();
-        user.setCompanyId(currentUserService.requireCurrentUser().getCompanyId());
+        User currentUser = currentUserService.requireCurrentUser();
+        user.setCompanyId(currentUser.getCompanyId());
+        ensureRoleInCompany(user.getRoleId(), currentUser.getCompanyId());
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         if (!StringUtils.hasText(user.getAccountType())) {
             user.setAccountType("real");
@@ -149,6 +153,9 @@ public class UserController {
         User existing = userService.getById(user.getId());
         if (existing == null || !java.util.Objects.equals(existing.getCompanyId(), currentUserService.requireCurrentUser().getCompanyId())) {
             throw new BizException(40400, "用户不存在或不在当前公司");
+        }
+        if (user.getRoleId() != null) {
+            ensureRoleInCompany(user.getRoleId(), existing.getCompanyId());
         }
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -269,6 +276,16 @@ public class UserController {
         log.setRiskLevel("NORMAL");
         log.setCreateTime(new Date());
         auditLogService.saveAudit(log);
+    }
+
+    private void ensureRoleInCompany(Long roleId, Long companyId) {
+        if (roleId == null) {
+            throw new BizException(40000, "角色不能为空");
+        }
+        Role role = roleService.getById(roleId);
+        if (role == null || !Objects.equals(role.getCompanyId(), companyId)) {
+            throw new BizException(40000, "角色不存在或不属于当前公司");
+        }
     }
 
     private String storeAvatar(MultipartFile file) {

@@ -18,6 +18,7 @@ import com.trustai.repository.AssetEsRepository;
 import com.trustai.service.DataAssetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -32,14 +33,14 @@ public class DataAssetServiceImpl extends ServiceImpl<DataAssetMapper, DataAsset
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
 	private final AiCallLogMapper aiCallLogMapper;
-	private final AssetEsRepository assetEsRepository;
+	private final ObjectProvider<AssetEsRepository> assetEsRepositoryProvider;
 	private final RabbitTemplate rabbitTemplate;
 
 	public DataAssetServiceImpl(AiCallLogMapper aiCallLogMapper,
-							 AssetEsRepository assetEsRepository,
+							 ObjectProvider<AssetEsRepository> assetEsRepositoryProvider,
 							 RabbitTemplate rabbitTemplate) {
 		this.aiCallLogMapper = aiCallLogMapper;
-		this.assetEsRepository = assetEsRepository;
+		this.assetEsRepositoryProvider = assetEsRepositoryProvider;
 		this.rabbitTemplate = rabbitTemplate;
 	}
 
@@ -103,6 +104,10 @@ public class DataAssetServiceImpl extends ServiceImpl<DataAssetMapper, DataAsset
 	}
 
 	private void saveEs(DataAsset entity) {
+		AssetEsRepository assetEsRepository = assetEsRepositoryProvider.getIfAvailable();
+		if (assetEsRepository == null) {
+			return;
+		}
 		try {
 			AssetDocument doc = new AssetDocument();
 			doc.setId(String.valueOf(entity.getId()));

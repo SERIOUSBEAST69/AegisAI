@@ -4,7 +4,7 @@ server:
 spring:
   # 数据源配置（MySQL，使用环境变量）
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/aegisai?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/aegisai?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -70,6 +70,11 @@ spring:
   # Elasticsearch 配置
   elasticsearch:
     uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
+
+  data:
+    elasticsearch:
+      repositories:
+        enabled: ${SPRING_DATA_ELASTICSEARCH_REPOSITORIES_ENABLED:true}
 
 # Flowable 配置
 flowable:

@@ -7,13 +7,14 @@ import com.trustai.mapper.AiModelMapper;
 import com.trustai.repository.ModelEsRepository;
 import com.trustai.service.AiModelService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class AiModelServiceImpl extends ServiceImpl<AiModelMapper, AiModel> implements AiModelService {
 
-	private final ModelEsRepository modelEsRepository;
+	private final ObjectProvider<ModelEsRepository> modelEsRepositoryProvider;
 
 	@Override
 	public boolean save(AiModel entity) {
@@ -30,6 +31,10 @@ public class AiModelServiceImpl extends ServiceImpl<AiModelMapper, AiModel> impl
 	}
 
 	private void saveEs(AiModel entity) {
+		ModelEsRepository modelEsRepository = modelEsRepositoryProvider.getIfAvailable();
+		if (modelEsRepository == null) {
+			return;
+		}
 		try {
 			ModelDocument doc = new ModelDocument();
 			doc.setId(String.valueOf(entity.getId()));

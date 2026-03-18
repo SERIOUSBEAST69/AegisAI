@@ -604,13 +604,33 @@ function buildLocalClient(info, result) {
   };
 }
 
+async function syncElectronAuthGate() {
+  if (!isElectron || !window.aegisClient?.setAuthState) {
+    return;
+  }
+  try {
+    await window.aegisClient.setAuthState({
+      authenticated: Boolean(userStore.token && userStore.userInfo),
+      user: userStore.userInfo || null,
+    });
+  } catch (error) {
+    console.warn('[ShadowAI] 同步 Electron 登录态失败:', error?.message || error);
+  }
+}
+
 async function runLocalScan() {
   localScanning.value = true;
   localScanEnabled.value = true;
   try {
     if (isElectron) {
+      await syncElectronAuthGate();
       // Electron 客户端模式：直接调用本机扫描 IPC
-      const result = await window.aegisClient.runScan();
+      let result = await window.aegisClient.runScan();
+      if (result?.skipped) {
+        // 兼容首次登录后主进程尚未刷新鉴权态的场景：自动重试一次。
+        await syncElectronAuthGate();
+        result = await window.aegisClient.runScan();
+      }
       if (result?.skipped) {
         ElMessage.warning(result.reason || '请先登录后再开始扫描');
         return;
@@ -840,6 +860,7 @@ function onScanComplete(result) {
 }
 
 onMounted(() => {
+  syncElectronAuthGate();
   refresh();
   refreshQueue();
   if (isElectron) {

@@ -115,14 +115,18 @@ DROP TABLE IF EXISTS `approval_request`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `approval_request` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '审批单ID',
+  `company_id` bigint DEFAULT NULL COMMENT '公司ID',
   `applicant_id` bigint DEFAULT NULL COMMENT '申请人ID',
   `asset_id` bigint DEFAULT NULL COMMENT '资产ID',
   `reason` varchar(200) DEFAULT NULL COMMENT '申请事由',
   `status` varchar(20) DEFAULT NULL COMMENT '状态（待审批/通过/拒绝）',
   `approver_id` bigint DEFAULT NULL COMMENT '审批人ID',
+  `process_instance_id` varchar(64) DEFAULT NULL COMMENT '流程实例ID',
+  `task_id` varchar(64) DEFAULT NULL COMMENT '任务ID',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
+  KEY `idx_approval_company` (`company_id`),
   KEY `idx_applicant` (`applicant_id`),
   KEY `idx_asset` (`asset_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='访问审批单表';
@@ -130,7 +134,7 @@ CREATE TABLE `approval_request` (
 
 LOCK TABLES `approval_request` WRITE;
 /*!40000 ALTER TABLE `approval_request` DISABLE KEYS */;
-INSERT INTO `approval_request` VALUES (1,2,1,'调试合规审计','待审批',1,'2026-03-01 21:09:11','2026-03-01 21:09:11'),(2,3,2,'数据订正','通过',1,'2026-03-01 21:09:11','2026-03-01 21:09:11'),(3,4,3,'审计复核','拒绝',1,'2026-03-01 21:09:11','2026-03-01 21:09:11');
+INSERT INTO `approval_request` VALUES (1,1,2,1,'调试合规审计','待审批',1,NULL,NULL,'2026-03-01 21:09:11','2026-03-01 21:09:11'),(2,1,3,2,'数据订正','通过',1,'PI_DEMO_001',NULL,'2026-03-01 21:09:11','2026-03-01 21:09:11'),(3,1,4,3,'审计复核','拒绝',1,'PI_DEMO_002',NULL,'2026-03-01 21:09:11','2026-03-01 21:09:11');
 /*!40000 ALTER TABLE `approval_request` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -177,6 +181,7 @@ DROP TABLE IF EXISTS `compliance_policy`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `compliance_policy` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '策略ID',
+  `company_id` bigint DEFAULT NULL COMMENT '公司ID',
   `name` varchar(100) NOT NULL COMMENT '策略名称',
   `rule_content` text COMMENT '规则内容（JSON/IF-THEN）',
   `scope` varchar(50) DEFAULT NULL COMMENT '生效范围（全局/指定资产/模型）',
@@ -184,13 +189,14 @@ CREATE TABLE `compliance_policy` (
   `version` int DEFAULT '1' COMMENT '版本号',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_policy_company` (`company_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='合规策略表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `compliance_policy` WRITE;
 /*!40000 ALTER TABLE `compliance_policy` DISABLE KEYS */;
-INSERT INTO `compliance_policy` VALUES (1,'手机号脱敏','{"mask":"****"}','全局',1,1,'2026-03-01 21:09:11','2026-03-01 21:09:11'),(2,'支付导出审批','{"require_approval":true}','支付流水',1,1,'2026-03-01 21:09:11','2026-03-01 21:09:11');
+INSERT INTO `compliance_policy` VALUES (1,1,'手机号脱敏','{"mask":"****"}','全局',1,1,'2026-03-01 21:09:11','2026-03-01 21:09:11'),(2,1,'支付导出审批','{"require_approval":true}','支付流水',1,1,'2026-03-01 21:09:11','2026-03-01 21:09:11');
 /*!40000 ALTER TABLE `compliance_policy` ENABLE KEYS */;
 UNLOCK TABLES;
 --
@@ -385,18 +391,21 @@ DROP TABLE IF EXISTS `role`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `role` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '角色ID',
+  `company_id` bigint DEFAULT NULL COMMENT '公司ID',
   `name` varchar(50) NOT NULL COMMENT '角色名称',
   `code` varchar(50) NOT NULL COMMENT '角色编码',
   `description` varchar(200) DEFAULT NULL COMMENT '描述',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_role_company` (`company_id`),
+  KEY `idx_role_company_code` (`company_id`,`code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2028091268882526215 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `role` WRITE;
 /*!40000 ALTER TABLE `role` DISABLE KEYS */;
-INSERT INTO `role` VALUES (2028091268882526210,'管理员','ADMIN','系统默认管理员角色','2026-03-01 20:53:33','2026-03-01 20:53:33'),(2028091268882526211,'管理员','ADMIN','系统管理员','2026-03-01 21:09:11','2026-03-01 21:09:11'),(2028091268882526212,'安全官','SEC','安全合规负责人','2026-03-01 21:09:11','2026-03-01 21:09:11'),(2028091268882526213,'数据管理员','DATA_ADMIN','数据资产管理','2026-03-01 21:09:11','2026-03-01 21:09:11'),(2028091268882526214,'审计员','AUDIT','审计日志查看','2026-03-01 21:09:11','2026-03-01 21:09:11');
+INSERT INTO `role` VALUES (2028091268882526210,1,'管理员','ADMIN','系统默认管理员角色','2026-03-01 20:53:33','2026-03-01 20:53:33'),(2028091268882526211,1,'管理员','ADMIN','系统管理员','2026-03-01 21:09:11','2026-03-01 21:09:11'),(2028091268882526212,1,'安全官','SEC','安全合规负责人','2026-03-01 21:09:11','2026-03-01 21:09:11'),(2028091268882526213,1,'数据管理员','DATA_ADMIN','数据资产管理','2026-03-01 21:09:11','2026-03-01 21:09:11'),(2028091268882526214,1,'审计员','AUDIT','审计日志查看','2026-03-01 21:09:11','2026-03-01 21:09:11');
 /*!40000 ALTER TABLE `role` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -458,6 +467,7 @@ DROP TABLE IF EXISTS `subject_request`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `subject_request` (
   `id` bigint NOT NULL AUTO_INCREMENT,
+  `company_id` bigint DEFAULT NULL COMMENT '公司ID',
   `user_id` bigint DEFAULT NULL,
   `type` varchar(30) DEFAULT NULL COMMENT 'access/export/delete',
   `status` varchar(20) DEFAULT NULL COMMENT 'pending/processing/done/rejected',
@@ -466,13 +476,14 @@ CREATE TABLE `subject_request` (
   `result` text,
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_subject_company` (`company_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2028095310606135299 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='数据主体权利请求工单';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `subject_request` WRITE;
 /*!40000 ALTER TABLE `subject_request` DISABLE KEYS */;
-INSERT INTO `subject_request` VALUES (2028092719054745602,NULL,'access','pending','',NULL,NULL,'2026-03-01 20:59:19','2026-03-01 20:59:19'),(2028092719054745603,10,'access','pending','请求访问个人数据',2,'','2026-02-13 09:00:00','2026-03-01 21:09:11'),(2028092719054745604,11,'delete','processing','删除历史记录',2,'处理中','2026-02-13 10:00:00','2026-03-01 21:09:11'),(2028092719054745605,12,'export','done','导出邮件',2,'已提供','2026-02-13 11:00:00','2026-03-01 21:09:11'),(2028095310606135298,NULL,'access','pending','',NULL,NULL,'2026-03-01 21:09:37','2026-03-01 21:09:36');
+INSERT INTO `subject_request` VALUES (2028092719054745602,1,NULL,'access','pending','',NULL,NULL,'2026-03-01 20:59:19','2026-03-01 20:59:19'),(2028092719054745603,1,10,'access','pending','请求访问个人数据',2,'','2026-02-13 09:00:00','2026-03-01 21:09:11'),(2028092719054745604,1,11,'delete','processing','删除历史记录',2,'处理中','2026-02-13 10:00:00','2026-03-01 21:09:11'),(2028092719054745605,1,12,'export','done','导出邮件',2,'已提供','2026-02-13 11:00:00','2026-03-01 21:09:11'),(2028095310606135298,1,NULL,'access','pending','',NULL,NULL,'2026-03-01 21:09:37','2026-03-01 21:09:36');
 /*!40000 ALTER TABLE `subject_request` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -516,6 +527,7 @@ DROP TABLE IF EXISTS `client_report`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `client_report` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `company_id` bigint DEFAULT NULL COMMENT '公司ID',
   `client_id` varchar(64) NOT NULL COMMENT '客户端唯一标识（UUID）',
   `hostname` varchar(255) DEFAULT NULL COMMENT '主机名',
   `os_username` varchar(255) DEFAULT NULL COMMENT '操作系统用户名',
@@ -528,6 +540,7 @@ CREATE TABLE `client_report` (
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
+  KEY `idx_client_report_company` (`company_id`),
   KEY `idx_client_id` (`client_id`),
   KEY `idx_scan_time` (`scan_time`),
   KEY `idx_risk_level` (`risk_level`)
@@ -546,6 +559,7 @@ UNLOCK TABLES;
 DROP TABLE IF EXISTS `security_event`;
 CREATE TABLE `security_event` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '事件ID',
+  `company_id` bigint DEFAULT NULL COMMENT '公司ID',
   `event_type` varchar(50) DEFAULT NULL COMMENT '事件类型：FILE_STEAL/SUSPICIOUS_UPLOAD/BATCH_COPY/EXFILTRATION/DATA_SCRAPE/CREDENTIAL_DUMP',
   `file_path` varchar(500) DEFAULT NULL COMMENT '涉及文件路径',
   `target_addr` varchar(200) DEFAULT NULL COMMENT '目标地址',
@@ -560,6 +574,7 @@ CREATE TABLE `security_event` (
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
+  KEY `idx_company` (`company_id`),
   KEY `idx_severity` (`severity`),
   KEY `idx_status` (`status`),
   KEY `idx_event_time` (`event_time`),
@@ -578,6 +593,7 @@ UNLOCK TABLES;
 DROP TABLE IF EXISTS `client_scan_queue`;
 CREATE TABLE `client_scan_queue` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `company_id` bigint DEFAULT NULL COMMENT '公司ID',
   `platform` varchar(20) DEFAULT NULL COMMENT '平台：windows/macos/linux',
   `hostname` varchar(100) DEFAULT NULL COMMENT '主机名',
   `os_username` varchar(50) DEFAULT NULL COMMENT '操作系统用户名',
@@ -588,6 +604,7 @@ CREATE TABLE `client_scan_queue` (
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
+  KEY `idx_client_queue_company` (`company_id`),
   KEY `idx_status` (`status`),
   KEY `idx_platform` (`platform`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='客户端扫描队列';

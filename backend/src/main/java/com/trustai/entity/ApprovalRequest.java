@@ -10,6 +10,7 @@ import java.util.Date;
 public class ApprovalRequest {
     @TableId
     private Long id;
+    private Long companyId;
     private Long applicantId;
     private Long assetId;
     private String reason;

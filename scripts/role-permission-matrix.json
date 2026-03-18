@@ -25,7 +25,7 @@
       "name": "AI_ADVERSARIAL_META",
       "method": "GET",
       "path": "/api/ai/adversarial/meta",
-      "allow": ["ADMIN"]
+      "allow": ["ADMIN", "SECOPS"]
     },
     {
       "name": "USER_LIST",
@@ -73,7 +73,7 @@
       "name": "SUBJECT_REQUEST_LIST",
       "method": "GET",
       "path": "/api/subject-request/list",
-      "allow": ["ADMIN"]
+      "allow": ["ADMIN", "DATA_ADMIN", "BUSINESS_OWNER", "EMPLOYEE"]
     },
     {
       "name": "POLICY_LIST",

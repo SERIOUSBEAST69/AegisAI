@@ -338,3 +338,138 @@ SET @sql_add_ai_call_log_ip := IF(
 PREPARE stmt FROM @sql_add_ai_call_log_ip;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- 租户与审批兼容补丁（历史库无对应列时自动补齐）
+SET @has_role_company_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'role' AND column_name = 'company_id'
+);
+SET @sql_add_role_company_id := IF(
+  @has_role_company_id = 0,
+  'ALTER TABLE role ADD COLUMN company_id BIGINT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_role_company_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_approval_company_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'approval_request' AND column_name = 'company_id'
+);
+SET @sql_add_approval_company_id := IF(
+  @has_approval_company_id = 0,
+  'ALTER TABLE approval_request ADD COLUMN company_id BIGINT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_approval_company_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_approval_process_instance_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'approval_request' AND column_name = 'process_instance_id'
+);
+SET @sql_add_approval_process_instance_id := IF(
+  @has_approval_process_instance_id = 0,
+  'ALTER TABLE approval_request ADD COLUMN process_instance_id VARCHAR(64)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_approval_process_instance_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_approval_task_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'approval_request' AND column_name = 'task_id'
+);
+SET @sql_add_approval_task_id := IF(
+  @has_approval_task_id = 0,
+  'ALTER TABLE approval_request ADD COLUMN task_id VARCHAR(64)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_approval_task_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_subject_company_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'subject_request' AND column_name = 'company_id'
+);
+SET @sql_add_subject_company_id := IF(
+  @has_subject_company_id = 0,
+  'ALTER TABLE subject_request ADD COLUMN company_id BIGINT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_subject_company_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_policy_company_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'compliance_policy' AND column_name = 'company_id'
+);
+SET @sql_add_policy_company_id := IF(
+  @has_policy_company_id = 0,
+  'ALTER TABLE compliance_policy ADD COLUMN company_id BIGINT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_policy_company_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_security_event_company_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'security_event' AND column_name = 'company_id'
+);
+SET @sql_add_security_event_company_id := IF(
+  @has_security_event_company_id = 0,
+  'ALTER TABLE security_event ADD COLUMN company_id BIGINT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_security_event_company_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_client_report_company_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'client_report' AND column_name = 'company_id'
+);
+SET @sql_add_client_report_company_id := IF(
+  @has_client_report_company_id = 0,
+  'ALTER TABLE client_report ADD COLUMN company_id BIGINT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_client_report_company_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_client_scan_queue_company_id := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'client_scan_queue' AND column_name = 'company_id'
+);
+SET @sql_add_client_scan_queue_company_id := IF(
+  @has_client_scan_queue_company_id = 0,
+  'ALTER TABLE client_scan_queue ADD COLUMN company_id BIGINT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_add_client_scan_queue_company_id;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+UPDATE role SET company_id = 1 WHERE company_id IS NULL;
+UPDATE approval_request SET company_id = 1 WHERE company_id IS NULL;
+UPDATE subject_request SET company_id = 1 WHERE company_id IS NULL;
+UPDATE compliance_policy SET company_id = 1 WHERE company_id IS NULL;
+UPDATE security_event SET company_id = 1 WHERE company_id IS NULL;
+UPDATE client_report SET company_id = 1 WHERE company_id IS NULL;
+UPDATE client_scan_queue SET company_id = 1 WHERE company_id IS NULL;

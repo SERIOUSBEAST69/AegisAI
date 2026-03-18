@@ -6,16 +6,16 @@
 "DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","AI_BUILDER","builder.demo","True","True","200","20000","success"
 "DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
 "DASHBOARD_WORKBENCH","GET","/api/dashboard/workbench","EMPLOYEE","employee.demo","True","True","200","20000","success"
-"AI_CATALOG","GET","/api/ai/catalog","ADMIN","admin","True","True","200","50000","No static resource api/ai/catalog."
-"AI_CATALOG","GET","/api/ai/catalog","EXECUTIVE","exec.demo","True","True","200","50000","No static resource api/ai/catalog."
-"AI_CATALOG","GET","/api/ai/catalog","SECOPS","secops.demo","True","True","200","50000","No static resource api/ai/catalog."
-"AI_CATALOG","GET","/api/ai/catalog","DATA_ADMIN","data.demo","True","True","200","50000","No static resource api/ai/catalog."
-"AI_CATALOG","GET","/api/ai/catalog","AI_BUILDER","builder.demo","True","True","200","50000","No static resource api/ai/catalog."
-"AI_CATALOG","GET","/api/ai/catalog","BUSINESS_OWNER","biz.demo","True","True","200","50000","No static resource api/ai/catalog."
-"AI_CATALOG","GET","/api/ai/catalog","EMPLOYEE","employee.demo","True","True","200","50000","No static resource api/ai/catalog."
-"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","ADMIN","admin","True","True","200","50000","Connection refused executing GET http://ai-inference:5000/api/adversarial/meta"
+"AI_CATALOG","GET","/api/ai/catalog","ADMIN","admin","True","True","200","20000","success"
+"AI_CATALOG","GET","/api/ai/catalog","EXECUTIVE","exec.demo","True","True","200","20000","success"
+"AI_CATALOG","GET","/api/ai/catalog","SECOPS","secops.demo","True","True","200","20000","success"
+"AI_CATALOG","GET","/api/ai/catalog","DATA_ADMIN","data.demo","True","True","200","20000","success"
+"AI_CATALOG","GET","/api/ai/catalog","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"AI_CATALOG","GET","/api/ai/catalog","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
+"AI_CATALOG","GET","/api/ai/catalog","EMPLOYEE","employee.demo","True","True","200","20000","success"
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","ADMIN","admin","True","True","200","20000","success"
 "AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","EXECUTIVE","exec.demo","False","False","200","40300","æ æé"
-"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","SECOPS","secops.demo","False","False","200","40300","æ æé"
+"AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","SECOPS","secops.demo","True","True","200","20000","success"
 "AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","DATA_ADMIN","data.demo","False","False","200","40300","æ æé"
 "AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","AI_BUILDER","builder.demo","False","False","200","40300","æ æé"
 "AI_ADVERSARIAL_META","GET","/api/ai/adversarial/meta","BUSINESS_OWNER","biz.demo","False","False","200","40300","æ æé"
@@ -83,48 +83,20 @@
 "RISK_EVENT_LIST","GET","/api/risk-event/list","AI_BUILDER","builder.demo","False","False","200","40300","æ æé"
 "RISK_EVENT_LIST","GET","/api/risk-event/list","BUSINESS_OWNER","biz.demo","False","False","200","40300","æ æé"
 "RISK_EVENT_LIST","GET","/api/risk-event/list","EMPLOYEE","employee.demo","False","False","200","40300","æ æé"
-"APPROVAL_LIST","GET","/api/approval/list","ADMIN","admin","True","True","200","50000","
-### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
-### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
-### The error may involve defaultParameterMap
-### The error occurred while setting parameters
-### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request
-### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
-; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","ADMIN","admin","True","True","200","20000","success"
 "APPROVAL_LIST","GET","/api/approval/list","EXECUTIVE","exec.demo","False","False","200","40300","æ æé"
 "APPROVAL_LIST","GET","/api/approval/list","SECOPS","secops.demo","False","False","200","40300","æ æé"
-"APPROVAL_LIST","GET","/api/approval/list","DATA_ADMIN","data.demo","True","True","200","50000","
-### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
-### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
-### The error may involve defaultParameterMap
-### The error occurred while setting parameters
-### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request
-### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
-; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","DATA_ADMIN","data.demo","True","True","200","20000","success"
 "APPROVAL_LIST","GET","/api/approval/list","AI_BUILDER","builder.demo","False","False","200","40300","æ æé"
-"APPROVAL_LIST","GET","/api/approval/list","BUSINESS_OWNER","biz.demo","True","True","200","50000","
-### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
-### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
-### The error may involve defaultParameterMap
-### The error occurred while setting parameters
-### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request
-### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
-; bad SQL grammar []"
-"APPROVAL_LIST","GET","/api/approval/list","EMPLOYEE","employee.demo","True","True","200","50000","
-### Error querying database.  Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
-### The error may exist in com/trustai/mapper/ApprovalRequestMapper.java (best guess)
-### The error may involve defaultParameterMap
-### The error occurred while setting parameters
-### SQL: SELECT  id,applicant_id,asset_id,reason,status,approver_id,process_instance_id,task_id,create_time,update_time  FROM approval_request      WHERE  (applicant_id = ?)
-### Cause: java.sql.SQLSyntaxErrorException: Unknown column 'process_instance_id' in 'field list'
-; bad SQL grammar []"
+"APPROVAL_LIST","GET","/api/approval/list","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
+"APPROVAL_LIST","GET","/api/approval/list","EMPLOYEE","employee.demo","True","True","200","20000","success"
 "SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","ADMIN","admin","True","True","200","20000","success"
 "SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","EXECUTIVE","exec.demo","False","False","200","40300","æ æé"
 "SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","SECOPS","secops.demo","False","False","200","40300","æ æé"
-"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","DATA_ADMIN","data.demo","False","False","200","40300","æ æé"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","DATA_ADMIN","data.demo","True","True","200","20000","success"
 "SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","AI_BUILDER","builder.demo","False","False","200","40300","æ æé"
-"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","BUSINESS_OWNER","biz.demo","False","False","200","40300","æ æé"
-"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","EMPLOYEE","employee.demo","False","False","200","40300","æ æé"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
+"SUBJECT_REQUEST_LIST","GET","/api/subject-request/list","EMPLOYEE","employee.demo","True","True","200","20000","success"
 "POLICY_LIST","GET","/api/policy/list","ADMIN","admin","True","True","200","20000","success"
 "POLICY_LIST","GET","/api/policy/list","EXECUTIVE","exec.demo","False","False","200","40300","æ æé"
 "POLICY_LIST","GET","/api/policy/list","SECOPS","secops.demo","True","True","200","20000","success"
@@ -153,13 +125,13 @@
 "ANOMALY_CHECK","POST","/api/anomaly/check","AI_BUILDER","builder.demo","True","True","200","50000","è¯·æ±ä½ä¸è½ä¸ºç©º"
 "ANOMALY_CHECK","POST","/api/anomaly/check","BUSINESS_OWNER","biz.demo","True","True","200","50000","è¯·æ±ä½ä¸è½ä¸ºç©º"
 "ANOMALY_CHECK","POST","/api/anomaly/check","EMPLOYEE","employee.demo","True","True","200","50000","è¯·æ±ä½ä¸è½ä¸ºç©º"
-"ANOMALY_EVENTS","GET","/api/anomaly/events","ADMIN","admin","True","True","200","50000","æ¥è¯¢å¼å¸¸äºä»¶å¤±è´¥"
-"ANOMALY_EVENTS","GET","/api/anomaly/events","EXECUTIVE","exec.demo","True","True","200","50000","æ¥è¯¢å¼å¸¸äºä»¶å¤±è´¥"
-"ANOMALY_EVENTS","GET","/api/anomaly/events","SECOPS","secops.demo","True","True","200","50000","æ¥è¯¢å¼å¸¸äºä»¶å¤±è´¥"
-"ANOMALY_EVENTS","GET","/api/anomaly/events","DATA_ADMIN","data.demo","True","True","200","50000","æ¥è¯¢å¼å¸¸äºä»¶å¤±è´¥"
-"ANOMALY_EVENTS","GET","/api/anomaly/events","AI_BUILDER","builder.demo","True","True","200","50000","æ¥è¯¢å¼å¸¸äºä»¶å¤±è´¥"
-"ANOMALY_EVENTS","GET","/api/anomaly/events","BUSINESS_OWNER","biz.demo","True","True","200","50000","æ¥è¯¢å¼å¸¸äºä»¶å¤±è´¥"
-"ANOMALY_EVENTS","GET","/api/anomaly/events","EMPLOYEE","employee.demo","True","True","200","50000","æ¥è¯¢å¼å¸¸äºä»¶å¤±è´¥"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","ADMIN","admin","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","EXECUTIVE","exec.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","SECOPS","secops.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","DATA_ADMIN","data.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","AI_BUILDER","builder.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","BUSINESS_OWNER","biz.demo","True","True","200","20000","success"
+"ANOMALY_EVENTS","GET","/api/anomaly/events","EMPLOYEE","employee.demo","True","True","200","20000","success"
 "PRIVACY_EVENTS","GET","/api/privacy/events?page=1&pageSize=5","ADMIN","admin","True","True","200","20000","success"
 "PRIVACY_EVENTS","GET","/api/privacy/events?page=1&pageSize=5","EXECUTIVE","exec.demo","True","True","200","20000","success"
 "PRIVACY_EVENTS","GET","/api/privacy/events?page=1&pageSize=5","SECOPS","secops.demo","True","True","200","20000","success"

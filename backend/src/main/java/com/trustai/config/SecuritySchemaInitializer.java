@@ -33,6 +33,7 @@ public class SecuritySchemaInitializer implements CommandLineRunner {
         jdbcTemplate.execute("""
             CREATE TABLE IF NOT EXISTS security_event (
               id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                            company_id BIGINT,
               event_type VARCHAR(64) NOT NULL,
               file_path VARCHAR(512),
               target_addr VARCHAR(256),

@@ -202,6 +202,18 @@ function formatScore(value) {
   return num.toFixed(4);
 }
 
+function normalizeAnomalyEvent(item = {}) {
+  return {
+    ...item,
+    employee_id: item.employee_id || item.employeeId || item.userId || '-',
+    department: item.department || item.dept || '-',
+    ai_service: item.ai_service || item.aiService || item.source || '-',
+    anomaly_score: item.anomaly_score ?? item.anomalyScore ?? null,
+    risk_level: item.risk_level || item.riskLevel || '-',
+    created_at: item.created_at || item.event_time || item.eventTime || null,
+  };
+}
+
 async function loadAnomalyStatus() {
   try {
     const data = await request.get('/anomaly/status');
@@ -226,7 +238,9 @@ async function loadAnomaly() {
       anomalyEvents.value = [];
       return;
     }
-    anomalyEvents.value = Array.isArray(data?.events) ? data.events : [];
+    anomalyEvents.value = Array.isArray(data?.events)
+      ? data.events.map((item) => normalizeAnomalyEvent(item))
+      : [];
   } catch (error) {
     anomalyEvents.value = [];
     ElMessage.error(error?.message || '加载异常行为失败');

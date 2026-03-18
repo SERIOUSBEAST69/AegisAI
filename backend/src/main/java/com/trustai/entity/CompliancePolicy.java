@@ -10,6 +10,7 @@ import java.util.Date;
 public class CompliancePolicy {
     @TableId
     private Long id;
+    private Long companyId;
     private String name;
     private String ruleContent;
     private String scope;

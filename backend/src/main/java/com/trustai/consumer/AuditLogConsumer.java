@@ -9,6 +9,7 @@ import com.trustai.repository.AuditLogEsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -19,7 +20,7 @@ public class AuditLogConsumer {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AuditLogMapper auditLogMapper;
-    private final AuditLogEsRepository auditLogEsRepository;
+    private final ObjectProvider<AuditLogEsRepository> auditLogEsRepositoryProvider;
 
     @RabbitListener(queues = RabbitConfig.AUDIT_LOG_QUEUE)
     public void onMessage(String payload) {
@@ -41,7 +42,11 @@ public class AuditLogConsumer {
             doc.setRiskLevel(log.getRiskLevel());
             doc.setHash(log.getHash());
             doc.setCreateTime(log.getCreateTime());
-            auditLogEsRepository.save(doc);
+
+            AuditLogEsRepository esRepository = auditLogEsRepositoryProvider.getIfAvailable();
+            if (esRepository != null) {
+                esRepository.save(doc);
+            }
         } catch (Exception e) {
             log.error("Consume audit log failed", e);
         }

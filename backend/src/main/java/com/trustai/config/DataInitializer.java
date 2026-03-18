@@ -4,6 +4,7 @@ import com.trustai.entity.Role;
 import com.trustai.entity.User;
 import com.trustai.service.RoleService;
 import com.trustai.service.UserService;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -43,7 +44,7 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        ROLE_LABELS.forEach(this::ensureRole);
+        ROLE_LABELS.forEach((code, name) -> ensureRole(1L, code, name));
 
         ensureUser("admin", "admin123", "平台管理员", "ADMIN", "enterprise", "治理中心", "13800138000", "admin@aegisai.com", "password", "wx_admin");
         ensureUser("exec.demo", "demo1234", "经营负责人", "EXECUTIVE", "enterprise", "经营管理部", "13800138001", "exec@aegisai.com", "password", "wx_exec_demo");
@@ -56,11 +57,15 @@ public class DataInitializer implements CommandLineRunner {
         cleanupDeprecatedSchoolIdentity();
     }
 
-    private void ensureRole(String code, String name) {
-        if (roleService.lambdaQuery().eq(Role::getCode, code).count() > 0) {
+    private void ensureRole(Long companyId, String code, String name) {
+        if (roleService.lambdaQuery()
+            .eq(Role::getCompanyId, companyId)
+            .eq(Role::getCode, code)
+            .count() > 0) {
             return;
         }
         Role role = new Role();
+        role.setCompanyId(companyId);
         role.setName(name);
         role.setCode(code);
         role.setDescription("系统默认角色: " + name);
@@ -72,7 +77,7 @@ public class DataInitializer implements CommandLineRunner {
     private void ensureUser(String username, String password, String realName, String roleCode,
                             String organizationType, String department, String phone, String email, String loginType,
                             String wechatOpenId) {
-        Role role = roleService.lambdaQuery().eq(Role::getCode, roleCode).one();
+        Role role = findRoleByCompanyAndCode(1L, roleCode);
         User user = userService.lambdaQuery().eq(User::getUsername, username).one();
         boolean isNew = user == null;
         boolean shouldResetPassword = false;
@@ -121,12 +126,12 @@ public class DataInitializer implements CommandLineRunner {
     private void cleanupDeprecatedSchoolIdentity() {
         userService.lambdaUpdate().eq(User::getUsername, "school.demo").remove();
 
-        Role schoolRole = roleService.lambdaQuery().eq(Role::getCode, "SCHOOL_ADMIN").one();
+        Role schoolRole = findRoleByCompanyAndCode(1L, "SCHOOL_ADMIN");
         if (schoolRole == null) {
             return;
         }
 
-        Role fallbackRole = roleService.lambdaQuery().eq(Role::getCode, "DATA_ADMIN").one();
+        Role fallbackRole = findRoleByCompanyAndCode(1L, "DATA_ADMIN");
         List<User> users = userService.lambdaQuery().eq(User::getRoleId, schoolRole.getId()).list();
         for (User user : users) {
             user.setRoleId(fallbackRole == null ? null : fallbackRole.getId());
@@ -136,6 +141,16 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         roleService.removeById(schoolRole.getId());
+    }
+
+    private Role findRoleByCompanyAndCode(Long companyId, String roleCode) {
+        return roleService.lambdaQuery()
+            .eq(Role::getCompanyId, companyId)
+            .eq(Role::getCode, roleCode)
+            .list()
+            .stream()
+            .min(Comparator.comparing(Role::getId))
+            .orElse(null);
     }
 
     private boolean isBcryptHash(String value) {

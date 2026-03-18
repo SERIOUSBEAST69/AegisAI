@@ -18,6 +18,9 @@ public class ClientScanQueue {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 公司ID（租户隔离） */
+    private Long companyId;
+
     /** 下载平台：windows / macos / linux */
     private String platform;
 

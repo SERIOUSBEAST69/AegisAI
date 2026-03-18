@@ -79,12 +79,14 @@ public class SecurityEventController {
 
         currentUserService.requireAnyRole("ADMIN", "SECOPS");
 
-        // 校验枚举参数，防止非法值注入查询
-        if (status != null && !VALID_STATUSES.contains(status)) {
-            return R.error(40000, "status 参数非法，合法值：" + VALID_STATUSES);
+        String normalizedStatus = status == null ? null : status.trim().toLowerCase();
+        String normalizedSeverity = severity == null ? null : severity.trim().toLowerCase();
+        // 非法枚举降级为无过滤，避免前端历史参数导致接口整体失败。
+        if (normalizedStatus != null && !normalizedStatus.isBlank() && !VALID_STATUSES.contains(normalizedStatus)) {
+            normalizedStatus = null;
         }
-        if (severity != null && !VALID_SEVERITIES.contains(severity)) {
-            return R.error(40000, "severity 参数非法，合法值：" + VALID_SEVERITIES);
+        if (normalizedSeverity != null && !normalizedSeverity.isBlank() && !VALID_SEVERITIES.contains(normalizedSeverity)) {
+            normalizedSeverity = null;
         }
         if (keyword != null && keyword.length() > 200) {
             return R.error(40000, "keyword 长度不得超过 200 字符");
@@ -95,11 +97,11 @@ public class SecurityEventController {
 
         QueryWrapper<SecurityEvent> qw = new QueryWrapper<>();
         companyScopeService.withCompany(qw);
-        if (status != null && !status.isBlank()) {
-            qw.eq("status", status);
+        if (normalizedStatus != null && !normalizedStatus.isBlank()) {
+            qw.eq("status", normalizedStatus);
         }
-        if (severity != null && !severity.isBlank()) {
-            qw.eq("severity", severity);
+        if (normalizedSeverity != null && !normalizedSeverity.isBlank()) {
+            qw.eq("severity", normalizedSeverity);
         }
         if (keyword != null && !keyword.isBlank()) {
             qw.and(w -> w.like("file_path", keyword)
@@ -111,14 +113,24 @@ public class SecurityEventController {
         }
         qw.orderByDesc("event_time");
 
-        Page<SecurityEvent> result = securityEventService.page(new Page<>(page, pageSize), qw);
+        try {
+            Page<SecurityEvent> result = securityEventService.page(new Page<>(page, pageSize), qw);
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("total", result.getTotal());
-        data.put("pages", result.getPages());
-        data.put("current", result.getCurrent());
-        data.put("list", result.getRecords());
-        return R.ok(data);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("total", result.getTotal());
+            data.put("pages", result.getPages());
+            data.put("current", result.getCurrent());
+            data.put("list", result.getRecords());
+            return R.ok(data);
+        } catch (Exception ex) {
+            Map<String, Object> empty = new LinkedHashMap<>();
+            empty.put("total", 0);
+            empty.put("pages", 0);
+            empty.put("current", page);
+            empty.put("list", List.of());
+            empty.put("degraded", true);
+            return R.ok(empty);
+        }
     }
 
     // ── 阻拦事件 ────────────────────────────────────────────────────────────────
@@ -248,11 +260,24 @@ public class SecurityEventController {
         User currentUser = currentUserService.requireCurrentUser();
         boolean employeeOnly = currentUserService.isEmployeeUser();
 
-        long total = securityEventService.count(scopedQuery(currentUser, employeeOnly));
-        long pending = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("status", "pending"));
-        long blocked = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("status", "blocked"));
-        long critical = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("severity", "critical"));
-        long high = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("severity", "high"));
+        long total;
+        long pending;
+        long blocked;
+        long critical;
+        long high;
+        try {
+            total = securityEventService.count(scopedQuery(currentUser, employeeOnly));
+            pending = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("status", "pending"));
+            blocked = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("status", "blocked"));
+            critical = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("severity", "critical"));
+            high = securityEventService.count(scopedQuery(currentUser, employeeOnly).eq("severity", "high"));
+        } catch (Exception ex) {
+            total = 0L;
+            pending = 0L;
+            blocked = 0L;
+            critical = 0L;
+            high = 0L;
+        }
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("total", total);

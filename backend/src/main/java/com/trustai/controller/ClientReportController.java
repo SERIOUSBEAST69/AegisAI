@@ -43,16 +43,22 @@ public class ClientReportController {
      * 若该 clientId 已有历史报告则直接返回确认，否则记录初始化记录。
      */
     @PostMapping("/register")
-    public R<Map<String, Object>> register(@RequestBody RegisterReq req) {
+    public R<Map<String, Object>> register(@RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
+                                           @RequestBody RegisterReq req) {
         if (req.getClientId() == null || req.getClientId().isBlank()) {
             return R.error(40000, "clientId 不能为空");
         }
 
+        Long companyId = resolveCompanyId(headerCompanyId);
+
         long existing = clientReportService.count(
-                new QueryWrapper<ClientReport>().eq("client_id", req.getClientId())
+                new QueryWrapper<ClientReport>()
+                    .eq("company_id", companyId)
+                    .eq("client_id", req.getClientId())
         );
 
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("companyId", companyId);
         result.put("clientId", req.getClientId());
         result.put("registered", existing > 0);
         result.put("serverTime", LocalDateTime.now().toString());
@@ -65,12 +71,14 @@ public class ClientReportController {
      * 客户端扫描完成后调用，将本次发现的影子AI服务列表上报给服务端。
      */
     @PostMapping("/report")
-    public R<Map<String, Object>> report(@RequestBody ClientReport report) {
+    public R<Map<String, Object>> report(@RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
+                                         @RequestBody ClientReport report) {
         if (report.getClientId() == null || report.getClientId().isBlank()) {
             return R.error(40000, "clientId 不能为空");
         }
 
         report.setId(null);
+        report.setCompanyId(resolveCompanyId(headerCompanyId));
         if (report.getScanTime() == null) {
             report.setScanTime(LocalDateTime.now());
         }
@@ -98,9 +106,12 @@ public class ClientReportController {
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<List<ClientReport>> list() {
         currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
+        Long companyId = currentUserService.requireCurrentUser().getCompanyId();
         // 取全部报告，按 clientId 分组，每组保留最新一条
         List<ClientReport> all = clientReportService.list(
-                new QueryWrapper<ClientReport>().orderByDesc("scan_time")
+            new QueryWrapper<ClientReport>()
+                .eq(companyId != null, "company_id", companyId)
+                .orderByDesc("scan_time")
         );
 
         Map<String, ClientReport> latestByClient = new LinkedHashMap<>();
@@ -118,8 +129,10 @@ public class ClientReportController {
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<List<ClientReport>> history(@RequestParam String clientId) {
         currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
+        Long companyId = currentUserService.requireCurrentUser().getCompanyId();
         List<ClientReport> records = clientReportService.list(
                 new QueryWrapper<ClientReport>()
+                .eq(companyId != null, "company_id", companyId)
                         .eq("client_id", clientId)
                         .orderByDesc("scan_time")
                         .last("LIMIT 50")
@@ -136,8 +149,11 @@ public class ClientReportController {
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<Map<String, Object>> stats() {
         currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
+        Long companyId = currentUserService.requireCurrentUser().getCompanyId();
         List<ClientReport> all = clientReportService.list(
-                new QueryWrapper<ClientReport>().orderByDesc("scan_time")
+            new QueryWrapper<ClientReport>()
+                .eq(companyId != null, "company_id", companyId)
+                .orderByDesc("scan_time")
         );
 
         // 每个客户端取最新报告
@@ -187,8 +203,10 @@ public class ClientReportController {
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<List<ClientScanQueue>> queue() {
         currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
+        Long companyId = currentUserService.requireCurrentUser().getCompanyId();
         List<ClientScanQueue> items = clientScanQueueService.list(
                 new QueryWrapper<ClientScanQueue>()
+                .eq(companyId != null, "company_id", companyId)
                         .orderByDesc("download_time")
                         .last("LIMIT 50")
         );
@@ -205,7 +223,9 @@ public class ClientReportController {
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<ClientScanQueue> enqueue(@RequestBody QueueReq req, HttpServletRequest servletReq) {
         currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
+        Long companyId = currentUserService.requireCurrentUser().getCompanyId();
         ClientScanQueue entry = new ClientScanQueue();
+        entry.setCompanyId(companyId);
         entry.setPlatform(req.getPlatform() != null ? req.getPlatform() : "unknown");
         entry.setHostname(req.getHostname());
         entry.setOsUsername(req.getOsUsername());
@@ -225,7 +245,12 @@ public class ClientReportController {
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS','AI_BUILDER')")
     public R<?> updateQueueStatus(@PathVariable Long id, @RequestBody QueueStatusReq req) {
         currentUserService.requireAnyRole("ADMIN", "SECOPS", "AI_BUILDER");
-        ClientScanQueue entry = clientScanQueueService.getById(id);
+        Long companyId = currentUserService.requireCurrentUser().getCompanyId();
+        ClientScanQueue entry = clientScanQueueService.getOne(
+            new QueryWrapper<ClientScanQueue>()
+                .eq("id", id)
+                .eq(companyId != null, "company_id", companyId)
+        );
         if (entry == null) return R.error(40000, "队列记录不存在");
         entry.setStatus(req.getStatus());
         if (req.getScanResult() != null) entry.setScanResult(req.getScanResult());
@@ -254,6 +279,21 @@ public class ClientReportController {
         if (count >= 5) return "high";
         if (count >= 2) return "medium";
         return "low";
+    }
+
+    private Long resolveCompanyId(Long headerCompanyId) {
+        if (headerCompanyId != null) {
+            return headerCompanyId;
+        }
+        try {
+            Long fromSession = currentUserService.requireCurrentUser().getCompanyId();
+            if (fromSession != null) {
+                return fromSession;
+            }
+        } catch (Exception ignored) {
+            // unauthenticated reporting is allowed
+        }
+        return 1L;
     }
 
     // ── DTO ────────────────────────────────────────────────────────────────────

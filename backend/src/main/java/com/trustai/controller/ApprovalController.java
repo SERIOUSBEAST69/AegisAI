@@ -6,6 +6,7 @@ import com.trustai.entity.Role;
 import com.trustai.entity.User;
 import com.trustai.exception.BizException;
 import com.trustai.service.ApprovalRequestService;
+import com.trustai.service.CompanyScopeService;
 import com.trustai.service.CurrentUserService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,7 @@ import jakarta.validation.constraints.NotNull;
 public class ApprovalController {
     @Autowired private ApprovalRequestService approvalRequestService;
     @Autowired private CurrentUserService currentUserService;
+    @Autowired private CompanyScopeService companyScopeService;
 
     private static final Set<String> APPROVE_STATUS = new HashSet<>(Arrays.asList("通过", "拒绝"));
     private static final String ROLE_ADMIN = "ADMIN";
@@ -40,7 +42,7 @@ public class ApprovalController {
                                          @RequestParam(required = false) Long assetId) {
         User currentUser = currentUserService.requireCurrentUser();
         String roleCode = currentUserService.currentRoleCode();
-        QueryWrapper<ApprovalRequest> qw = new QueryWrapper<>();
+        QueryWrapper<ApprovalRequest> qw = companyScopeService.withCompany(new QueryWrapper<>());
         if (isApprovalOperator(currentUser)) {
             if (applicantId != null) qw.eq("applicant_id", applicantId);
         } else {
@@ -56,6 +58,7 @@ public class ApprovalController {
     public R<?> apply(@RequestBody ApprovalRequest req) {
         User currentUser = currentUserService.requireCurrentUser();
         String roleCode = currentUserService.currentRoleCode();
+        req.setCompanyId(companyScopeService.requireCompanyId());
         req.setApplicantId(currentUser.getId());
         req.setReason(normalizeApplyReason(req.getReason(), roleCode));
         req.setApproverId(null);
@@ -71,7 +74,9 @@ public class ApprovalController {
     public R<?> reject(@RequestBody ApproveReq req) {
         User currentUser = currentUserService.requireCurrentUser();
         String roleCode = currentUserService.currentRoleCode();
-        ApprovalRequest before = approvalRequestService.getById(req.getRequestId());
+        ApprovalRequest before = approvalRequestService.getOne(
+            companyScopeService.withCompany(new QueryWrapper<ApprovalRequest>()).eq("id", req.getRequestId())
+        );
         if (before == null) return R.error(40000, "申请不存在");
         if (!canOperateRequest(roleCode, before, currentUser)) {
             throw new BizException(40300, "当前身份无权审批该类型申请");
@@ -95,7 +100,9 @@ public class ApprovalController {
         if (!APPROVE_STATUS.contains(req.getStatus())) return R.error(40000, "不支持的状态");
         User currentUser = currentUserService.requireCurrentUser();
         String roleCode = currentUserService.currentRoleCode();
-        ApprovalRequest request = approvalRequestService.getById(req.getRequestId());
+        ApprovalRequest request = approvalRequestService.getOne(
+            companyScopeService.withCompany(new QueryWrapper<ApprovalRequest>()).eq("id", req.getRequestId())
+        );
         if (request == null) return R.error(40000, "申请不存在");
         if (!canOperateRequest(roleCode, request, currentUser)) {
             throw new BizException(40300, "当前身份无权审批该类型申请");
@@ -110,6 +117,10 @@ public class ApprovalController {
         User currentUser = currentUserService.requireCurrentUser();
         String roleCode = currentUserService.currentRoleCode();
         List<ApprovalRequest> todos = approvalRequestService.todo(currentUser.getId());
+        Long companyId = companyScopeService.requireCompanyId();
+        todos = todos.stream()
+            .filter(item -> java.util.Objects.equals(item.getCompanyId(), companyId))
+            .toList();
         return R.ok(filterByOperatorScope(todos, roleCode, currentUser));
     }
 
@@ -118,7 +129,9 @@ public class ApprovalController {
     public R<?> delete(@RequestBody @Validated IdReq req) {
         User currentUser = currentUserService.requireCurrentUser();
         String roleCode = currentUserService.currentRoleCode();
-        ApprovalRequest approval = approvalRequestService.getById(req.getId());
+        ApprovalRequest approval = approvalRequestService.getOne(
+            companyScopeService.withCompany(new QueryWrapper<ApprovalRequest>()).eq("id", req.getId())
+        );
         if (approval == null) {
             throw new BizException(40000, "申请不存在");
         }

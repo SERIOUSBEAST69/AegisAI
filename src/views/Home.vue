@@ -578,7 +578,17 @@ async function fetchAiModels() {
   aiModelLoadState.value = 'loading';
   aiModelLoadMessage.value = '';
   try {
-    const payload = await request.get('/ai/catalog');
+    let payload;
+    try {
+      payload = await request.get('/ai/catalog');
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (message.includes('no static resource') || message.includes('404')) {
+        payload = await request.get('/ai/catalog/list');
+      } else {
+        throw error;
+      }
+    }
     const list = normalizeModelListPayload(payload)
       .filter(isEnabledModel)
       .map(item => ({
@@ -727,6 +737,18 @@ async function runAdversarialBattle() {
       payload.seed = Number(adversarialConfig.value.seed);
     }
     const data = await request.post('/ai/adversarial/run', payload);
+    if (data?.mode === 'real-threat-assessment') {
+      adversarialBattle.value = {
+        rounds: [],
+        summary: {
+          winner: 'assessment',
+          total_rounds: 0,
+          attack_success_rate: Number(data?.riskScore || 0) / 100,
+        },
+      };
+      ElMessage.success('已完成实时态势检测');
+      return;
+    }
     if (!data?.ok || !data?.battle) {
       throw new Error(data?.error || '对弈执行失败');
     }

@@ -3,6 +3,7 @@ package com.trustai.service;
 import com.trustai.entity.Role;
 import com.trustai.entity.User;
 import com.trustai.exception.BizException;
+import java.util.Objects;
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -61,12 +62,15 @@ public class CurrentUserService {
     public Role getCurrentRole(User user) {
         if (user.getRoleId() != null) {
             Role resolved = roleService.getById(user.getRoleId());
-            if (resolved != null) {
+            if (resolved != null && Objects.equals(resolved.getCompanyId(), user.getCompanyId())) {
                 return resolved;
             }
         }
         if ("admin".equalsIgnoreCase(user.getUsername())) {
-            return roleService.lambdaQuery().eq(Role::getCode, ADMIN_ROLE_CODE).one();
+            return roleService.lambdaQuery()
+                .eq(Role::getCode, ADMIN_ROLE_CODE)
+                .eq(user.getCompanyId() != null, Role::getCompanyId, user.getCompanyId())
+                .one();
         }
         return null;
     }
