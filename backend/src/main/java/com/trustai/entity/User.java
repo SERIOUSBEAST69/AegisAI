@@ -30,6 +30,7 @@ public class User {
     private Long approvedBy;
     private String rejectReason;
     private Date approvedAt;
+    private Date lastPolicyPullTime;
     private Date createTime;
     private Date updateTime;
 }

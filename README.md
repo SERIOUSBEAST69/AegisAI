@@ -33,7 +33,7 @@ npm install      # 项目根目录（必须先执行，确保 @element-plus/icon
 npm run dev
 ```
 - 访问：http://localhost:5173
-- 默认账号：`admin` / `admin123`
+- 默认账号：`admin` / `admin`
 
 ### 3. 启动 Python AI 推理服务
 ```bash

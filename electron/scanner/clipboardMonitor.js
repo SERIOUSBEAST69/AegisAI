@@ -12,6 +12,8 @@ const DEFAULT_CONFIG = {
   predictEnabled: true,
   predictEndpoint: 'http://localhost:5000/predict',
   dedupeSeconds: 60,
+  configVersion: 1,
+  syncIntervalSec: 60,
   aiWindowRules: {
     titleKeywords: ['ChatGPT', '豆包', '文心一言', 'Kimi', '通义千问'],
     processNames: ['chrome', 'msedge', 'firefox', 'doubao', 'qqbrowser'],
@@ -93,13 +95,16 @@ async function callPredict(config, text) {
 }
 
 class ClipboardPrivacyMonitor {
-  constructor({ getBackendUrl, getAuthState }) {
+  constructor({ getBackendUrl, getAuthState, getClientToken, getCompanyId }) {
     this.getBackendUrl = getBackendUrl;
     this.getAuthState = getAuthState;
+    this.getClientToken = getClientToken;
+    this.getCompanyId = getCompanyId;
     this.lastClipboard = '';
     this.lastWarnByHash = new Map();
     this.timer = null;
     this.config = { ...DEFAULT_CONFIG };
+    this.configVersion = Number(DEFAULT_CONFIG.configVersion || 1);
     this.lastConfigFetchAt = 0;
   }
 
@@ -119,7 +124,8 @@ class ClipboardPrivacyMonitor {
 
   async refreshConfig(force = false) {
     const now = Date.now();
-    if (!force && now - this.lastConfigFetchAt < 60 * 1000) {
+    const syncIntervalSec = Math.max(15, Number(this.config.syncIntervalSec || 60));
+    if (!force && now - this.lastConfigFetchAt < syncIntervalSec * 1000) {
       return;
     }
     this.lastConfigFetchAt = now;
@@ -129,11 +135,23 @@ class ClipboardPrivacyMonitor {
       return;
     }
     try {
-      const resp = await axios.get(`${backendUrl}/api/privacy/config/public`, { timeout: 3000 });
+      const resp = await axios.get(`${backendUrl}/api/privacy/config/public`, {
+        timeout: 3000,
+        params: { sinceVersion: this.configVersion || 1 },
+      });
       const data = resp?.data;
       const payload = data?.data ? data.data : data;
       if (payload && typeof payload === 'object') {
-        this.config = { ...DEFAULT_CONFIG, ...payload };
+        if (payload.changed === false) {
+          this.configVersion = Number(payload.configVersion || this.configVersion || 1);
+          this.config = {
+            ...this.config,
+            syncIntervalSec: Number(payload.syncIntervalSec || this.config.syncIntervalSec || 60),
+          };
+        } else {
+          this.config = { ...DEFAULT_CONFIG, ...payload };
+          this.configVersion = Number(this.config.configVersion || payload.configVersion || this.configVersion || 1);
+        }
       }
     } catch {
       // Keep defaults.
@@ -222,12 +240,21 @@ class ClipboardPrivacyMonitor {
       return;
     }
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      const clientToken = typeof this.getClientToken === 'function' ? this.getClientToken() : '';
+      const companyId = typeof this.getCompanyId === 'function' ? this.getCompanyId() : null;
+      if (clientToken) {
+        headers['X-Client-Token'] = String(clientToken);
+      }
+      if (Number.isFinite(Number(companyId)) && Number(companyId) > 0) {
+        headers['X-Company-Id'] = String(companyId);
+      }
       await axios.post(`${backendUrl}/api/privacy/events`, {
         ...payload,
         content: maskContent(payload.content),
       }, {
         timeout: 4000,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
       });
     } catch {
       // Ignore to keep tray process resilient.

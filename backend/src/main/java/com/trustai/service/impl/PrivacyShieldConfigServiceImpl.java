@@ -39,12 +39,24 @@ public class PrivacyShieldConfigServiceImpl implements PrivacyShieldConfigServic
     @Override
     @Transactional
     public Map<String, Object> updateConfig(Map<String, Object> newConfig) {
+        Map<String, Object> current = getOrCreateConfig();
         Map<String, Object> merged = new LinkedHashMap<>(defaultConfig());
+        merged.putAll(current);
         if (newConfig != null) {
             merged.putAll(newConfig);
         }
+        long currentVersion = toLong(current.get("configVersion"), 1L);
+        long requestedVersion = toLong(merged.get("configVersion"), currentVersion);
+        merged.put("configVersion", Math.max(currentVersion + 1, requestedVersion));
+        merged.put("updatedAt", System.currentTimeMillis());
         saveConfig(merged);
         return merged;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getConfigVersion() {
+        return toLong(getOrCreateConfig().get("configVersion"), 1L);
     }
 
     private void saveConfig(Map<String, Object> config) {
@@ -67,7 +79,6 @@ public class PrivacyShieldConfigServiceImpl implements PrivacyShieldConfigServic
         systemConfigRepository.save(entity);
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> parseConfigSafely(SystemConfig config) {
         if (config == null || !StringUtils.hasText(config.getConfigValue())) {
             return defaultConfig();
@@ -79,6 +90,8 @@ public class PrivacyShieldConfigServiceImpl implements PrivacyShieldConfigServic
             if (parsed != null) {
                 merged.putAll(parsed);
             }
+            merged.put("configVersion", toLong(merged.get("configVersion"), 1L));
+            merged.putIfAbsent("updatedAt", System.currentTimeMillis());
             return merged;
         } catch (Exception ex) {
             return defaultConfig();
@@ -91,6 +104,9 @@ public class PrivacyShieldConfigServiceImpl implements PrivacyShieldConfigServic
         root.put("predictEnabled", true);
         root.put("predictEndpoint", "http://localhost:5000/predict");
         root.put("dedupeSeconds", 60);
+        root.put("configVersion", 1L);
+        root.put("updatedAt", System.currentTimeMillis());
+        root.put("syncIntervalSec", 60);
         root.put("sensitiveKeywords", List.of("身份证", "银行卡", "手机号", "公司代码"));
 
         List<Map<String, Object>> selectors = new ArrayList<>();
@@ -115,5 +131,16 @@ public class PrivacyShieldConfigServiceImpl implements PrivacyShieldConfigServic
         item.put("hosts", hosts);
         item.put("inputSelectors", inputs);
         return item;
+    }
+
+    private long toLong(Object value, long defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (Exception ignored) {
+            return defaultValue;
+        }
     }
 }

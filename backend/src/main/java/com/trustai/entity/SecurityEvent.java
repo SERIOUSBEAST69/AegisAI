@@ -41,6 +41,9 @@ public class SecurityEvent {
     /** 上报来源（如 openclaw-sim / agent / manual） */
     private String source;
 
+    /** 告警触发时使用的策略版本 */
+    private Long policyVersion;
+
     /** 操作者 ID（阻拦/忽略时记录） */
     private Long operatorId;
 

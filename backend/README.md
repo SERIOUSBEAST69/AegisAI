@@ -7,7 +7,7 @@
 1. 配置数据库（MySQL 8.0）和 Redis
 2. 修改 `src/main/resources/application.yml` 数据库连接信息
 3. 执行数据库建表 SQL（见 backend/src/main/resources/db.sql）
-4. 启动后若表为空，会自动创建默认账号：用户名 `admin`，密码 `admin123`
+4. 启动后若表为空，会自动创建默认账号：用户名 `admin`，密码 `admin`
 5. 编译并启动：
 
 ```bash

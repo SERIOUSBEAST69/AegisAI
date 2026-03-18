@@ -19,6 +19,7 @@ CREATE TABLE `sys_user` (
   `approved_by` BIGINT COMMENT '审批人ID',
   `reject_reason` VARCHAR(255) COMMENT '拒绝原因',
   `approved_at` DATETIME COMMENT '审批时间',
+  `last_policy_pull_time` DATETIME COMMENT '最近策略拉取时间',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   INDEX idx_username(`username`),
@@ -135,7 +136,8 @@ CREATE TABLE `audit_log` (
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   INDEX idx_user(`user_id`),
   INDEX idx_asset(`asset_id`),
-  INDEX idx_time(`operation_time`)
+  INDEX idx_time(`operation_time`),
+  INDEX idx_user_operation_time(`user_id`,`operation_time`)
 ) COMMENT='审计日志表';
 
 CREATE TABLE `approval_request` (
@@ -181,7 +183,8 @@ CREATE TABLE `risk_event` (
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   INDEX idx_type(`type`),
-  INDEX idx_level(`level`)
+  INDEX idx_level(`level`),
+  INDEX idx_risk_company_status_time(`company_id`,`status`,`create_time`)
 ) COMMENT='风险事件表';
 
 -- 敏感数据扫描任务
@@ -268,6 +271,7 @@ CREATE TABLE `security_event` (
   `severity` VARCHAR(20) DEFAULT 'medium' COMMENT 'critical/high/medium/low',
   `status` VARCHAR(20) DEFAULT 'pending' COMMENT 'pending/blocked/ignored/reviewing',
   `source` VARCHAR(64) DEFAULT 'agent' COMMENT '上报来源',
+  `policy_version` BIGINT COMMENT '触发事件时策略版本',
   `operator_id` BIGINT COMMENT '操作者ID',
   `event_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -275,11 +279,14 @@ CREATE TABLE `security_event` (
   INDEX idx_event_status(`status`),
   INDEX idx_event_severity(`severity`),
   INDEX idx_event_employee(`employee_id`),
-  INDEX idx_event_time(`event_time`)
+  INDEX idx_event_time(`event_time`),
+  INDEX idx_sec_company_status_time(`company_id`,`status`,`event_time`),
+  INDEX idx_sec_company_severity_time(`company_id`,`severity`,`event_time`)
 ) COMMENT='安全事件表';
 
 CREATE TABLE `privacy_event` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `company_id` BIGINT COMMENT '公司ID',
   `user_id` VARCHAR(128) NOT NULL COMMENT '用户标识（用户名）',
   `event_type` VARCHAR(64) DEFAULT 'SENSITIVE_TEXT' COMMENT '事件类型',
   `content_masked` TEXT COMMENT '脱敏后的内容',
@@ -289,13 +296,63 @@ CREATE TABLE `privacy_event` (
   `hostname` VARCHAR(128) COMMENT '主机名',
   `window_title` VARCHAR(255) COMMENT '窗口标题',
   `matched_types` VARCHAR(255) COMMENT '命中的敏感类型',
+  `policy_version` BIGINT COMMENT '触发事件时策略版本',
   `event_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '事件时间',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_privacy_company(`company_id`),
   INDEX idx_privacy_user(`user_id`),
   INDEX idx_privacy_source(`source`),
-  INDEX idx_privacy_time(`event_time`)
+  INDEX idx_privacy_time(`event_time`),
+  INDEX idx_privacy_company_time(`company_id`,`event_time`),
+  INDEX idx_privacy_company_user_time(`company_id`,`user_id`,`event_time`)
 ) COMMENT='隐私盾事件表';
+
+CREATE TABLE `governance_event` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `company_id` BIGINT COMMENT '公司ID',
+  `user_id` BIGINT COMMENT '关联用户ID',
+  `username` VARCHAR(128) COMMENT '关联用户名',
+  `event_type` VARCHAR(64) NOT NULL COMMENT '统一事件类型',
+  `source_module` VARCHAR(64) NOT NULL COMMENT '来源模块',
+  `severity` VARCHAR(20) DEFAULT 'medium' COMMENT '风险等级',
+  `status` VARCHAR(20) DEFAULT 'pending' COMMENT '处置状态',
+  `title` VARCHAR(255) COMMENT '告警标题',
+  `description` TEXT COMMENT '告警描述',
+  `source_event_id` VARCHAR(64) COMMENT '来源事件ID',
+  `attack_type` VARCHAR(64) COMMENT '映射攻防类型',
+  `policy_version` BIGINT COMMENT '触发时策略版本',
+  `payload_json` LONGTEXT COMMENT '扩展载荷',
+  `handler_id` BIGINT COMMENT '处置人ID',
+  `dispose_note` VARCHAR(500) COMMENT '处置备注',
+  `event_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '事件时间',
+  `disposed_at` DATETIME COMMENT '处置时间',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_gov_company(`company_id`),
+  INDEX idx_gov_user(`user_id`),
+  INDEX idx_gov_type(`event_type`),
+  INDEX idx_gov_status(`status`),
+  INDEX idx_gov_time(`event_time`)
+) COMMENT='统一治理事件表';
+
+CREATE TABLE `adversarial_record` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `company_id` BIGINT COMMENT '公司ID',
+  `user_id` BIGINT COMMENT '关联用户ID',
+  `username` VARCHAR(128) COMMENT '关联用户名',
+  `governance_event_id` BIGINT COMMENT '触发来源告警ID',
+  `scenario` VARCHAR(64) COMMENT '攻防场景',
+  `policy_version` BIGINT COMMENT '验证时策略版本',
+  `result_json` LONGTEXT COMMENT '战报结果',
+  `effectiveness_analysis` LONGTEXT COMMENT '策略有效性分析',
+  `suggestions_json` LONGTEXT COMMENT '优化建议',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_adv_company(`company_id`),
+  INDEX idx_adv_user(`user_id`),
+  INDEX idx_adv_event(`governance_event_id`)
+) COMMENT='攻防验证记录表';
 
 CREATE TABLE `security_detection_rule` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,

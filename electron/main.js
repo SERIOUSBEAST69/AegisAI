@@ -32,6 +32,8 @@ function loadConfig() {
   const defaults = {
     serverUrl: 'http://localhost:5173',
     backendUrl: 'http://localhost:8080',
+    clientIngressToken: '',
+    companyId: 1,
     scanIntervalMinutes: 30,
     autoStart: true,
     minimizeToTray: true,
@@ -114,6 +116,22 @@ let authState    = {
 
 function canRunScan() {
   return !config.requireLoginBeforeScan || authState.authenticated;
+}
+
+function resolveReportCompanyId() {
+  const userCompanyId = Number(authState?.user?.companyId);
+  if (Number.isFinite(userCompanyId) && userCompanyId > 0) {
+    return userCompanyId;
+  }
+  const configuredCompanyId = Number(config.companyId);
+  if (Number.isFinite(configuredCompanyId) && configuredCompanyId > 0) {
+    return configuredCompanyId;
+  }
+  return 1;
+}
+
+function resolveClientIngressToken() {
+  return String(config.clientIngressToken || process.env.AEGIS_CLIENT_TOKEN || '').trim();
 }
 
 // ── 主窗口 ──────────────────────────────────────────────────────────────────
@@ -304,6 +322,14 @@ async function showServerSettings() {
       <input id="backendUrl" value="${config.backendUrl || 'http://localhost:8080'}"
         style="${inputStyle}"/>
       <p style="${hintStyle}">Spring Boot 后端地址，如 http://localhost:8080（客户端扫描上报使用）</p>
+      <label style="${labelStyle}">公司 ID（Company ID）</label>
+      <input id="companyId" value="${Number(config.companyId) || 1}"
+        style="${inputStyle}"/>
+      <p style="${hintStyle}">上报到多租户后端时用于归属公司，优先级低于已登录用户公司。</p>
+      <label style="${labelStyle}">客户端上报令牌（Client Ingress Token）</label>
+      <input id="clientIngressToken" value="${config.clientIngressToken || ''}"
+        style="${inputStyle}"/>
+      <p style="${hintStyle}">用于调用 /api/client/* 和 /api/privacy/events 等无会话上报接口。</p>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
         <button onclick="window.close()"
           style="padding:8px 20px;background:transparent;border:1px solid %23334;color:%238ab;border-radius:6px;cursor:pointer">取消</button>
@@ -314,8 +340,15 @@ async function showServerSettings() {
         document.getElementById('saveBtn').onclick = function() {
           var serverUrl = document.getElementById('serverUrl').value.trim();
           var backendUrl = document.getElementById('backendUrl').value.trim();
+          var companyId = Number(document.getElementById('companyId').value.trim() || '1');
+          var clientIngressToken = document.getElementById('clientIngressToken').value.trim();
           if (window.aegisClient) {
-            window.aegisClient.saveConfig({ serverUrl: serverUrl, backendUrl: backendUrl });
+            window.aegisClient.saveConfig({
+              serverUrl: serverUrl,
+              backendUrl: backendUrl,
+              companyId: Number.isFinite(companyId) && companyId > 0 ? companyId : 1,
+              clientIngressToken: clientIngressToken
+            });
           }
           window.close();
         };
@@ -343,6 +376,8 @@ async function runScan() {
     const result = await scanner.scan({
       clientId: CLIENT_ID,
       backendUrl: config.backendUrl || config.serverUrl,
+      companyId: resolveReportCompanyId(),
+      clientToken: resolveClientIngressToken(),
     });
     lastScanResult = result;
     console.log(`[Aegis] 扫描完成，发现影子AI：${result.shadowAiCount} 个，风险等级：${result.riskLevel}`);
@@ -399,6 +434,8 @@ ipcMain.handle('get-client-info', () => ({
   scanIntervalMinutes: config.scanIntervalMinutes,
   autoStart: config.autoStart,
   requireLoginBeforeScan: config.requireLoginBeforeScan,
+  companyId: resolveReportCompanyId(),
+  hasClientIngressToken: !!resolveClientIngressToken(),
   authState,
   lastScanResult,
 }));
@@ -465,6 +502,8 @@ app.whenReady().then(async () => {
   clipboardMonitor = createClipboardMonitor({
     getBackendUrl: () => config.backendUrl || config.serverUrl,
     getAuthState: () => authState,
+    getClientToken: () => resolveClientIngressToken(),
+    getCompanyId: () => resolveReportCompanyId(),
   });
   clipboardMonitor.start().catch(() => {});
 });

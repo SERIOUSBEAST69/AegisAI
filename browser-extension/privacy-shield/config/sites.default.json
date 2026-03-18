@@ -3,6 +3,8 @@
   "predictEnabled": true,
   "predictEndpoint": "http://localhost:5000/predict",
   "backendBaseUrl": "http://localhost:8080",
+  "clientIngressToken": "",
+  "companyId": 1,
   "siteSelectors": [
     {
       "siteId": "chatgpt",

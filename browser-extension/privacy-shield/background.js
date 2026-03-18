@@ -5,6 +5,10 @@ const DEFAULT_CONFIG = {
   predictEnabled: true,
   predictEndpoint: 'http://localhost:5000/predict',
   backendBaseUrl: 'http://localhost:8080',
+  clientIngressToken: '',
+  companyId: 1,
+  configVersion: 1,
+  syncIntervalSec: 60,
   siteSelectors: [
     {
       siteId: 'chatgpt',
@@ -40,9 +44,12 @@ async function saveLocalConfig(config) {
   await chrome.storage.local.set({ privacyConfig: config });
 }
 
-async function fetchRemoteConfig(baseUrl) {
+async function fetchRemoteConfig(baseUrl, sinceVersion) {
   try {
-    const resp = await fetch(`${baseUrl}/api/privacy/config/public`, {
+    const query = Number.isFinite(Number(sinceVersion))
+      ? `?sinceVersion=${encodeURIComponent(String(sinceVersion))}`
+      : '';
+    const resp = await fetch(`${baseUrl}/api/privacy/config/public${query}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -56,8 +63,21 @@ async function fetchRemoteConfig(baseUrl) {
 
 async function ensureConfig() {
   const local = await getLocalConfig();
-  const remote = await fetchRemoteConfig(local.backendBaseUrl);
-  const merged = remote ? { ...local, ...remote } : local;
+  const localVersion = Number(local.configVersion || 0);
+  const remote = await fetchRemoteConfig(local.backendBaseUrl, localVersion);
+  let merged = local;
+  if (remote && remote.changed === false) {
+    merged = {
+      ...local,
+      configVersion: Number(remote.configVersion || localVersion || 1),
+      syncIntervalSec: Number(remote.syncIntervalSec || local.syncIntervalSec || 60),
+    };
+  } else if (remote) {
+    merged = { ...local, ...remote };
+  }
+  if (!merged.configVersion) {
+    merged.configVersion = localVersion || 1;
+  }
   await saveLocalConfig(merged);
   return merged;
 }
@@ -152,9 +172,16 @@ async function reportEvent(payload) {
   };
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (config.clientIngressToken) {
+      headers['X-Client-Token'] = String(config.clientIngressToken);
+    }
+    if (Number.isFinite(Number(config.companyId)) && Number(config.companyId) > 0) {
+      headers['X-Company-Id'] = String(config.companyId);
+    }
     await fetch(`${config.backendBaseUrl}/api/privacy/events`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(event),
     });
   } catch {

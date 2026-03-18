@@ -1,6 +1,6 @@
 {
   "accounts": [
-    { "role": "ADMIN", "username": "admin", "password": "admin123" },
+    { "role": "ADMIN", "username": "admin", "password": "admin" },
     { "role": "EXECUTIVE", "username": "exec.demo", "password": "demo1234" },
     { "role": "SECOPS", "username": "secops.demo", "password": "demo1234" },
     { "role": "DATA_ADMIN", "username": "data.demo", "password": "demo1234" },

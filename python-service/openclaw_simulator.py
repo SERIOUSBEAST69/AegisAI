@@ -10,13 +10,15 @@ OpenClaw 工作台事件模拟器（Workbench Event Simulator）
      python openclaw_adversarial.py --verbose --scenario supply_chain_apt
 
 用法：
-    python openclaw_simulator.py [--url URL] [--count N] [--batch BATCH_SIZE] [--delay SECONDS]
+    python openclaw_simulator.py [--url URL] [--count N] [--batch BATCH_SIZE] [--delay SECONDS] [--token TOKEN] [--company-id ID]
 
 参数：
     --url       AegisAI 后端地址，默认 http://localhost:8080
     --count     生成事件总数，默认 1200
     --batch     每批上报数量，默认 50
     --delay     每批之间的延迟秒数，默认 0.1（实时模式用 1-5）
+    --token     客户端上报令牌（可选，支持 AEGIS_CLIENT_TOKEN 环境变量）
+    --company-id 上报公司ID（默认 1，支持 AEGIS_COMPANY_ID 环境变量）
     --realtime  实时模式：每秒生成 1-5 条事件，持续运行直到 Ctrl+C
 
 示例：
@@ -29,6 +31,7 @@ OpenClaw 工作台事件模拟器（Workbench Event Simulator）
 
 import argparse
 import json
+import os
 import random
 import time
 import uuid
@@ -162,7 +165,7 @@ def generate_event(offset_seconds: Optional[int] = None) -> dict:
     }
 
 
-def report_events(backend_url: str, events: list) -> Tuple[int, int]:
+def report_events(backend_url: str, events: list, client_token: str = "", company_id: Optional[int] = None) -> Tuple[int, int]:
     """将事件列表逐条上报至后端，返回 (成功数, 失败数)"""
     success = 0
     failure = 0
@@ -170,10 +173,15 @@ def report_events(backend_url: str, events: list) -> Tuple[int, int]:
 
     for event in events:
         payload = json.dumps(event).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if client_token:
+            headers["X-Client-Token"] = client_token
+        if company_id is not None and company_id > 0:
+            headers["X-Company-Id"] = str(company_id)
         req = urllib.request.Request(
             report_url,
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         try:
@@ -200,7 +208,7 @@ def report_events(backend_url: str, events: list) -> Tuple[int, int]:
     return success, failure
 
 
-def run_batch_mode(backend_url: str, total: int, batch_size: int, delay: float):
+def run_batch_mode(backend_url: str, total: int, batch_size: int, delay: float, client_token: str = "", company_id: Optional[int] = None):
     """一次性生成 total 条历史事件并分批上报"""
     print(f"[OpenClaw Simulator] 准备生成 {total} 条模拟事件，上报至 {backend_url}")
     print(f"  批次大小: {batch_size}  批间延迟: {delay}s\n")
@@ -218,7 +226,7 @@ def run_batch_mode(backend_url: str, total: int, batch_size: int, delay: float):
     for i, offset in enumerate(offsets, 1):
         batch.append(generate_event(offset_seconds=offset))
         if len(batch) >= batch_size or i == total:
-            ok, fail = report_events(backend_url, batch)
+            ok, fail = report_events(backend_url, batch, client_token=client_token, company_id=company_id)
             ok_total += ok
             fail_total += fail
             generated += len(batch)
@@ -230,7 +238,7 @@ def run_batch_mode(backend_url: str, total: int, batch_size: int, delay: float):
     print(f"\n[完成] 共上报 {ok_total} 条成功，{fail_total} 条失败。")
 
 
-def run_realtime_mode(backend_url: str, events_per_second: float = 2.0):
+def run_realtime_mode(backend_url: str, events_per_second: float = 2.0, client_token: str = "", company_id: Optional[int] = None):
     """实时模式：持续生成事件直到 Ctrl+C，模拟在线检测场景"""
     print(f"[OpenClaw Simulator] 实时模式启动，上报至 {backend_url}")
     print("  按 Ctrl+C 停止\n")
@@ -242,7 +250,7 @@ def run_realtime_mode(backend_url: str, events_per_second: float = 2.0):
     try:
         while True:
             event = generate_event()
-            ok, fail = report_events(backend_url, [event])
+            ok, fail = report_events(backend_url, [event], client_token=client_token, company_id=company_id)
             total_ok += ok
             total_fail += fail
             ts = datetime.now().strftime("%H:%M:%S")
@@ -256,6 +264,14 @@ def run_realtime_mode(backend_url: str, events_per_second: float = 2.0):
         print(f"\n[停止] 共上报 {total_ok} 条成功，{total_fail} 条失败。")
 
 
+def parse_company_id(raw: str, fallback: int = 1) -> int:
+    try:
+        value = int(str(raw).strip())
+        return value if value > 0 else fallback
+    except (TypeError, ValueError):
+        return fallback
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="OpenClaw 代理窃取模拟器 — 生成模拟安全事件并上报到 AegisAI"
@@ -266,12 +282,14 @@ def main():
     parser.add_argument("--delay", type=float, default=0.05, help="批间延迟（秒）")
     parser.add_argument("--realtime", action="store_true", help="实时模式（持续生成，Ctrl+C 停止）")
     parser.add_argument("--rps", type=float, default=2.0, help="实时模式每秒事件数（默认 2）")
+    parser.add_argument("--token", default=os.getenv("AEGIS_CLIENT_TOKEN", ""), help="客户端上报令牌（可选）")
+    parser.add_argument("--company-id", type=int, default=parse_company_id(os.getenv("AEGIS_COMPANY_ID", "1")), help="公司ID（默认 1）")
     args = parser.parse_args()
 
     if args.realtime:
-        run_realtime_mode(args.url, events_per_second=args.rps)
+        run_realtime_mode(args.url, events_per_second=args.rps, client_token=args.token, company_id=args.company_id)
     else:
-        run_batch_mode(args.url, total=args.count, batch_size=args.batch, delay=args.delay)
+        run_batch_mode(args.url, total=args.count, batch_size=args.batch, delay=args.delay, client_token=args.token, company_id=args.company_id)
 
 
 if __name__ == "__main__":

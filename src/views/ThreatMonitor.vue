@@ -192,6 +192,104 @@
         </el-card>
       </el-tab-pane>
 
+      <el-tab-pane label="告警闭环" name="alertCenter">
+        <el-card class="card-glass" style="margin-top: 0">
+          <div class="toolbar-row">
+            <el-select
+              v-model="centerFilter.status"
+              placeholder="处置状态"
+              clearable
+              style="width: 140px"
+              @change="refreshCenterEvents"
+            >
+              <el-option label="待处理" value="pending" />
+              <el-option label="审查中" value="reviewing" />
+              <el-option label="已阻断" value="blocked" />
+              <el-option label="已忽略" value="ignored" />
+            </el-select>
+
+            <el-select
+              v-model="centerFilter.eventType"
+              placeholder="告警类型"
+              clearable
+              style="width: 160px"
+              @change="refreshCenterEvents"
+            >
+              <el-option label="隐私告警" value="PRIVACY_ALERT" />
+              <el-option label="行为异常" value="ANOMALY_ALERT" />
+              <el-option label="影子AI" value="SHADOW_AI_ALERT" />
+              <el-option label="安全威胁" value="SECURITY_ALERT" />
+            </el-select>
+
+            <el-input
+              v-model="centerFilter.keyword"
+              placeholder="搜索标题 / 描述 / 用户 / 模块"
+              style="width: 300px"
+              clearable
+              @change="refreshCenterEvents"
+            >
+              <template #prefix><el-icon><Search /></el-icon></template>
+            </el-input>
+
+            <el-button @click="resetCenterFilter">重置</el-button>
+          </div>
+
+          <el-table
+            :data="centerEvents"
+            v-loading="centerLoading"
+            style="margin-top: 12px"
+            :row-style="rowStyle"
+          >
+            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column prop="eventType" label="类型" width="130">
+              <template #default="{ row }">{{ centerEventTypeLabel(row.eventType) }}</template>
+            </el-table-column>
+            <el-table-column prop="severity" label="级别" width="100">
+              <template #default="{ row }">
+                <el-tag :type="severityTagType(row.severity)" size="small">{{ severityLabel(row.severity) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="title" label="告警标题" min-width="220" />
+            <el-table-column prop="username" label="关联用户" width="120" />
+            <el-table-column prop="sourceModule" label="来源模块" width="120" />
+            <el-table-column prop="eventTime" label="发生时间" min-width="160" />
+            <el-table-column prop="status" label="状态" width="110">
+              <template #default="{ row }">
+                <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="260" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" @click="openRelated(row)">关联事件</el-button>
+                <el-button
+                  v-if="canHandleThreats && (row.status === 'pending' || row.status === 'reviewing')"
+                  size="small"
+                  type="danger"
+                  @click="openDispose(row, 'blocked')"
+                >阻断并验证</el-button>
+                <el-button
+                  v-if="canHandleThreats && (row.status === 'pending' || row.status === 'reviewing')"
+                  size="small"
+                  @click="openDispose(row, 'ignored')"
+                >忽略</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination-row">
+            <el-pagination
+              v-model:current-page="centerPagination.page"
+              v-model:page-size="centerPagination.pageSize"
+              :total="centerPagination.total"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next, jumper"
+              @current-change="refreshCenterEvents"
+              @size-change="refreshCenterEvents"
+            />
+          </div>
+        </el-card>
+      </el-tab-pane>
+
       <!-- ── 检测规则 Tab ── -->
       <el-tab-pane v-if="canManageThreatRules" label="检测规则" name="rules">
         <el-card class="card-glass" style="margin-top: 0">
@@ -239,10 +337,26 @@
 
             <div class="drill-actions">
               <el-button type="primary" :loading="drillLoading" @click="runImmediateThreatDrill">立即检测</el-button>
+              <el-button type="success" :loading="simDrillLoading" @click="runPythonBattleDrill">模拟攻防</el-button>
               <el-tag :type="threatDrill.threatLevel === 'high' ? 'danger' : (threatDrill.threatLevel === 'medium' ? 'warning' : 'success')" size="large">
                 当前态势：{{ threatDrill.threatLevel || 'unknown' }}
               </el-tag>
             </div>
+
+            <div class="drill-config-row">
+              <el-select v-model="simDrillConfig.scenario" style="width: 280px" :disabled="simDrillLoading">
+                <el-option
+                  v-for="scene in simulationScenarios"
+                  :key="scene.code"
+                  :label="scene.description || scene.code"
+                  :value="scene.code"
+                />
+              </el-select>
+              <el-input-number v-model="simDrillConfig.rounds" :min="1" :max="100" :disabled="simDrillLoading" />
+              <el-input v-model="simDrillConfig.seed" style="width: 180px" placeholder="seed(可选)" :disabled="simDrillLoading" />
+            </div>
+
+            <p v-if="simDrillError" class="sim-error">{{ simDrillError }}</p>
 
             <div class="code-block" style="margin-top: 14px">
               <div class="code-label">风险评分</div>
@@ -261,6 +375,52 @@
               <el-table-column prop="status" label="状态" width="120" />
               <el-table-column prop="eventTime" label="时间" min-width="180" />
             </el-table>
+
+            <div v-if="battleDrill" class="battle-panel">
+              <h4>多维度攻防对弈结果</h4>
+              <div class="battle-summary-grid">
+                <article>
+                  <span>胜方</span>
+                  <strong>{{ battleDrill.winner || '—' }}</strong>
+                </article>
+                <article>
+                  <span>突破率</span>
+                  <strong>{{ Math.round((battleDrill.attack_success_rate || 0) * 100) }}%</strong>
+                </article>
+                <article>
+                  <span>最终分数</span>
+                  <strong>{{ battleDrill.attacker_final_score }} : {{ battleDrill.defender_final_score }}</strong>
+                </article>
+                <article>
+                  <span>总回合</span>
+                  <strong>{{ battleDrill.total_rounds || visibleBattleRounds.length }}</strong>
+                </article>
+              </div>
+
+              <div v-if="visibleBattleRounds.length" class="battle-round-stream">
+                <article v-for="round in visibleBattleRounds" :key="`battle-${round.round_num}`" class="battle-round-item">
+                  <div class="battle-round-head">
+                    <strong>Round {{ round.round_num }}</strong>
+                    <span class="battle-pill" :class="round.attack_success ? 'hit' : 'block'">
+                      {{ round.attack_success ? '攻破' : '拦截' }}
+                    </span>
+                  </div>
+                  <p>{{ round.attack_strategy }} vs {{ round.defense_strategy }}</p>
+                  <em>effective={{ round.final_attack_effectiveness }}</em>
+                </article>
+              </div>
+
+              <div v-if="battleDrill.recommendations?.length" class="battle-recommendations">
+                <h5>防守建议</h5>
+                <p v-for="tip in battleDrill.recommendations" :key="tip">{{ tip }}</p>
+              </div>
+
+              <div v-if="battleInsights.analysis || battleInsights.suggestions.length" class="battle-recommendations">
+                <h5>策略有效性分析</h5>
+                <p>{{ battleInsights.analysis || '暂无分析内容' }}</p>
+                <p v-for="(tip, idx) in battleInsights.suggestions" :key="`insight-${idx}`">{{ idx + 1 }}. {{ tip }}</p>
+              </div>
+            </div>
           </div>
         </el-card>
       </el-tab-pane>
@@ -273,13 +433,88 @@
       type="button"
       :disabled="floatingDrillLoading"
       @click="runFloatingDrill"
-      :title="floatingDrillLoading ? '攻防检测进行中' : '启动攻防检测'"
+      :title="floatingDrillLoading ? '攻防模拟进行中' : '启动攻防模拟'"
     >
       <span class="fab-icon">⚔</span>
-      <span class="fab-label">{{ floatingDrillLoading ? '检测中' : '模拟攻防' }}</span>
+      <span class="fab-label">{{ floatingDrillLoading ? '模拟中' : '模拟攻防' }}</span>
     </button>
 
     <!-- 规则编辑弹窗 -->
+    <el-drawer
+      v-model="relatedVisible"
+      title="关联事件链路"
+      size="50%"
+      :with-header="true"
+    >
+      <div v-if="relatedCurrent" class="related-head">
+        <p>当前事件: #{{ relatedCurrent.id }} / {{ relatedCurrent.title || '未命名告警' }}</p>
+      </div>
+      <el-skeleton v-if="relatedLoading" rows="6" animated />
+      <template v-else>
+        <div class="related-tags">
+          <el-tag v-for="(count, key) in relatedTypeCount" :key="key" size="small">{{ centerEventTypeLabel(key) }}: {{ count }}</el-tag>
+        </div>
+        <el-table :data="relatedEvents" style="margin-top: 10px">
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="eventType" label="类型" width="130">
+            <template #default="{ row }">{{ centerEventTypeLabel(row.eventType) }}</template>
+          </el-table-column>
+          <el-table-column prop="severity" label="级别" width="90">
+            <template #default="{ row }">
+              <el-tag :type="severityTagType(row.severity)" size="small">{{ severityLabel(row.severity) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="title" label="标题" min-width="200" />
+          <el-table-column prop="status" label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="eventTime" label="时间" min-width="160" />
+        </el-table>
+      </template>
+    </el-drawer>
+
+    <el-dialog
+      v-model="disposeDialogVisible"
+      title="告警处置与策略验证"
+      width="620px"
+    >
+      <el-form :model="disposeForm" label-position="top">
+        <el-form-item label="处置动作">
+          <el-radio-group v-model="disposeForm.status">
+            <el-radio label="blocked">阻断</el-radio>
+            <el-radio label="ignored">忽略</el-radio>
+            <el-radio label="reviewing">审查中</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="处置备注">
+          <el-input v-model="disposeForm.note" type="textarea" :rows="3" placeholder="输入处置说明与依据" />
+        </el-form-item>
+        <el-form-item label="触发攻防验证">
+          <el-switch v-model="disposeForm.triggerSimulation" active-text="触发" inactive-text="不触发" />
+        </el-form-item>
+        <el-form-item v-if="disposeForm.triggerSimulation" label="验证回合数">
+          <el-input-number v-model="disposeForm.rounds" :min="1" :max="100" />
+        </el-form-item>
+      </el-form>
+
+      <div v-if="disposeResult" class="dispose-result">
+        <div class="code-label">策略有效性分析</div>
+        <p>{{ disposeResult.effectivenessAnalysis || disposeResult.analysis || '无' }}</p>
+        <div class="code-label" style="margin-top: 8px">优化建议</div>
+        <p
+          v-for="(tip, idx) in (disposeResult.optimizationSuggestions || disposeResult.suggestions || [])"
+          :key="`dispose-tip-${idx}`"
+        >{{ idx + 1 }}. {{ tip }}</p>
+      </div>
+
+      <template #footer>
+        <el-button @click="disposeDialogVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="disposeLoading" @click="submitDispose">提交处置</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog
       v-model="showRuleDialog"
       :title="ruleForm.id ? '编辑检测规则' : '新增检测规则'"
@@ -332,6 +567,7 @@ import {
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import request from '../api/request';
+import { alertCenterApi } from '../api/alertCenter';
 import { useUserStore } from '../store/user';
 
 const userStore = useUserStore();
@@ -351,11 +587,35 @@ const stats = ref({});
 
 async function fetchStats() {
   try {
-    stats.value = await request.get('/security/stats');
+    stats.value = await alertCenterApi.stats();
   } catch (e) {
-    console.warn('[ThreatMonitor] stats error:', e.message);
+    try {
+      stats.value = await request.get('/security/stats');
+    } catch (err) {
+      console.warn('[ThreatMonitor] stats error:', err.message);
+    }
   }
 }
+
+const centerLoading = ref(false);
+const centerEvents = ref([]);
+const centerFilter = ref({ status: '', eventType: '', keyword: '' });
+const centerPagination = ref({ page: 1, pageSize: 20, total: 0 });
+const relatedVisible = ref(false);
+const relatedLoading = ref(false);
+const relatedCurrent = ref(null);
+const relatedEvents = ref([]);
+const relatedTypeCount = ref({});
+const disposeDialogVisible = ref(false);
+const disposeLoading = ref(false);
+const disposeForm = ref({
+  id: null,
+  status: 'blocked',
+  note: '',
+  triggerSimulation: true,
+  rounds: 12,
+});
+const disposeResult = ref(null);
 
 // ── 事件列表 ──────────────────────────────────────────────────────────────────
 const events = ref([]);
@@ -502,17 +762,37 @@ let refreshTimer = null;
 
 const drillLoading = ref(false);
 const floatingDrillLoading = ref(false);
+const simDrillLoading = ref(false);
+const simDrillError = ref('');
 const threatDrill = ref({
   threatLevel: 'low',
   riskScore: 0,
   signals: {},
   recentSecurityEvents: [],
 });
+const adversarialMeta = ref({ scenarios: [] });
+const battleDrill = ref(null);
+const visibleBattleRounds = ref([]);
+const battleInsights = ref({ analysis: '', suggestions: [] });
+const simDrillConfig = ref({
+  scenario: 'random',
+  rounds: 12,
+  seed: '',
+});
+let battlePlaybackTimer = null;
+
+const simulationScenarios = computed(() => {
+  const all = Array.isArray(adversarialMeta.value?.scenarios) ? adversarialMeta.value.scenarios : [];
+  return all.filter(scene => String(scene?.code || '').trim().toLowerCase() !== 'real-threat-check');
+});
 
 function startAutoRefresh() {
   stopAutoRefresh();
   refreshTimer = setInterval(() => {
     refreshEvents();
+    if (activeTab.value === 'alertCenter') {
+      refreshCenterEvents();
+    }
     fetchStats();
   }, 5000);
 }
@@ -540,7 +820,87 @@ const activeTab = ref('events');
 
 // ── 总刷新 ────────────────────────────────────────────────────────────────────
 async function refresh() {
-  await Promise.all([refreshEvents(), fetchStats()]);
+  await Promise.all([refreshEvents(), refreshCenterEvents(), fetchStats()]);
+}
+
+async function refreshCenterEvents() {
+  centerLoading.value = true;
+  try {
+    const params = {
+      page: centerPagination.value.page,
+      pageSize: centerPagination.value.pageSize,
+    };
+    if (centerFilter.value.status) params.status = centerFilter.value.status;
+    if (centerFilter.value.eventType) params.eventType = centerFilter.value.eventType;
+    if (centerFilter.value.keyword) params.keyword = centerFilter.value.keyword;
+
+    const data = await alertCenterApi.list(params);
+    centerEvents.value = data.list || [];
+    centerPagination.value.total = data.total || 0;
+    if (data.stats) {
+      stats.value = data.stats;
+    }
+  } catch (e) {
+    ElMessage.error('加载告警闭环失败：' + (e.message || '未知错误'));
+  } finally {
+    centerLoading.value = false;
+  }
+}
+
+function resetCenterFilter() {
+  centerFilter.value = { status: '', eventType: '', keyword: '' };
+  centerPagination.value.page = 1;
+  refreshCenterEvents();
+}
+
+async function openRelated(row) {
+  relatedVisible.value = true;
+  relatedCurrent.value = row;
+  relatedLoading.value = true;
+  relatedEvents.value = [];
+  relatedTypeCount.value = {};
+  try {
+    const data = await alertCenterApi.related(row.id, { limit: 30 });
+    relatedEvents.value = data.related || [];
+    relatedTypeCount.value = data.typeCount || {};
+  } catch (e) {
+    ElMessage.error('加载关联事件失败：' + (e.message || '未知错误'));
+  } finally {
+    relatedLoading.value = false;
+  }
+}
+
+function openDispose(row, status) {
+  disposeForm.value = {
+    id: row.id,
+    status,
+    note: '',
+    triggerSimulation: true,
+    rounds: 12,
+  };
+  disposeResult.value = null;
+  disposeDialogVisible.value = true;
+}
+
+async function submitDispose() {
+  disposeLoading.value = true;
+  try {
+    const payload = {
+      id: disposeForm.value.id,
+      status: disposeForm.value.status,
+      note: disposeForm.value.note,
+      triggerSimulation: disposeForm.value.triggerSimulation,
+      rounds: disposeForm.value.rounds,
+    };
+    const data = await alertCenterApi.dispose(payload);
+    disposeResult.value = data.validation || null;
+    ElMessage.success('告警处置已提交');
+    await Promise.all([refreshCenterEvents(), fetchStats()]);
+  } catch (e) {
+    ElMessage.error('处置失败：' + (e.message || '未知错误'));
+  } finally {
+    disposeLoading.value = false;
+  }
 }
 
 async function fetchThreatDrillMeta() {
@@ -548,7 +908,13 @@ async function fetchThreatDrillMeta() {
     return;
   }
   try {
-    threatDrill.value = await request.get('/ai/adversarial/meta');
+    const data = await request.get('/ai/adversarial/meta');
+    threatDrill.value = data;
+    adversarialMeta.value = data || { scenarios: [] };
+    const firstScene = simulationScenarios.value[0]?.code;
+    if (firstScene && !simulationScenarios.value.some(scene => scene.code === simDrillConfig.value.scenario)) {
+      simDrillConfig.value.scenario = firstScene;
+    }
   } catch (e) {
     ElMessage.error('攻防态势加载失败：' + (e.message || '未知错误'));
   }
@@ -573,22 +939,95 @@ async function runImmediateThreatDrill() {
   }
 }
 
+function stopBattlePlayback() {
+  if (battlePlaybackTimer) {
+    clearInterval(battlePlaybackTimer);
+    battlePlaybackTimer = null;
+  }
+}
+
+function startBattlePlayback(rounds) {
+  stopBattlePlayback();
+  visibleBattleRounds.value = [];
+  if (!Array.isArray(rounds) || rounds.length === 0) {
+    return;
+  }
+  let cursor = 0;
+  battlePlaybackTimer = window.setInterval(() => {
+    visibleBattleRounds.value = rounds.slice(0, cursor + 1);
+    cursor += 1;
+    if (cursor >= rounds.length) {
+      stopBattlePlayback();
+    }
+  }, 320);
+}
+
+async function runPythonBattleDrill() {
+  if (!canRunThreatDrill.value || simDrillLoading.value) {
+    return;
+  }
+  simDrillLoading.value = true;
+  simDrillError.value = '';
+  try {
+    const payload = {
+      scenario: simDrillConfig.value.scenario || 'random',
+      rounds: Math.max(1, Math.min(100, Number(simDrillConfig.value.rounds || 10))),
+    };
+    if (String(simDrillConfig.value.seed || '').trim()) {
+      payload.seed = Number(simDrillConfig.value.seed);
+    }
+
+    const data = await request.post('/ai/adversarial/start', payload);
+    if (!data?.ok) {
+      throw new Error(data?.error || data?.engineError || '未获取到对弈结果');
+    }
+    const normalizedBattle = data.battle || {
+      winner: data.winner || (data.riskScore >= 60 ? 'attacker' : 'defender'),
+      attack_success_rate: Number(data.attack_success_rate ?? 0),
+      attacker_final_score: Number(data.attacker_final_score ?? Math.max(1, Number(data.riskScore || 0))),
+      defender_final_score: Number(data.defender_final_score ?? Math.max(1, 100 - Number(data.riskScore || 0))),
+      total_rounds: Number(data.total_rounds ?? payload.rounds),
+      rounds: Array.isArray(data.rounds) ? data.rounds : [],
+      recommendations: data.recommendations || data.optimizationSuggestions || data.suggestions || [],
+    };
+    battleDrill.value = normalizedBattle;
+    battleInsights.value = {
+      analysis: data.effectivenessAnalysis || data.analysis || '',
+      suggestions: data.optimizationSuggestions || data.suggestions || [],
+    };
+    if (data.meta) {
+      adversarialMeta.value = data.meta;
+    }
+    if (data.assessment) {
+      threatDrill.value = data.assessment;
+    } else {
+      threatDrill.value = {
+        ...threatDrill.value,
+        threatLevel: data.threatLevel || threatDrill.value.threatLevel,
+        riskScore: data.riskScore ?? threatDrill.value.riskScore,
+      };
+    }
+    startBattlePlayback(normalizedBattle.rounds || []);
+    ElMessage.success('多维度攻防模拟已完成');
+    await refresh();
+  } catch (e) {
+    simDrillError.value = e?.message || '攻防模拟失败';
+    ElMessage.error('攻防模拟失败：' + simDrillError.value);
+  } finally {
+    simDrillLoading.value = false;
+  }
+}
+
 async function runFloatingDrill() {
   if (!canHandleThreats.value || floatingDrillLoading.value) {
     return;
   }
   floatingDrillLoading.value = true;
   try {
-    const data = await request.post('/ai/adversarial/start', {
-      scenario: 'real-threat-check',
-      rounds: 1,
-    });
-    threatDrill.value = data?.assessment || data || threatDrill.value;
+    await runPythonBattleDrill();
     activeTab.value = 'drill';
-    ElMessage.success('攻防检测已触发，态势面板已更新');
-    await refresh();
   } catch (e) {
-    ElMessage.error('攻防检测触发失败：' + (e.message || '未知错误'));
+    ElMessage.error('攻防模拟触发失败：' + (e.message || '未知错误'));
   } finally {
     floatingDrillLoading.value = false;
   }
@@ -621,6 +1060,16 @@ function eventTypeLabel(t) {
     CREDENTIAL_DUMP: '凭证转储',
   };
   return map[t] ?? t;
+}
+
+function centerEventTypeLabel(t) {
+  const map = {
+    PRIVACY_ALERT: '隐私告警',
+    ANOMALY_ALERT: '行为异常',
+    SHADOW_AI_ALERT: '影子AI',
+    SECURITY_ALERT: '安全威胁',
+  };
+  return map[t] ?? (t || '未知');
 }
 
 function formatSize(bytes) {
@@ -659,6 +1108,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  stopBattlePlayback();
   stopAutoRefresh();
 });
 </script>
@@ -871,6 +1321,147 @@ code {
   margin: 12px 0;
 }
 
+.drill-config-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.sim-error {
+  margin: 4px 0 12px;
+  color: #ff8a80;
+  font-size: 13px;
+}
+
+.battle-panel {
+  margin-top: 16px;
+}
+
+.battle-panel h4 {
+  margin: 0 0 10px;
+  color: #e8f4ff;
+}
+
+.battle-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.battle-summary-grid article {
+  border-radius: 10px;
+  border: 1px solid rgba(100, 180, 255, 0.2);
+  background: rgba(17, 38, 74, 0.55);
+  padding: 10px 12px;
+}
+
+.battle-summary-grid span {
+  display: block;
+  color: rgba(200, 220, 255, 0.68);
+  font-size: 12px;
+}
+
+.battle-summary-grid strong {
+  display: block;
+  margin-top: 4px;
+  color: #f4fbff;
+  font-size: 16px;
+}
+
+.battle-round-stream {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.battle-round-item {
+  border: 1px solid rgba(100, 180, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(13, 28, 52, 0.6);
+  padding: 10px;
+}
+
+.battle-round-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.battle-round-item p {
+  margin: 0;
+  color: rgba(218, 236, 255, 0.82);
+}
+
+.battle-round-item em {
+  display: block;
+  margin-top: 6px;
+  color: rgba(188, 214, 246, 0.72);
+  font-style: normal;
+  font-size: 12px;
+}
+
+.battle-pill {
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.battle-pill.hit {
+  color: #ffe2e2;
+  background: rgba(230, 70, 70, 0.25);
+}
+
+.battle-pill.block {
+  color: #d7ffe0;
+  background: rgba(58, 188, 118, 0.25);
+}
+
+.battle-recommendations {
+  margin-top: 12px;
+  border-top: 1px solid rgba(100, 180, 255, 0.15);
+  padding-top: 10px;
+}
+
+.battle-recommendations h5 {
+  margin: 0 0 6px;
+  color: #dff1ff;
+}
+
+.battle-recommendations p {
+  margin: 0 0 5px;
+}
+
+.related-head p {
+  margin: 0;
+  color: rgba(214, 232, 255, 0.86);
+}
+
+.related-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dispose-result {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 180, 255, 0.18);
+  background: rgba(18, 40, 75, 0.55);
+}
+
+.dispose-result p {
+  margin: 4px 0;
+  color: rgba(224, 238, 255, 0.88);
+}
+
 .adversarial-fab {
   position: fixed;
   right: 28px;
@@ -931,6 +1522,10 @@ code {
 @media (max-width: 900px) {
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .battle-summary-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
   }
 
   .adversarial-fab {

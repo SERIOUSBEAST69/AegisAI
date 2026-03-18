@@ -55,7 +55,6 @@ public class DashboardController {
             return R.ok(buildDemoStats());
         }
         Long companyId = companyScopeService.requireCompanyId();
-        List<Long> companyUserIds = companyScopeService.companyUserIds();
         Map<String, Object> map = new HashMap<>();
         map.put("dataAsset", dataAssetService.count(new QueryWrapper<DataAsset>().eq("company_id", companyId)));
         map.put("aiModel", aiModelService.count());
@@ -88,22 +87,44 @@ public class DashboardController {
         Date todayDate = Date.from(today.atStartOfDay(zoneId).toInstant());
         Date yesterdayDate = Date.from(today.minusDays(1).atStartOfDay(zoneId).toInstant());
 
-        List<RiskEvent> recentRiskEvents = riskEventService.list(new QueryWrapper<RiskEvent>().eq("company_id", companyId).ge("create_time", previous7Date));
-        QueryWrapper<AuditLog> auditQuery = new QueryWrapper<AuditLog>().ge("operation_time", previous7Date);
+        List<RiskEvent> recentRiskEvents = riskEventService.list(
+            new QueryWrapper<RiskEvent>()
+                .select("id", "type", "level", "status", "process_log", "create_time")
+                .eq("company_id", companyId)
+                .ge("create_time", previous7Date)
+                .orderByDesc("create_time")
+                .last("LIMIT 5000")
+        );
+        QueryWrapper<AuditLog> auditQuery = new QueryWrapper<AuditLog>()
+            .select("id", "user_id", "operation_time")
+            .ge("operation_time", previous7Date)
+            .last("LIMIT 10000");
         if (!companyUserIds.isEmpty()) {
             auditQuery.in("user_id", companyUserIds);
         }
         List<AuditLog> recentAuditLogs = auditLogService.list(auditQuery);
-        QueryWrapper<ModelCallStat> modelStatQuery = new QueryWrapper<ModelCallStat>().ge("date", previous7Date);
+        QueryWrapper<ModelCallStat> modelStatQuery = new QueryWrapper<ModelCallStat>()
+            .select("id", "user_id", "date", "call_count", "cost_cents")
+            .ge("date", previous7Date)
+            .last("LIMIT 10000");
         if (!companyUserIds.isEmpty()) {
             modelStatQuery.in("user_id", companyUserIds);
         }
         List<ModelCallStat> recentModelStats = modelCallStatService.list(modelStatQuery);
-        QueryWrapper<SubjectRequest> subjectQuery = new QueryWrapper<>();
+        QueryWrapper<SubjectRequest> pendingSubjectQuery = new QueryWrapper<SubjectRequest>()
+            .in("status", Arrays.asList("pending", "processing"));
         if (!companyUserIds.isEmpty()) {
-            subjectQuery.in("user_id", companyUserIds);
+            pendingSubjectQuery.in("user_id", companyUserIds);
         }
-        List<SubjectRequest> subjectRequests = subjectRequestService.list(subjectQuery);
+        long pendingSubjectRequests = subjectRequestService.count(pendingSubjectQuery);
+        QueryWrapper<SubjectRequest> subjectFeedQuery = new QueryWrapper<SubjectRequest>()
+            .select("id", "type", "status", "comment", "create_time")
+            .orderByDesc("create_time")
+            .last("LIMIT 500");
+        if (!companyUserIds.isEmpty()) {
+            subjectFeedQuery.in("user_id", companyUserIds);
+        }
+        List<SubjectRequest> recentSubjectRequests = subjectRequestService.list(subjectFeedQuery);
 
         long highSensitivityAssets = dataAssetService.count(
             new QueryWrapper<DataAsset>()
@@ -153,9 +174,6 @@ public class DashboardController {
         long highRiskEvents = recentRiskEvents.stream()
             .filter(item -> Arrays.asList("high", "critical", "高").contains(normalizeLower(item.getLevel())))
             .count();
-        long pendingSubjectRequests = subjectRequests.stream()
-            .filter(item -> Arrays.asList("pending", "processing").contains(normalizeLower(item.getStatus())))
-            .count();
         long enabledModels = aiModelService.count(new QueryWrapper<AiModel>().eq("status", "enabled"));
 
         WorkbenchOverviewDTO dto = new WorkbenchOverviewDTO();
@@ -179,7 +197,7 @@ public class DashboardController {
         dto.setTrend(buildTrend(last7Start, recentRiskEvents, recentAuditLogs, recentModelStats));
         dto.setRiskDistribution(buildRiskDistribution(recentRiskEvents));
         dto.setTodos(buildTodos(highRiskEvents, openAlerts, pendingSubjectRequests, enabledModels));
-        dto.setFeeds(buildFeeds(recentRiskEvents, subjectRequests));
+        dto.setFeeds(buildFeeds(recentRiskEvents, recentSubjectRequests));
         return R.ok(dto);
     }
 

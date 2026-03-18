@@ -7,6 +7,7 @@ import com.trustai.entity.SecurityEvent;
 import com.trustai.entity.User;
 import com.trustai.service.CompanyScopeService;
 import com.trustai.service.CurrentUserService;
+import com.trustai.service.EventHubService;
 import com.trustai.service.RiskEventService;
 import com.trustai.service.SecurityEventService;
 import com.trustai.service.UserService;
@@ -74,6 +75,9 @@ public class AnomalyController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private EventHubService eventHubService;
+
     /**
      * 检测单条员工 AI 行为记录是否异常。
      *
@@ -105,6 +109,7 @@ public class AnomalyController {
         }
         try {
             Map<String, Object> result = aiInferenceClient.anomalyCheck(payload);
+            ingestAnomalyIfNeeded(payload, result);
             return R.ok(result);
         } catch (Exception e) {
             log.error("[Anomaly] 异常检测失败: {}", e.getMessage());
@@ -351,5 +356,47 @@ public class AnomalyController {
         summary.put("events", List.of());
         summary.put("count", 0);
         return summary;
+    }
+
+    private void ingestAnomalyIfNeeded(Map<String, Object> payload, Map<String, Object> result) {
+        if (result == null || !isAnomaly(result.get("is_anomaly"))) {
+            return;
+        }
+        Long companyId = companyScopeService.requireCompanyId();
+        String employeeId = String.valueOf(payload.getOrDefault("employee_id", currentUserService.requireCurrentUser().getUsername()));
+        String level = normalizeRisk(String.valueOf(result.getOrDefault("risk_level", "high")));
+        String description = String.valueOf(result.getOrDefault("description", "AI行为异常"));
+
+        RiskEvent riskEvent = new RiskEvent();
+        riskEvent.setCompanyId(companyId);
+        riskEvent.setType("behavior_anomaly");
+        riskEvent.setLevel(level);
+        riskEvent.setStatus("open");
+        riskEvent.setHandlerId(currentUserService.requireCurrentUser().getId());
+        riskEvent.setProcessLog(description);
+        riskEvent.setCreateTime(new Date());
+        riskEvent.setUpdateTime(new Date());
+        riskEventService.save(riskEvent);
+
+        User employee = userService.lambdaQuery().eq(User::getCompanyId, companyId).eq(User::getUsername, employeeId).one();
+        eventHubService.ingestAnomalyEvent(companyId, employee, Map.of(
+            "employeeId", employeeId,
+            "riskEventId", riskEvent.getId() == null ? "" : String.valueOf(riskEvent.getId()),
+            "aiService", String.valueOf(payload.getOrDefault("ai_service", "unknown")),
+            "department", String.valueOf(payload.getOrDefault("department", "unknown")),
+            "score", String.valueOf(result.getOrDefault("score", result.getOrDefault("anomaly_score", ""))),
+            "rawResult", result
+        ));
+    }
+
+    private boolean isAnomaly(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof Number num) {
+            return num.intValue() != 0;
+        }
+        String text = String.valueOf(value == null ? "" : value).trim();
+        return "true".equalsIgnoreCase(text) || "1".equals(text) || "yes".equalsIgnoreCase(text);
     }
 }

@@ -155,7 +155,7 @@
                       <div class="field-group">
                         <label for="login-password">密码</label>
                         <div class="password-wrap">
-                          <input id="login-password" v-model="passwordForm.password" class="field-input" :type="showPwd ? 'text' : 'password'" autocomplete="current-password" placeholder="例如：admin123" />
+                          <input id="login-password" v-model="passwordForm.password" class="field-input" :type="showPwd ? 'text' : 'password'" autocomplete="current-password" placeholder="例如：admin" />
                           <button type="button" class="assist-button clickable" @click="showPwd = !showPwd">{{ showPwd ? '隐藏' : '显示' }}</button>
                         </div>
                       </div>
@@ -479,7 +479,7 @@ const accessModes = [
 ];
 
 const demoAccounts = [
-  { label: '治理管理员', username: 'admin', password: 'admin123', phone: '13800138000', nickname: '平台管理员', roleCode: 'ADMIN', organizationType: 'enterprise', department: '治理中心', wechatOpenId: 'wx_admin' },
+  { label: '治理管理员', username: 'admin', password: 'admin', phone: '13800138000', nickname: '平台管理员', roleCode: 'ADMIN', organizationType: 'enterprise', department: '治理中心', wechatOpenId: 'wx_admin' },
   { label: '管理层', username: 'exec.demo', password: 'demo1234', phone: '13800138001', nickname: '经营负责人', roleCode: 'EXECUTIVE', organizationType: 'enterprise', department: '经营管理部', wechatOpenId: 'wx_exec_demo' },
   { label: '安全运维', username: 'secops.demo', password: 'demo1234', phone: '13800138002', nickname: '安全运维负责人', roleCode: 'SECOPS', organizationType: 'enterprise', department: '安全运营中心', wechatOpenId: 'wx_secops_demo' },
   { label: '数据管理员', username: 'data.demo', password: 'demo1234', phone: '13800138003', nickname: '数据管理员', roleCode: 'DATA_ADMIN', organizationType: 'enterprise', department: '数据治理部', wechatOpenId: 'wx_data_demo' },

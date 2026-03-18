@@ -85,7 +85,7 @@ flowable:
 # MyBatis-Plus 配置
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: ${MYBATIS_LOG_IMPL:org.apache.ibatis.logging.nologging.NoLoggingImpl}
     map-underscore-to-camel-case: true
   global-config:
     db-config:
@@ -94,7 +94,8 @@ mybatis-plus:
 # 日志配置
 logging:
   level:
-    com.trustai: debug
+    com.trustai: ${APP_LOG_LEVEL:INFO}
+    org.springframework.web: ${WEB_LOG_LEVEL:INFO}
 
 # 自定义配置
 ai:
@@ -122,6 +123,13 @@ risk:
 
 # 安全跨域配置
 security:
+  jwt:
+    secret: ${SECURITY_JWT_SECRET:aegisai-secret-key-please-change-at-least-32-chars}
+    expire-ms: ${SECURITY_JWT_EXPIRE_MS:43200000}
+  client-ingress:
+    enforce: ${CLIENT_INGRESS_ENFORCE:false}
+    token: ${CLIENT_INGRESS_TOKEN:}
+    default-company-id: ${CLIENT_INGRESS_DEFAULT_COMPANY_ID:1}
   cross-site:
     guard-enabled: ${CROSS_SITE_GUARD_ENABLED:true}
     allowed-origins: ${CROSS_SITE_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080}

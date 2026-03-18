@@ -1,6 +1,7 @@
 package com.trustai.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.trustai.config.DemoAccountCatalog;
 import com.trustai.config.jwt.JwtUtil;
 import com.trustai.dto.UserProfileDTO;
 import com.trustai.entity.Company;
@@ -42,27 +43,6 @@ public class AuthController {
     private static final String ACCOUNT_STATUS_ACTIVE = "active";
     private static final String ACCOUNT_STATUS_REJECTED = "rejected";
     private static final String ACCOUNT_STATUS_DISABLED = "disabled";
-    private static final Map<String, String> ROLE_LABELS = new LinkedHashMap<>();
-
-    static {
-        ROLE_LABELS.put("ADMIN", "治理管理员");
-        ROLE_LABELS.put("EXECUTIVE", "管理层");
-        ROLE_LABELS.put("SECOPS", "安全运维");
-        ROLE_LABELS.put("DATA_ADMIN", "数据管理员");
-        ROLE_LABELS.put("AI_BUILDER", "AI应用开发者");
-        ROLE_LABELS.put("BUSINESS_OWNER", "业务负责人");
-        ROLE_LABELS.put("EMPLOYEE", "普通员工");
-    }
-
-    private static final List<DemoAccountSeed> DEMO_ACCOUNT_SEEDS = List.of(
-        new DemoAccountSeed("admin", "admin123", "平台管理员", "ADMIN", "enterprise", "治理中心", "13800138000", "admin@aegisai.com", "wx_admin"),
-        new DemoAccountSeed("exec.demo", "demo1234", "经营负责人", "EXECUTIVE", "enterprise", "经营管理部", "13800138001", "exec@aegisai.com", "wx_exec_demo"),
-        new DemoAccountSeed("secops.demo", "demo1234", "安全运维负责人", "SECOPS", "enterprise", "安全运营中心", "13800138002", "secops@aegisai.com", "wx_secops_demo"),
-        new DemoAccountSeed("data.demo", "demo1234", "数据管理员", "DATA_ADMIN", "enterprise", "数据治理部", "13800138003", "data@aegisai.com", "wx_data_demo"),
-        new DemoAccountSeed("builder.demo", "demo1234", "AI应用开发者", "AI_BUILDER", "ai-team", "模型平台组", "13800138004", "builder@aegisai.com", "wx_builder_demo"),
-        new DemoAccountSeed("biz.demo", "demo1234", "业务负责人", "BUSINESS_OWNER", "enterprise", "业务创新部", "13800138006", "biz@aegisai.com", "wx_biz_demo"),
-        new DemoAccountSeed("employee.demo", "demo1234", "普通员工", "EMPLOYEE", "enterprise", "业务一线", "13800138007", "employee@aegisai.com", "wx_employee_demo")
-    );
 
     @Autowired private UserService userService;
     @Autowired private PasswordEncoder passwordEncoder;
@@ -139,7 +119,7 @@ public class AuthController {
 
     @GetMapping("/registration-options")
     public R<?> registrationOptions() {
-        List<Map<String, String>> identities = ROLE_LABELS.entrySet().stream()
+        List<Map<String, String>> identities = DemoAccountCatalog.roleLabels().entrySet().stream()
             .map(entry -> option(entry.getKey(), entry.getValue()))
             .toList();
         List<Map<String, String>> organizations = List.of(
@@ -203,22 +183,31 @@ public class AuthController {
     }
 
     private void ensureDemoUserByUsername(String username) {
-        ensureDemoUser(DEMO_ACCOUNT_SEEDS.stream().filter(seed -> seed.username().equals(username)).findFirst().orElse(null));
+        ensureDemoUser(DemoAccountCatalog.demoAccountSeeds().stream()
+            .filter(seed -> seed.username().equals(username))
+            .findFirst()
+            .orElse(null));
     }
 
     private void ensureDemoUserByPhone(String phone) {
-        ensureDemoUser(DEMO_ACCOUNT_SEEDS.stream().filter(seed -> seed.phone().equals(phone)).findFirst().orElse(null));
+        ensureDemoUser(DemoAccountCatalog.demoAccountSeeds().stream()
+            .filter(seed -> seed.phone().equals(phone))
+            .findFirst()
+            .orElse(null));
     }
 
     private void ensureDemoUserByWechat(String wechatOpenId) {
-        ensureDemoUser(DEMO_ACCOUNT_SEEDS.stream().filter(seed -> seed.wechatOpenId().equals(wechatOpenId)).findFirst().orElse(null));
+        ensureDemoUser(DemoAccountCatalog.demoAccountSeeds().stream()
+            .filter(seed -> seed.wechatOpenId().equals(wechatOpenId))
+            .findFirst()
+            .orElse(null));
     }
 
-    private void ensureDemoUser(DemoAccountSeed seed) {
+    private void ensureDemoUser(DemoAccountCatalog.DemoAccountSeed seed) {
         if (seed == null) {
             return;
         }
-        Role role = resolveOrCreateRoleForCompany(seed.roleCode(), 1L);
+        Role role = resolveOrCreateRoleForCompany(seed.roleCode(), DemoAccountCatalog.DEMO_COMPANY_ID);
         if (role == null) {
             return;
         }
@@ -236,7 +225,7 @@ public class AuthController {
         user.setNickname(seed.realName());
         user.setRoleId(role.getId());
         if (user.getCompanyId() == null) {
-            user.setCompanyId(1L);
+            user.setCompanyId(DemoAccountCatalog.DEMO_COMPANY_ID);
         }
         user.setDeviceId(seed.username() + "-device");
         user.setOrganizationType(seed.organizationType());
@@ -252,7 +241,7 @@ public class AuthController {
         user.setRejectReason(null);
         user.setStatus(1);
         user.setUpdateTime(new Date());
-        if (isNew || !isBcryptHash(user.getPassword())) {
+        if (isNew || !isBcryptHash(user.getPassword()) || !passwordMatches(user.getPassword(), seed.password())) {
             user.setPassword(passwordEncoder.encode(seed.password()));
         }
 
@@ -274,7 +263,7 @@ public class AuthController {
         if (role != null) {
             return role;
         }
-        String roleName = ROLE_LABELS.get(roleCode);
+        String roleName = DemoAccountCatalog.roleLabels().get(roleCode);
         if (!StringUtils.hasText(roleName)) {
             return null;
         }
@@ -291,6 +280,14 @@ public class AuthController {
 
     private boolean isBcryptHash(String value) {
         return StringUtils.hasText(value) && value.startsWith("$2");
+    }
+
+    private boolean passwordMatches(String encodedPassword, String rawPassword) {
+        try {
+            return StringUtils.hasText(encodedPassword) && passwordEncoder.matches(rawPassword, encodedPassword);
+        } catch (Exception ex) {
+            return false;
+        }
     }
 
     private User createUser(RegisterReq req, String loginType) {
@@ -579,15 +576,4 @@ public class AuthController {
         private final long serverTime;
     }
 
-    private record DemoAccountSeed(
-        String username,
-        String password,
-        String realName,
-        String roleCode,
-        String organizationType,
-        String department,
-        String phone,
-        String email,
-        String wechatOpenId
-    ) { }
 }

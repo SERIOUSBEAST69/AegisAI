@@ -2,6 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS client_report (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   client_id VARCHAR(64) NOT NULL,
   hostname VARCHAR(255),
   os_username VARCHAR(255),
@@ -17,6 +18,7 @@ CREATE TABLE IF NOT EXISTS client_report (
 
 CREATE TABLE IF NOT EXISTS client_scan_queue (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   platform VARCHAR(32) NOT NULL,
   hostname VARCHAR(255),
   os_username VARCHAR(255),
@@ -50,6 +52,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
   approved_by BIGINT,
   reject_reason VARCHAR(255),
   approved_at TIMESTAMP,
+  last_policy_pull_time TIMESTAMP,
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -258,6 +261,17 @@ CREATE TABLE IF NOT EXISTS system_config (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_audit_user_op_time ON audit_log(user_id, operation_time);
+CREATE INDEX IF NOT EXISTS idx_risk_company_status_time ON risk_event(company_id, status, create_time);
+CREATE INDEX IF NOT EXISTS idx_model_stat_user_date ON model_call_stat(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_sec_company_status_time ON security_event(company_id, status, event_time);
+CREATE INDEX IF NOT EXISTS idx_sec_company_severity_time ON security_event(company_id, severity, event_time);
+CREATE INDEX IF NOT EXISTS idx_privacy_company_time ON privacy_event(company_id, event_time);
+CREATE INDEX IF NOT EXISTS idx_privacy_company_user_time ON privacy_event(company_id, user_id, event_time);
+CREATE INDEX IF NOT EXISTS idx_client_report_company_scan ON client_report(company_id, scan_time);
+CREATE INDEX IF NOT EXISTS idx_client_report_company_client_scan ON client_report(company_id, client_id, scan_time);
+CREATE INDEX IF NOT EXISTS idx_client_queue_company_download ON client_scan_queue(company_id, download_time);
+
 -- Default admin user will be created by DataInitializer on startup
 
 INSERT INTO company (company_code, company_name, status, create_time, update_time)
@@ -364,6 +378,7 @@ CREATE TABLE IF NOT EXISTS security_event (
   severity VARCHAR(20) DEFAULT 'medium' COMMENT 'critical/high/medium/low',
   status VARCHAR(20) DEFAULT 'pending' COMMENT 'pending/blocked/ignored/reviewing',
   source VARCHAR(64) DEFAULT 'agent' COMMENT '上报来源',
+  policy_version BIGINT,
   operator_id BIGINT COMMENT '操作者ID',
   event_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -385,6 +400,7 @@ CREATE TABLE IF NOT EXISTS security_detection_rule (
 
 CREATE TABLE IF NOT EXISTS privacy_event (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
   user_id VARCHAR(128) NOT NULL,
   event_type VARCHAR(64) DEFAULT 'SENSITIVE_TEXT',
   content_masked CLOB,
@@ -394,7 +410,46 @@ CREATE TABLE IF NOT EXISTS privacy_event (
   hostname VARCHAR(128),
   window_title VARCHAR(255),
   matched_types VARCHAR(255),
+  policy_version BIGINT,
   event_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS governance_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
+  user_id BIGINT,
+  username VARCHAR(128),
+  event_type VARCHAR(64) NOT NULL,
+  source_module VARCHAR(64) NOT NULL,
+  severity VARCHAR(20) DEFAULT 'medium',
+  status VARCHAR(20) DEFAULT 'pending',
+  title VARCHAR(255),
+  description CLOB,
+  source_event_id VARCHAR(64),
+  attack_type VARCHAR(64),
+  policy_version BIGINT,
+  payload_json CLOB,
+  handler_id BIGINT,
+  dispose_note VARCHAR(500),
+  event_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  disposed_at TIMESTAMP,
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS adversarial_record (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT,
+  user_id BIGINT,
+  username VARCHAR(128),
+  governance_event_id BIGINT,
+  scenario VARCHAR(64),
+  policy_version BIGINT,
+  result_json CLOB,
+  effectiveness_analysis CLOB,
+  suggestions_json CLOB,
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

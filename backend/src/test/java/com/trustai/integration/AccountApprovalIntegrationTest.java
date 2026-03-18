@@ -49,7 +49,7 @@ class AccountApprovalIntegrationTest {
         String approvableUsername = uniqueUsername("approve");
         String rejectedUsername = uniqueUsername("reject");
 
-        JsonNode adminLoginResp = login("admin", "admin123");
+        JsonNode adminLoginResp = login("admin", "admin");
         assertEquals(20000, adminLoginResp.path("code").asInt());
         String adminToken = adminLoginResp.path("data").path("token").asText();
         String adminCompanyName = adminLoginResp.path("data").path("user").path("companyName").asText();

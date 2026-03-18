@@ -7,8 +7,6 @@ import com.trustai.service.UserService;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
@@ -23,18 +21,6 @@ import org.springframework.util.StringUtils;
 @Order(1)
 public class DataInitializer implements CommandLineRunner {
 
-    private static final Map<String, String> ROLE_LABELS = new LinkedHashMap<>();
-
-    static {
-        ROLE_LABELS.put("ADMIN", "治理管理员");
-        ROLE_LABELS.put("EXECUTIVE", "管理层");
-        ROLE_LABELS.put("SECOPS", "安全运维");
-        ROLE_LABELS.put("DATA_ADMIN", "数据管理员");
-        ROLE_LABELS.put("AI_BUILDER", "AI应用开发者");
-        ROLE_LABELS.put("BUSINESS_OWNER", "业务负责人");
-        ROLE_LABELS.put("EMPLOYEE", "普通员工");
-    }
-
     @Autowired
     private UserService userService;
     @Autowired
@@ -44,15 +30,11 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        ROLE_LABELS.forEach((code, name) -> ensureRole(1L, code, name));
+        DemoAccountCatalog.roleLabels().forEach((code, name) -> ensureRole(DemoAccountCatalog.DEMO_COMPANY_ID, code, name));
 
-        ensureUser("admin", "admin123", "平台管理员", "ADMIN", "enterprise", "治理中心", "13800138000", "admin@aegisai.com", "password", "wx_admin");
-        ensureUser("exec.demo", "demo1234", "经营负责人", "EXECUTIVE", "enterprise", "经营管理部", "13800138001", "exec@aegisai.com", "password", "wx_exec_demo");
-        ensureUser("secops.demo", "demo1234", "安全运维负责人", "SECOPS", "enterprise", "安全运营中心", "13800138002", "secops@aegisai.com", "password", "wx_secops_demo");
-        ensureUser("data.demo", "demo1234", "数据管理员", "DATA_ADMIN", "enterprise", "数据治理部", "13800138003", "data@aegisai.com", "password", "wx_data_demo");
-        ensureUser("builder.demo", "demo1234", "AI应用开发者", "AI_BUILDER", "ai-team", "模型平台组", "13800138004", "builder@aegisai.com", "password", "wx_builder_demo");
-        ensureUser("biz.demo", "demo1234", "业务负责人", "BUSINESS_OWNER", "enterprise", "业务创新部", "13800138006", "biz@aegisai.com", "password", "wx_biz_demo");
-        ensureUser("employee.demo", "demo1234", "普通员工", "EMPLOYEE", "enterprise", "业务一线", "13800138007", "employee@aegisai.com", "password", "wx_employee_demo");
+        for (DemoAccountCatalog.DemoAccountSeed seed : DemoAccountCatalog.demoAccountSeeds()) {
+            ensureUser(seed);
+        }
 
         cleanupDeprecatedSchoolIdentity();
     }
@@ -74,42 +56,39 @@ public class DataInitializer implements CommandLineRunner {
         roleService.save(role);
     }
 
-    private void ensureUser(String username, String password, String realName, String roleCode,
-                            String organizationType, String department, String phone, String email, String loginType,
-                            String wechatOpenId) {
-        Role role = findRoleByCompanyAndCode(1L, roleCode);
-        User user = userService.lambdaQuery().eq(User::getUsername, username).one();
+    private void ensureUser(DemoAccountCatalog.DemoAccountSeed seed) {
+        Role role = findRoleByCompanyAndCode(DemoAccountCatalog.DEMO_COMPANY_ID, seed.roleCode());
+        User user = userService.lambdaQuery().eq(User::getUsername, seed.username()).one();
         boolean isNew = user == null;
         boolean shouldResetPassword = false;
         if (isNew) {
             user = new User();
-            user.setUsername(username);
+            user.setUsername(seed.username());
             user.setCreateTime(new Date());
             shouldResetPassword = true;
-        } else if (!isBcryptHash(user.getPassword())) {
+        } else if (!isBcryptHash(user.getPassword()) || !passwordMatches(user.getPassword(), seed.password())) {
             shouldResetPassword = true;
         }
 
         if (shouldResetPassword) {
-            user.setPassword(passwordEncoder.encode(password));
+            user.setPassword(passwordEncoder.encode(seed.password()));
         }
 
-        // 对于已存在的用户，不修改密码
-        user.setRealName(realName);
-        user.setNickname(realName);
+        user.setRealName(seed.realName());
+        user.setNickname(seed.realName());
         user.setRoleId(role == null ? null : role.getId());
-        user.setCompanyId(1L);
-        user.setDeviceId(username + "-device");
-        user.setOrganizationType(organizationType);
-        user.setDepartment(department);
-        user.setPhone(phone);
-        user.setEmail(email);
-        user.setLoginType(loginType);
-        user.setWechatOpenId(wechatOpenId);
+        user.setCompanyId(DemoAccountCatalog.DEMO_COMPANY_ID);
+        user.setDeviceId(seed.username() + "-device");
+        user.setOrganizationType(seed.organizationType());
+        user.setDepartment(seed.department());
+        user.setPhone(seed.phone());
+        user.setEmail(seed.email());
+        user.setLoginType("password");
+        user.setWechatOpenId(seed.wechatOpenId());
         user.setAccountType("demo");
         user.setAccountStatus("active");
         user.setRejectReason(null);
-        user.setApprovedBy(1L);
+        user.setApprovedBy(resolveAdminId());
         user.setApprovedAt(new Date());
         user.setStatus(1);
         user.setUpdateTime(new Date());
@@ -117,7 +96,7 @@ public class DataInitializer implements CommandLineRunner {
             userService.save(user);
         } else {
             if (!shouldResetPassword) {
-                user.setPassword(null); // 确保更新时不修改现有用户密码（updateById 默认跳过 null 字段）
+                user.setPassword(null);
             }
             userService.updateById(user);
         }
@@ -126,12 +105,12 @@ public class DataInitializer implements CommandLineRunner {
     private void cleanupDeprecatedSchoolIdentity() {
         userService.lambdaUpdate().eq(User::getUsername, "school.demo").remove();
 
-        Role schoolRole = findRoleByCompanyAndCode(1L, "SCHOOL_ADMIN");
+        Role schoolRole = findRoleByCompanyAndCode(DemoAccountCatalog.DEMO_COMPANY_ID, "SCHOOL_ADMIN");
         if (schoolRole == null) {
             return;
         }
 
-        Role fallbackRole = findRoleByCompanyAndCode(1L, "DATA_ADMIN");
+        Role fallbackRole = findRoleByCompanyAndCode(DemoAccountCatalog.DEMO_COMPANY_ID, "DATA_ADMIN");
         List<User> users = userService.lambdaQuery().eq(User::getRoleId, schoolRole.getId()).list();
         for (User user : users) {
             user.setRoleId(fallbackRole == null ? null : fallbackRole.getId());
@@ -155,5 +134,18 @@ public class DataInitializer implements CommandLineRunner {
 
     private boolean isBcryptHash(String value) {
         return StringUtils.hasText(value) && value.startsWith("$2");
+    }
+
+    private boolean passwordMatches(String encoded, String raw) {
+        try {
+            return StringUtils.hasText(encoded) && passwordEncoder.matches(raw, encoded);
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private Long resolveAdminId() {
+        User admin = userService.lambdaQuery().eq(User::getUsername, "admin").one();
+        return admin == null ? null : admin.getId();
     }
 }

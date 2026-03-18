@@ -3,9 +3,13 @@ package com.trustai.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.trustai.entity.ClientReport;
 import com.trustai.entity.ClientScanQueue;
+import com.trustai.entity.User;
+import com.trustai.service.ClientIngressAuthService;
 import com.trustai.service.ClientReportService;
 import com.trustai.service.ClientScanQueueService;
 import com.trustai.service.CurrentUserService;
+import com.trustai.service.EventHubService;
+import com.trustai.service.UserService;
 import com.trustai.utils.R;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +39,9 @@ public class ClientReportController {
     private final ClientReportService clientReportService;
     private final ClientScanQueueService clientScanQueueService;
     private final CurrentUserService currentUserService;
+    private final EventHubService eventHubService;
+    private final UserService userService;
+    private final ClientIngressAuthService clientIngressAuthService;
 
     // ── 客户端注册（幂等） ──────────────────────────────────────────────────────
 
@@ -43,8 +50,12 @@ public class ClientReportController {
      * 若该 clientId 已有历史报告则直接返回确认，否则记录初始化记录。
      */
     @PostMapping("/register")
-    public R<Map<String, Object>> register(@RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
+    public R<Map<String, Object>> register(@RequestHeader(value = "X-Client-Token", required = false) String clientToken,
+                                           @RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
                                            @RequestBody RegisterReq req) {
+        if (!clientIngressAuthService.isAuthorized(clientToken)) {
+            return R.error(40100, "客户端令牌无效");
+        }
         if (req.getClientId() == null || req.getClientId().isBlank()) {
             return R.error(40000, "clientId 不能为空");
         }
@@ -71,8 +82,12 @@ public class ClientReportController {
      * 客户端扫描完成后调用，将本次发现的影子AI服务列表上报给服务端。
      */
     @PostMapping("/report")
-    public R<Map<String, Object>> report(@RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
+    public R<Map<String, Object>> report(@RequestHeader(value = "X-Client-Token", required = false) String clientToken,
+                                         @RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
                                          @RequestBody ClientReport report) {
+        if (!clientIngressAuthService.isAuthorized(clientToken)) {
+            return R.error(40100, "客户端令牌无效");
+        }
         if (report.getClientId() == null || report.getClientId().isBlank()) {
             return R.error(40000, "clientId 不能为空");
         }
@@ -89,6 +104,14 @@ public class ClientReportController {
         report.setRiskLevel(calcRiskLevel(report.getShadowAiCount(), report.getDiscoveredServices()));
 
         clientReportService.save(report);
+        User relatedUser = resolveRelatedUser(report);
+        eventHubService.ingestShadowAiEvent(report, relatedUser, Map.of(
+            "clientId", String.valueOf(report.getClientId() == null ? "" : report.getClientId()),
+            "osUsername", String.valueOf(report.getOsUsername() == null ? "" : report.getOsUsername()),
+            "hostname", String.valueOf(report.getHostname() == null ? "" : report.getHostname()),
+            "serviceCount", report.getShadowAiCount() == null ? 0 : report.getShadowAiCount(),
+            "riskLevel", String.valueOf(report.getRiskLevel() == null ? "" : report.getRiskLevel())
+        ));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", report.getId());
@@ -282,7 +305,7 @@ public class ClientReportController {
     }
 
     private Long resolveCompanyId(Long headerCompanyId) {
-        if (headerCompanyId != null) {
+        if (headerCompanyId != null && headerCompanyId > 0) {
             return headerCompanyId;
         }
         try {
@@ -293,7 +316,24 @@ public class ClientReportController {
         } catch (Exception ignored) {
             // unauthenticated reporting is allowed
         }
-        return 1L;
+        return clientIngressAuthService.getDefaultCompanyId();
+    }
+
+    private User resolveRelatedUser(ClientReport report) {
+        if (report == null || report.getCompanyId() == null) {
+            return null;
+        }
+        String osUsername = report.getOsUsername();
+        if (osUsername != null && !osUsername.isBlank()) {
+            User byUsername = userService.lambdaQuery()
+                    .eq(User::getCompanyId, report.getCompanyId())
+                    .eq(User::getUsername, osUsername)
+                    .one();
+            if (byUsername != null) {
+                return byUsername;
+            }
+        }
+        return null;
     }
 
     // ── DTO ────────────────────────────────────────────────────────────────────

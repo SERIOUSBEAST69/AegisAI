@@ -1,5 +1,5 @@
 -- Aegis Workbench 主题化演示数据
--- 说明：默认管理员账号由后端 DataInitializer 自动创建（admin / admin123）。
+-- 说明：默认管理员账号由后端 DataInitializer 自动创建（admin / admin）。
 
 INSERT INTO role (id, name, code, description) VALUES
 (1, '平台管理员', 'ADMIN', '负责可信AI数据治理与隐私合规平台全局运营');

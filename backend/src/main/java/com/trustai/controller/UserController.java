@@ -22,7 +22,9 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -47,6 +49,9 @@ public class UserController {
     private static final String ACCOUNT_STATUS_PENDING = "pending";
     private static final String ACCOUNT_STATUS_ACTIVE = "active";
     private static final String ACCOUNT_STATUS_REJECTED = "rejected";
+    private static final long MAX_AVATAR_SIZE_BYTES = 2L * 1024 * 1024;
+    private static final Set<String> ALLOWED_AVATAR_EXTENSIONS = Set.of(".png", ".jpg", ".jpeg", ".gif", ".webp");
+    private static final Set<String> ALLOWED_AVATAR_CONTENT_TYPES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
 
     @Autowired private UserService userService;
     @Autowired private PasswordEncoder passwordEncoder;
@@ -290,8 +295,23 @@ public class UserController {
 
     private String storeAvatar(MultipartFile file) {
         try {
+            if (file.getSize() > MAX_AVATAR_SIZE_BYTES) {
+                throw new BizException(40000, "头像大小不能超过 2MB");
+            }
             String original = file.getOriginalFilename();
-            String ext = original != null && original.contains(".") ? original.substring(original.lastIndexOf('.')) : "";
+            if (!StringUtils.hasText(original) || !original.contains(".")) {
+                throw new BizException(40000, "头像文件名非法");
+            }
+            String ext = original.substring(original.lastIndexOf('.')).toLowerCase(Locale.ROOT);
+            if (!ALLOWED_AVATAR_EXTENSIONS.contains(ext)) {
+                throw new BizException(40000, "仅支持 png/jpg/jpeg/gif/webp 格式头像");
+            }
+            String contentType = StringUtils.hasText(file.getContentType())
+                    ? file.getContentType().toLowerCase(Locale.ROOT)
+                    : "";
+            if (!ALLOWED_AVATAR_CONTENT_TYPES.contains(contentType)) {
+                throw new BizException(40000, "头像 MIME 类型不合法");
+            }
             String filename = UUID.randomUUID() + ext;
             Path dir = Paths.get("uploads");
             Files.createDirectories(dir);

@@ -69,7 +69,7 @@ function calcOverallRisk(services) {
 /**
  * 执行完整扫描并将结果上报至服务端。
  *
- * @param {{ clientId: string, backendUrl: string, serverUrl?: string }} opts
+ * @param {{ clientId: string, backendUrl: string, serverUrl?: string, clientToken?: string, companyId?: number }} opts
  * @returns {Promise<{
  *   shadowAiCount: number,
  *   riskLevel: string,
@@ -77,7 +77,7 @@ function calcOverallRisk(services) {
  *   time: string,
  * }>}
  */
-async function scan({ clientId, backendUrl, serverUrl }) {
+async function scan({ clientId, backendUrl, serverUrl, clientToken, companyId }) {
   // backendUrl 优先；兼容旧调用方式中传入 serverUrl 的情况
   const apiBase = backendUrl || serverUrl;
   const startTime = Date.now();
@@ -126,9 +126,16 @@ async function scan({ clientId, backendUrl, serverUrl }) {
     };
 
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (clientToken) {
+        headers['X-Client-Token'] = String(clientToken);
+      }
+      if (Number.isFinite(Number(companyId)) && Number(companyId) > 0) {
+        headers['X-Company-Id'] = String(companyId);
+      }
       await axios.post(`${apiBase}/api/client/report`, report, {
         timeout: 10000,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
       });
       console.log('[Scanner] 扫描报告已成功上报至服务端');
     } catch (err) {

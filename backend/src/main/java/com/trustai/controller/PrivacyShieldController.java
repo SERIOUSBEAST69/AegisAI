@@ -2,11 +2,15 @@ package com.trustai.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.trustai.entity.GovernanceEvent;
 import com.trustai.entity.PrivacyEvent;
 import com.trustai.entity.User;
+import com.trustai.service.ClientIngressAuthService;
+import com.trustai.service.EventHubService;
 import com.trustai.service.CurrentUserService;
 import com.trustai.service.PrivacyEventService;
 import com.trustai.service.PrivacyShieldConfigService;
+import com.trustai.service.UserService;
 import com.trustai.utils.R;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -27,6 +31,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,38 +49,69 @@ public class PrivacyShieldController {
     private final PrivacyEventService privacyEventService;
     private final PrivacyShieldConfigService privacyShieldConfigService;
     private final CurrentUserService currentUserService;
+    private final UserService userService;
+    private final EventHubService eventHubService;
+    private final ClientIngressAuthService clientIngressAuthService;
 
     @PostMapping("/events")
-    public R<Map<String, Object>> reportEvent(@RequestBody PrivacyEventReportReq req) {
+    public R<Map<String, Object>> reportEvent(
+            @RequestHeader(value = "X-Client-Token", required = false) String clientToken,
+            @RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
+            @RequestBody PrivacyEventReportReq req) {
+        if (!clientIngressAuthService.isAuthorized(clientToken)) {
+            return R.error(40100, "客户端令牌无效");
+        }
         if (req == null) {
             return R.error(40000, "请求体不能为空");
         }
+
+        User resolvedUser = resolveReportedUser(req.getUserId());
+        Long companyId = resolveCompanyId(resolvedUser, headerCompanyId);
+        if (companyId == null) {
+            return R.error(40000, "companyId 与 userId 归属不一致");
+        }
+        Long policyVersion = privacyShieldConfigService.getConfigVersion();
 
         String content = StringUtils.hasText(req.getContent()) ? req.getContent() : "";
         String contentMasked = maskSensitive(content);
         List<String> matched = StringUtils.hasText(req.getMatchedTypes())
                 ? List.of(req.getMatchedTypes().split(","))
                 : detectMatchedTypes(content);
+        String severity = resolveSeverity(matched);
 
         PrivacyEvent event = new PrivacyEvent();
-        event.setUserId(resolveUserId(req.getUserId()));
+        event.setCompanyId(companyId);
+        event.setUserId(resolveUserId(req.getUserId(), resolvedUser));
         event.setEventType(StringUtils.hasText(req.getEventType()) ? req.getEventType() : "SENSITIVE_TEXT");
         event.setContentMasked(contentMasked);
         event.setSource(StringUtils.hasText(req.getSource()) ? req.getSource() : "extension");
         event.setAction(StringUtils.hasText(req.getAction()) ? req.getAction() : "detect");
+        event.setSeverity(severity);
         event.setDeviceId(StringUtils.hasText(req.getDeviceId()) ? req.getDeviceId() : null);
         event.setHostname(StringUtils.hasText(req.getHostname()) ? req.getHostname() : null);
         event.setWindowTitle(StringUtils.hasText(req.getWindowTitle()) ? req.getWindowTitle() : null);
         event.setMatchedTypes(String.join(",", matched));
+        event.setPolicyVersion(policyVersion);
         event.setEventTime(resolveTime(req.getTimestamp()));
         event.setCreateTime(new Date());
         event.setUpdateTime(new Date());
 
         privacyEventService.save(event);
 
+        GovernanceEvent governanceEvent = eventHubService.ingestPrivacyEvent(event, resolvedUser, Map.of(
+            "matchedTypes", matched,
+            "severity", severity,
+            "source", event.getSource(),
+            "action", event.getAction(),
+            "windowTitle", event.getWindowTitle() == null ? "" : event.getWindowTitle()
+        ));
+        touchPolicyPull(resolvedUser);
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", event.getId());
+        data.put("governanceEventId", governanceEvent.getId());
         data.put("matchedTypes", matched);
+        data.put("policyVersion", policyVersion);
         return R.ok(data);
     }
 
@@ -92,18 +128,19 @@ public class PrivacyShieldController {
             @RequestParam(required = false) String endTime
     ) {
         User currentUser = currentUserService.requireCurrentUser();
+        Long companyId = currentUser.getCompanyId();
         boolean adminOrSecops = currentUserService.hasAnyRole("ADMIN", "SECOPS");
         boolean executive = currentUserService.hasRole("EXECUTIVE");
         String scopedUserId;
         if (adminOrSecops) {
-            scopedUserId = userId;
+            scopedUserId = resolveRequestedUserId(userId);
         } else if (executive) {
             scopedUserId = null;
         } else {
-            scopedUserId = currentUser.getUsername();
+            scopedUserId = String.valueOf(currentUser.getId());
         }
 
-        Map<String, Object> summary = buildSummary(scopedUserId, eventType, source, action, startTime, endTime);
+        Map<String, Object> summary = buildSummary(companyId, scopedUserId, eventType, source, action, startTime, endTime);
         if (executive) {
             summary.put("summaryOnly", true);
             summary.put("list", List.of());
@@ -113,7 +150,7 @@ public class PrivacyShieldController {
             return R.ok(summary);
         }
 
-        QueryWrapper<PrivacyEvent> query = buildQuery(scopedUserId, eventType, source, action, startTime, endTime)
+        QueryWrapper<PrivacyEvent> query = buildQuery(companyId, scopedUserId, eventType, source, action, startTime, endTime)
                 .orderByDesc("event_time");
 
         Page<PrivacyEvent> result = privacyEventService.page(new Page<>(Math.max(1, page), Math.max(1, pageSize)), query);
@@ -131,12 +168,27 @@ public class PrivacyShieldController {
     @GetMapping("/config")
     @PreAuthorize("@currentUserService.hasAnyRole('ADMIN','SECOPS')")
     public R<Map<String, Object>> getConfig() {
+        User currentUser = currentUserService.requireCurrentUser();
+        touchPolicyPull(currentUser);
         return R.ok(privacyShieldConfigService.getOrCreateConfig());
     }
 
     @GetMapping("/config/public")
-    public R<Map<String, Object>> getPublicConfig() {
-        return R.ok(privacyShieldConfigService.getOrCreateConfig());
+    public R<Map<String, Object>> getPublicConfig(@RequestParam(required = false) Long sinceVersion) {
+        Map<String, Object> config = new LinkedHashMap<>(privacyShieldConfigService.getOrCreateConfig());
+        long version = privacyShieldConfigService.getConfigVersion();
+        if (sinceVersion != null && sinceVersion >= version) {
+            Map<String, Object> unchanged = new LinkedHashMap<>();
+            unchanged.put("changed", false);
+            unchanged.put("configVersion", version);
+            unchanged.put("syncIntervalSec", config.getOrDefault("syncIntervalSec", 60));
+            touchPolicyPullSafe();
+            return R.ok(unchanged);
+        }
+        config.put("changed", true);
+        config.put("configVersion", version);
+        touchPolicyPullSafe();
+        return R.ok(config);
     }
 
     @PostMapping("/config")
@@ -146,9 +198,12 @@ public class PrivacyShieldController {
         return R.ok(updated);
     }
 
-    private QueryWrapper<PrivacyEvent> buildQuery(String userId, String eventType, String source, String action,
+    private QueryWrapper<PrivacyEvent> buildQuery(Long companyId, String userId, String eventType, String source, String action,
                                                   String startTime, String endTime) {
         QueryWrapper<PrivacyEvent> query = new QueryWrapper<>();
+        if (companyId != null) {
+            query.eq("company_id", companyId);
+        }
         if (StringUtils.hasText(userId)) {
             query.eq("user_id", userId);
         }
@@ -172,20 +227,20 @@ public class PrivacyShieldController {
         return query;
     }
 
-    private Map<String, Object> buildSummary(String userId, String eventType, String source,
+    private Map<String, Object> buildSummary(Long companyId, String userId, String eventType, String source,
                                              String action, String startTime, String endTime) {
         Map<String, Object> summary = new LinkedHashMap<>();
 
-        long total = privacyEventService.count(buildQuery(userId, eventType, source, action, startTime, endTime));
+        long total = privacyEventService.count(buildQuery(companyId, userId, eventType, source, action, startTime, endTime));
 
         LocalDateTime dayStart = LocalDate.now().atStartOfDay();
-        long today = privacyEventService.count(buildQuery(userId, eventType, source, action, startTime, endTime)
+        long today = privacyEventService.count(buildQuery(companyId, userId, eventType, source, action, startTime, endTime)
                 .ge("event_time", Date.from(dayStart.atZone(ZoneId.systemDefault()).toInstant())));
 
-        long extensionCount = privacyEventService.count(buildQuery(userId, eventType, "extension", action, startTime, endTime));
-        long clipboardCount = privacyEventService.count(buildQuery(userId, eventType, "clipboard", action, startTime, endTime));
-        long ignoreCount = privacyEventService.count(buildQuery(userId, eventType, source, "ignore", startTime, endTime));
-        long desenseCount = privacyEventService.count(buildQuery(userId, eventType, source, "desensitize", startTime, endTime));
+        long extensionCount = privacyEventService.count(buildQuery(companyId, userId, eventType, "extension", action, startTime, endTime));
+        long clipboardCount = privacyEventService.count(buildQuery(companyId, userId, eventType, "clipboard", action, startTime, endTime));
+        long ignoreCount = privacyEventService.count(buildQuery(companyId, userId, eventType, source, "ignore", startTime, endTime));
+        long desenseCount = privacyEventService.count(buildQuery(companyId, userId, eventType, source, "desensitize", startTime, endTime));
 
         summary.put("total", total);
         summary.put("today", today);
@@ -196,15 +251,93 @@ public class PrivacyShieldController {
         return summary;
     }
 
-    private String resolveUserId(String requestUserId) {
+    private String resolveUserId(String requestUserId, User resolvedUser) {
+        if (resolvedUser != null && resolvedUser.getId() != null) {
+            return String.valueOf(resolvedUser.getId());
+        }
         if (StringUtils.hasText(requestUserId)) {
             return requestUserId;
         }
         try {
-            return currentUserService.requireCurrentUser().getUsername();
+            return String.valueOf(currentUserService.requireCurrentUser().getId());
         } catch (Exception ex) {
             return "unknown";
         }
+    }
+
+    private String resolveRequestedUserId(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            return null;
+        }
+        String input = userId.trim();
+        if (input.matches("^\\d+$")) {
+            return input;
+        }
+        User byName = userService.lambdaQuery().eq(User::getUsername, input).one();
+        if (byName != null && byName.getId() != null) {
+            return String.valueOf(byName.getId());
+        }
+        return input;
+    }
+
+    private User resolveReportedUser(String requestUserId) {
+        if (StringUtils.hasText(requestUserId)) {
+            String input = requestUserId.trim();
+            if (input.matches("^\\d+$")) {
+                User byId = userService.getById(Long.parseLong(input));
+                if (byId != null) {
+                    return byId;
+                }
+            }
+            User byName = userService.lambdaQuery().eq(User::getUsername, input).one();
+            if (byName != null) {
+                return byName;
+            }
+        }
+        try {
+            return currentUserService.requireCurrentUser();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private Long resolveCompanyId(User user, Long headerCompanyId) {
+        Long resolved = user != null ? user.getCompanyId() : null;
+        if (headerCompanyId != null) {
+            if (resolved != null && !headerCompanyId.equals(resolved)) {
+                return null;
+            }
+            return headerCompanyId;
+        }
+        if (resolved != null) {
+            return resolved;
+        }
+        try {
+            Long fromSession = currentUserService.requireCurrentUser().getCompanyId();
+            if (fromSession != null) {
+                return fromSession;
+            }
+        } catch (Exception ignored) {
+            // ignore unauthenticated context
+        }
+        return clientIngressAuthService.getDefaultCompanyId();
+    }
+
+    private void touchPolicyPullSafe() {
+        try {
+            touchPolicyPull(currentUserService.requireCurrentUser());
+        } catch (Exception ignored) {
+            // public call without session
+        }
+    }
+
+    private void touchPolicyPull(User user) {
+        if (user == null) {
+            return;
+        }
+        user.setLastPolicyPullTime(new Date());
+        user.setUpdateTime(new Date());
+        userService.updateById(user);
     }
 
     private Date resolveTime(String timestamp) {
@@ -272,6 +405,21 @@ public class PrivacyShieldController {
             matched.add("company_code");
         }
         return matched;
+    }
+
+    private String resolveSeverity(List<String> matchedTypes) {
+        if (matchedTypes == null || matchedTypes.isEmpty()) {
+            return "low";
+        }
+        boolean high = matchedTypes.stream().anyMatch(type -> "id_card".equalsIgnoreCase(type) || "bank_card".equalsIgnoreCase(type));
+        if (high) {
+            return "high";
+        }
+        boolean medium = matchedTypes.stream().anyMatch(type -> "phone".equalsIgnoreCase(type) || "company_code".equalsIgnoreCase(type));
+        if (medium) {
+            return "medium";
+        }
+        return "low";
     }
 
     private String maskSensitive(String content) {

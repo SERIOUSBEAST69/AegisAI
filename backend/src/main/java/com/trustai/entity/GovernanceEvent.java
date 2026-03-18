@@ -7,24 +7,33 @@ import java.util.Date;
 import lombok.Data;
 
 @Data
-@TableName("privacy_event")
-public class PrivacyEvent {
+@TableName("governance_event")
+public class GovernanceEvent {
     @TableId(type = IdType.AUTO)
     private Long id;
 
     private Long companyId;
-    private String userId;
+    private Long userId;
+    private String username;
+
     private String eventType;
-    private String contentMasked;
-    private String source;
-    private String action;
+    private String sourceModule;
     private String severity;
-    private String deviceId;
-    private String hostname;
-    private String windowTitle;
-    private String matchedTypes;
+    private String status;
+
+    private String title;
+    private String description;
+    private String sourceEventId;
+    private String attackType;
     private Long policyVersion;
+
+    private String payloadJson;
+
+    private Long handlerId;
+    private String disposeNote;
     private Date eventTime;
+    private Date disposedAt;
+
     private Date createTime;
     private Date updateTime;
 }

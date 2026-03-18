@@ -5,10 +5,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.trustai.entity.SecurityDetectionRule;
 import com.trustai.entity.SecurityEvent;
 import com.trustai.entity.User;
+import com.trustai.entity.AuditLog;
+import com.trustai.service.ClientIngressAuthService;
 import com.trustai.service.CompanyScopeService;
 import com.trustai.service.CurrentUserService;
+import com.trustai.service.EventHubService;
 import com.trustai.service.SecurityDetectionRuleService;
 import com.trustai.service.SecurityEventService;
+import com.trustai.service.AuditLogService;
 import com.trustai.service.UserService;
 import com.trustai.utils.R;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +60,15 @@ public class SecurityEventController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private EventHubService eventHubService;
+
+    @Autowired
+    private AuditLogService auditLogService;
+
+    @Autowired
+    private ClientIngressAuthService clientIngressAuthService;
 
     // ── 事件列表（分页） ──────────────────────────────────────────────────────────
 
@@ -152,6 +165,8 @@ public class SecurityEventController {
         event.setOperatorId(currentUserService.requireCurrentUser().getId());
         event.setUpdateTime(new Date());
         securityEventService.updateById(event);
+        eventHubService.syncGovernanceStatus("security", event.getId(), "blocked", event.getOperatorId(), "阻拦处置");
+        saveAudit("security_block", event, "success");
         return R.okMsg("已阻拦");
     }
 
@@ -174,6 +189,8 @@ public class SecurityEventController {
         event.setOperatorId(currentUserService.requireCurrentUser().getId());
         event.setUpdateTime(new Date());
         securityEventService.updateById(event);
+        eventHubService.syncGovernanceStatus("security", event.getId(), "ignored", event.getOperatorId(), "忽略处置");
+        saveAudit("security_ignore", event, "success");
         return R.okMsg("已忽略");
     }
 
@@ -186,21 +203,29 @@ public class SecurityEventController {
      * 但需要请求体中包含合法的事件字段。
      */
     @PostMapping("/events/report")
-    public R<?> report(@RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
+    public R<?> report(@RequestHeader(value = "X-Client-Token", required = false) String clientToken,
+                       @RequestHeader(value = "X-Company-Id", required = false) Long headerCompanyId,
                        @RequestBody SecurityEvent event) {
+        if (!clientIngressAuthService.isAuthorized(clientToken)) {
+            return R.error(40100, "客户端令牌无效");
+        }
+
         Long companyId = null;
-        if (headerCompanyId != null) {
-            companyId = headerCompanyId;
-        } else if (event.getCompanyId() != null) {
-            companyId = event.getCompanyId();
-        } else if (event.getEmployeeId() != null && !event.getEmployeeId().isBlank()) {
-            User reporter = userService.lambdaQuery().eq(User::getUsername, event.getEmployeeId()).one();
+        User reporter = null;
+        if (event.getEmployeeId() != null && !event.getEmployeeId().isBlank()) {
+            reporter = userService.lambdaQuery().eq(User::getUsername, event.getEmployeeId()).one();
             if (reporter != null) {
                 companyId = reporter.getCompanyId();
             }
         }
+        if (headerCompanyId != null) {
+            if (companyId != null && !headerCompanyId.equals(companyId)) {
+                return R.error(40000, "companyId 与 employeeId 归属不一致");
+            }
+            companyId = headerCompanyId;
+        }
         if (companyId == null) {
-            companyId = 1L;
+            companyId = clientIngressAuthService.getDefaultCompanyId();
         }
         event.setCompanyId(companyId);
         if (event.getEventTime() == null) {
@@ -212,10 +237,25 @@ public class SecurityEventController {
         if (event.getSource() == null || event.getSource().isBlank()) {
             event.setSource("agent");
         }
+        if (event.getPolicyVersion() == null) {
+            event.setPolicyVersion(eventHubService.resolvePolicyVersion(companyId));
+        }
         event.setId(null);
         event.setCreateTime(new Date());
         event.setUpdateTime(new Date());
         securityEventService.save(event);
+        User boundUser = null;
+        if (reporter != null && companyId.equals(reporter.getCompanyId())) {
+            boundUser = reporter;
+        } else if (event.getEmployeeId() != null && !event.getEmployeeId().isBlank()) {
+            boundUser = userService.lambdaQuery().eq(User::getCompanyId, companyId).eq(User::getUsername, event.getEmployeeId()).one();
+        }
+        eventHubService.ingestSecurityEvent(event, boundUser, Map.of(
+            "eventType", event.getEventType() == null ? "" : event.getEventType(),
+            "filePath", event.getFilePath() == null ? "" : event.getFilePath(),
+            "targetAddr", event.getTargetAddr() == null ? "" : event.getTargetAddr(),
+            "source", event.getSource() == null ? "" : event.getSource()
+        ));
         Long newId = event.getId();
         return R.ok(newId != null ? Map.of("id", newId) : Map.of());
     }
@@ -302,5 +342,23 @@ public class SecurityEventController {
         private Long id;
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
+    }
+
+    private void saveAudit(String operation, SecurityEvent event, String result) {
+        try {
+            AuditLog log = new AuditLog();
+            log.setUserId(currentUserService.requireCurrentUser().getId());
+            log.setOperation(operation);
+            log.setOperationTime(new Date());
+            log.setInputOverview("eventId=" + event.getId() + ", type=" + event.getEventType());
+            log.setOutputOverview("status=" + event.getStatus());
+            log.setResult(result);
+            log.setRiskLevel("MEDIUM");
+            log.setHash(String.valueOf(System.currentTimeMillis()));
+            log.setCreateTime(new Date());
+            auditLogService.saveAudit(log);
+        } catch (Exception ignored) {
+            // keep business flow stable
+        }
     }
 }
