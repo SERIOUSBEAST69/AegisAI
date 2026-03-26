@@ -1,24 +1,16 @@
-# 构建阶段
-FROM maven:3.9-eclipse-temurin-17 AS builder
+# 单阶段构建，使用包含 Maven 的镜像
+FROM hub.rat.dev/library/maven:3.9-eclipse-temurin-17
 WORKDIR /app
-
-# 复制 pom.xml 并下载依赖（利用缓存）
-COPY backend/pom.xml ./backend/pom.xml
-RUN mvn -f backend/pom.xml dependency:go-offline
 
 # 复制全部源代码
 COPY backend ./backend
 
-# 打包（跳过测试）
-RUN mvn -f backend/pom.xml clean package -DskipTests
-
-# 运行阶段
-FROM eclipse-temurin:17-jre
-WORKDIR /app
-
-# 使用通配符复制任意 JAR 文件，避免版本号硬编码
-COPY --from=builder /app/backend/target/*.jar app.jar
+# 打包（跳过测试，禁用 SSL 验证）
+RUN mvn -f backend/pom.xml clean package -DskipTests \
+    -Dmaven.wagon.http.ssl.insecure=true \
+    -Dmaven.wagon.http.ssl.allowall=true \
+    -Dmaven.resolver.transport=wagon
 
 EXPOSE 8080
 ENV JAVA_OPTS=""
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/backend/target/*.jar"]

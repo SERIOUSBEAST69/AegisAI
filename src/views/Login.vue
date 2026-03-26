@@ -177,49 +177,7 @@
                       </div>
                     </template>
 
-                    <template v-else-if="flowType === 'login' && activeMode === 'phone'">
-                      <div class="field-group">
-                        <label for="login-phone">手机号</label>
-                        <input id="login-phone" v-model.trim="phoneForm.phone" class="field-input" type="text" autocomplete="tel" placeholder="例如：13800138000" />
-                      </div>
 
-                      <div class="field-group">
-                        <label for="login-phone-code">验证码</label>
-                        <div class="password-wrap">
-                          <input id="login-phone-code" v-model.trim="phoneForm.code" class="field-input" type="text" maxlength="6" placeholder="输入短信验证码" />
-                          <button type="button" class="assist-button clickable" :disabled="phoneCodeCountdown > 0" @click="sendPhoneCode('login')">
-                            {{ phoneCodeCountdown > 0 ? `${phoneCodeCountdown}s` : '发送验证码' }}
-                          </button>
-                        </div>
-                      </div>
-                    </template>
-
-                    <template v-else-if="flowType === 'login' && activeMode === 'wechat'">
-                      <div class="field-group">
-                        <label for="wechat-nickname">微信昵称</label>
-                        <input id="wechat-nickname" v-model.trim="wechatForm.nickname" class="field-input" type="text" placeholder="例如：张老师 / 产品负责人" />
-                      </div>
-
-                      <div class="field-group">
-                        <label for="wechat-phone">绑定手机号（可选）</label>
-                        <input id="wechat-phone" v-model.trim="wechatForm.phone" class="field-input" type="text" autocomplete="tel" placeholder="用于后续短信验证或通知" />
-                      </div>
-
-                      <div class="compact-grid">
-                        <div class="field-group">
-                          <label for="wechat-role">进入身份</label>
-                          <select id="wechat-role" v-model="wechatForm.roleCode" class="field-input field-select">
-                            <option v-for="item in registrationOptions.identities" :key="item.code" :value="item.code">{{ item.label }}</option>
-                          </select>
-                        </div>
-                        <div class="field-group">
-                          <label for="wechat-organization">组织类型</label>
-                          <select id="wechat-organization" v-model="wechatForm.organizationType" class="field-input field-select">
-                            <option v-for="item in registrationOptions.organizations" :key="item.code" :value="item.code">{{ item.label }}</option>
-                          </select>
-                        </div>
-                      </div>
-                    </template>
 
                     <template v-else-if="flowType === 'register' && activeMode === 'password'">
                       <div class="compact-grid">
@@ -280,116 +238,7 @@
                       </div>
                     </template>
 
-                    <template v-else-if="flowType === 'register' && activeMode === 'phone'">
-                      <div class="compact-grid">
-                        <div class="field-group">
-                          <label for="phone-register-real-name">姓名</label>
-                          <input id="phone-register-real-name" v-model.trim="registerForm.realName" class="field-input" type="text" placeholder="请输入真实姓名" />
-                        </div>
-                        <div class="field-group">
-                          <label for="phone-register-nickname">展示名称</label>
-                          <input id="phone-register-nickname" v-model.trim="registerForm.nickname" class="field-input" type="text" placeholder="工作台显示名称" />
-                        </div>
-                      </div>
 
-                      <div class="compact-grid">
-                        <div class="field-group">
-                          <label for="phone-register-role">身份</label>
-                          <select id="phone-register-role" v-model="registerForm.roleCode" class="field-input field-select">
-                            <option v-for="item in registrationOptions.identities" :key="item.code" :value="item.code">{{ item.label }}</option>
-                          </select>
-                        </div>
-                        <div class="field-group">
-                          <label for="phone-register-organization">组织类型</label>
-                          <select id="phone-register-organization" v-model="registerForm.organizationType" class="field-input field-select">
-                            <option v-for="item in registrationOptions.organizations" :key="item.code" :value="item.code">{{ item.label }}</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div class="field-group">
-                        <label for="phone-register-company-name">公司名称</label>
-                        <input id="phone-register-company-name" v-model.trim="registerForm.companyName" class="field-input" type="text" placeholder="例如：Aegis 科技有限公司" />
-                      </div>
-
-                      <div class="field-group">
-                        <label for="phone-register-department">部门 / 团队</label>
-                        <input id="phone-register-department" v-model.trim="registerForm.department" class="field-input" type="text" placeholder="例如：安全运营中心 / AI研发部 / 教务处" />
-                      </div>
-
-                      <div class="field-group">
-                        <label for="register-phone">手机号</label>
-                        <input id="register-phone" v-model.trim="registerForm.phone" class="field-input" type="text" autocomplete="tel" placeholder="用于登录与通知" />
-                      </div>
-
-                      <div class="field-group">
-                        <label for="register-phone-code">短信验证码</label>
-                        <div class="password-wrap">
-                          <input id="register-phone-code" v-model.trim="registerForm.phoneCode" class="field-input" type="text" maxlength="6" placeholder="输入验证码" />
-                          <button type="button" class="assist-button clickable" :disabled="registerCodeCountdown > 0" @click="sendPhoneCode('register')">
-                            {{ registerCodeCountdown > 0 ? `${registerCodeCountdown}s` : '发送验证码' }}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div class="field-group">
-                        <label for="phone-register-email">邮箱（可选）</label>
-                        <input id="phone-register-email" v-model.trim="registerForm.email" class="field-input" type="email" placeholder="用于接收治理通知" />
-                      </div>
-                    </template>
-
-                    <template v-else>
-                      <div class="compact-grid">
-                        <div class="field-group">
-                          <label for="wechat-register-real-name">姓名</label>
-                          <input id="wechat-register-real-name" v-model.trim="registerForm.realName" class="field-input" type="text" placeholder="请输入真实姓名" />
-                        </div>
-                        <div class="field-group">
-                          <label for="wechat-register-nickname">展示名称</label>
-                          <input id="wechat-register-nickname" v-model.trim="registerForm.nickname" class="field-input" type="text" placeholder="工作台显示名称" />
-                        </div>
-                      </div>
-
-                      <div class="compact-grid">
-                        <div class="field-group">
-                          <label for="wechat-register-role">身份</label>
-                          <select id="wechat-register-role" v-model="registerForm.roleCode" class="field-input field-select">
-                            <option v-for="item in registrationOptions.identities" :key="item.code" :value="item.code">{{ item.label }}</option>
-                          </select>
-                        </div>
-                        <div class="field-group">
-                          <label for="wechat-register-organization">组织类型</label>
-                          <select id="wechat-register-organization" v-model="registerForm.organizationType" class="field-input field-select">
-                            <option v-for="item in registrationOptions.organizations" :key="item.code" :value="item.code">{{ item.label }}</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div class="field-group">
-                        <label for="wechat-register-company-name">公司名称</label>
-                        <input id="wechat-register-company-name" v-model.trim="registerForm.companyName" class="field-input" type="text" placeholder="例如：Aegis 科技有限公司" />
-                      </div>
-
-                      <div class="field-group">
-                        <label for="wechat-register-department">部门 / 团队</label>
-                        <input id="wechat-register-department" v-model.trim="registerForm.department" class="field-input" type="text" placeholder="例如：安全运营中心 / AI研发部 / 教务处" />
-                      </div>
-
-                      <div class="field-group">
-                        <label for="wechat-open-id">微信 OpenID（可选）</label>
-                        <input id="wechat-open-id" v-model.trim="registerForm.wechatOpenId" class="field-input" type="text" placeholder="留空则按昵称自动生成" />
-                      </div>
-
-                      <div class="field-group">
-                        <label for="wechat-register-phone">绑定手机号（可选）</label>
-                        <input id="wechat-register-phone" v-model.trim="registerForm.phone" class="field-input" type="text" autocomplete="tel" placeholder="方便后续通知与绑定" />
-                      </div>
-
-                      <div class="field-group">
-                        <label for="wechat-register-email">邮箱（可选）</label>
-                        <input id="wechat-register-email" v-model.trim="registerForm.email" class="field-input" type="email" placeholder="用于接收治理通知" />
-                      </div>
-                    </template>
                   </form>
                 </div>
               </template>
@@ -443,7 +292,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRouter } from 'vue-router';
 import gsap from 'gsap';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { ChatDotRound, Iphone, UserFilled } from '@element-plus/icons-vue';
+import { UserFilled } from '@element-plus/icons-vue';
 import { authApi } from '../api/auth';
 import { useUserStore } from '../store/user';
 import LiquidChrome from '../components/LiquidChrome.vue';
@@ -474,8 +323,6 @@ const accessFlows = [
 
 const accessModes = [
   { value: 'password', label: '账号密码', icon: UserFilled, loginHint: '通过账号与密码建立安全会话。', registerHint: '创建一组适合长期使用的工作台凭据。' },
-  { value: 'phone', label: '手机验证', icon: Iphone, loginHint: '短信校验后直接进入工作台。', registerHint: '适合移动端和轻量化身份建立。' },
-  { value: 'wechat', label: '微信身份', icon: ChatDotRound, loginHint: '外部体验与临时接入都更自然。', registerHint: '先用昵称进入，再逐步补全真实组织身份。' },
 ];
 
 const demoAccounts = [
@@ -501,12 +348,10 @@ const globalError = ref('');
 const showPwd = ref(false);
 const remember = ref(true);
 const captchaCode = ref('');
-const phoneCodeCountdown = ref(0);
-const registerCodeCountdown = ref(0);
+
 
 const passwordForm = reactive({ username: '', password: '', captcha: '' });
-const phoneForm = reactive({ phone: '', code: '' });
-const wechatForm = reactive({ nickname: '', phone: '', roleCode: 'BUSINESS_OWNER', organizationType: 'enterprise', wechatOpenId: '' });
+
 const registerForm = reactive({
   accountType: 'real',
   loginType: 'password',
@@ -597,26 +442,20 @@ const reviewDescription = computed(() => flowType.value === 'register'
 
 const reviewPrimaryIdentity = computed(() => {
   if (flowType.value === 'login' && activeMode.value === 'password') return passwordForm.username || '未填写';
-  if (flowType.value === 'login' && activeMode.value === 'phone') return phoneForm.phone || '未填写';
-  if (flowType.value === 'login' && activeMode.value === 'wechat') return wechatForm.nickname || wechatForm.phone || '未填写';
   if (flowType.value === 'register' && activeMode.value === 'password') return registerForm.username || registerForm.realName || '未填写';
-  if (flowType.value === 'register' && activeMode.value === 'phone') return registerForm.phone || registerForm.realName || '未填写';
-  return registerForm.nickname || registerForm.realName || registerForm.wechatOpenId || '未填写';
+  return registerForm.username || registerForm.realName || '未填写';
 });
 
 const reviewRole = computed(() => {
-  if (flowType.value === 'login' && activeMode.value === 'wechat') return wechatForm.roleCode || 'BUSINESS_OWNER';
   return registerForm.roleCode || 'BUSINESS_OWNER';
 });
 
 const reviewOrganization = computed(() => {
-  if (flowType.value === 'login' && activeMode.value === 'wechat') return wechatForm.organizationType || 'enterprise';
   return registerForm.organizationType || 'enterprise';
 });
 
 const reviewDepartment = computed(() => {
   if (flowType.value === 'register') return registerForm.department || '进入后补充';
-  if (flowType.value === 'login' && activeMode.value === 'wechat') return '外部体验会话';
   return '当前已有身份';
 });
 
@@ -647,8 +486,7 @@ const primaryButtonLabel = computed(() => {
 const loadingLabel = computed(() => {
   if (flowType.value === 'register') return '正在创建身份';
   if (activeMode.value === 'password') return '正在建立安全会话';
-  if (activeMode.value === 'phone') return '正在校验身份';
-  return '正在建立微信会话';
+  return '正在建立安全会话';
 });
 
 const canProceed = computed(() => {
@@ -712,20 +550,7 @@ function refreshCaptcha() {
   captchaCode.value = Array.from({ length: 4 }, () => CAPTCHA_CHARS[Math.floor(Math.random() * CAPTCHA_CHARS.length)]).join('');
 }
 
-function startCountdown(target) {
-  const holder = target === 'login' ? phoneCodeCountdown : registerCodeCountdown;
-  holder.value = 60;
-  const timer = window.setInterval(() => {
-    holder.value -= 1;
-    if (holder.value <= 0) {
-      window.clearInterval(timer);
-    }
-  }, 1000);
-}
 
-function ensurePhone(value) {
-  return /^1\d{10}$/.test(value || '');
-}
 
 function ensureRegistrationBasics() {
   if (!registerForm.realName || !registerForm.roleCode || !registerForm.organizationType) {
@@ -750,10 +575,7 @@ function getFormValidationError() {
       }
       return '';
     }
-    if (activeMode.value === 'phone') {
-      return ensurePhone(phoneForm.phone) && phoneForm.code ? '' : '请输入正确手机号与验证码';
-    }
-    return wechatForm.nickname ? '' : '请输入微信昵称';
+    return '';
   }
 
   try {
@@ -772,16 +594,6 @@ function getFormValidationError() {
     return '';
   }
 
-  if (activeMode.value === 'phone') {
-    if (!ensurePhone(registerForm.phone) || !registerForm.phoneCode) {
-      return '手机号注册需要手机号和验证码';
-    }
-    return '';
-  }
-
-  if (!registerForm.nickname && !registerForm.realName) {
-    return '微信注册至少填写姓名或展示名称';
-  }
   return '';
 }
 
@@ -1102,22 +914,10 @@ function syncPortalPose(immediate = false) {
   }, 0.06);
 }
 
-function buildWechatIdentity(payload) {
-  if (payload?.wechatOpenId) {
-    return payload.wechatOpenId.trim();
-  }
-  const base = [payload?.nickname, payload?.phone, payload?.roleCode, payload?.organizationType]
-    .filter(Boolean)
-    .join('-')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_-]/g, '_');
-  return base ? `wx_${base}` : `wx_guest_${Date.now()}`;
-}
+
 
 function onForgot() {
-  globalError.value = '当前版本请联系治理管理员重置密码，或改用手机号 / 微信建立身份';
+  globalError.value = '当前版本请联系治理管理员重置密码';
 }
 
 function shakePanel() {
@@ -1178,15 +978,7 @@ async function handlePrimaryAction() {
     return;
   }
 
-  if (activeMode.value === 'password') {
-    await submitPasswordLogin();
-    return;
-  }
-  if (activeMode.value === 'phone') {
-    await submitPhoneLogin();
-    return;
-  }
-  await submitWechatLogin();
+  await submitPasswordLogin();
 }
 
 watch([flowType, activeMode], async () => {
@@ -1906,6 +1698,7 @@ onBeforeUnmount(() => {
 .field-group {
   display: grid;
   gap: 8px;
+  max-width: 480px;
 }
 
 .field-group label,
@@ -1919,10 +1712,12 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 14px;
+  max-width: 480px;
 }
 
 .field-input {
   width: 100%;
+  max-width: 480px;
   height: clamp(48px, 6.6vh, 54px);
   padding: 0 16px;
   border-radius: 16px;
@@ -1932,6 +1727,7 @@ onBeforeUnmount(() => {
   outline: none;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  box-sizing: border-box;
 }
 
 .field-input:focus {
@@ -1950,15 +1746,21 @@ onBeforeUnmount(() => {
 .password-wrap {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 10px;
+  gap: 12px;
+  max-width: 480px;
 }
 
 .assist-button {
   min-width: 108px;
   padding: 0 16px;
+  height: clamp(48px, 6.6vh, 54px);
   border-radius: 16px;
   background: rgba(255,255,255,0.1);
   color: #f0f5ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .assist-button:disabled {
@@ -1969,6 +1771,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  max-width: 480px;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .remember-row {
@@ -2227,6 +2032,14 @@ onBeforeUnmount(() => {
   .password-wrap {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .field-input,
+  .field-group,
+  .compact-grid,
+  .password-wrap,
+  .form-options {
+    max-width: 100%;
   }
 
   .step-indicator-row {

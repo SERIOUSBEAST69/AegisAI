@@ -1,10 +1,10 @@
 # 构建阶段
-FROM node:18-alpine AS builder
+FROM hub.rat.dev/library/node:18-alpine AS builder
 WORKDIR /app
 
 # 复制依赖清单（在仓库根目录）
 COPY package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # 复制前端源码与配置
 COPY src ./src
@@ -22,7 +22,7 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 
 # 运行阶段
-FROM nginx:alpine
+FROM hub.rat.dev/library/nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Nginx 代理配置：支持 SPA history 路由 + 转发 /api/* 到后端

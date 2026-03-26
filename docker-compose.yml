@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # 1. MySQL 容器
   mysql:
-    image: mysql:8.0
+    image: hub.rat.dev/library/mysql:8.0
     container_name: aegisai-mysql
     restart: always
     environment:
@@ -27,7 +27,7 @@ services:
 
   # 2. Redis 容器
   redis:
-    image: redis:7.0
+    image: hub.rat.dev/library/redis:7.0
     container_name: aegisai-redis
     restart: always
     ports:
@@ -45,7 +45,7 @@ services:
 
   # 3. Elasticsearch 容器
   es:
-    image: elasticsearch:8.14.0
+    image: hub.rat.dev/library/elasticsearch:8.14.0
     container_name: aegisai-es
     restart: always
     environment:
@@ -85,7 +85,7 @@ services:
 
   # 5. RabbitMQ 服务
   rabbitmq:
-    image: rabbitmq:3.12-management
+    image: hub.rat.dev/library/rabbitmq:3.12-management
     container_name: aegisai-rabbitmq
     restart: always
     ports:
@@ -107,7 +107,7 @@ services:
 
   # 6. 数据库兼容性迁移（每次启动时自动补齐缺失列）
   mysql-bootstrap:
-    image: mysql:8.0
+    image: hub.rat.dev/library/mysql:8.0
     container_name: aegisai-mysql-bootstrap
     restart: "no"
     environment:
@@ -163,6 +163,21 @@ services:
       rabbitmq:
         condition: service_healthy
       ai-inference:
+        condition: service_started
+    networks:
+      - aegisai-network
+
+  # 8. 前端应用容器（开发模式）
+  aegisai-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.dev
+    container_name: aegisai-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      aegisai-backend:
         condition: service_started
     networks:
       - aegisai-network
