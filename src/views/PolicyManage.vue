@@ -18,7 +18,11 @@
       </el-form-item>
     </el-form>
     <el-table :data="policies" style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column prop="id" label="ID" width="250">
+        <template #default="scope">
+          <div class="cell nowrap">{{ scope.row.id }}</div>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="策略名称" />
       <el-table-column prop="ruleContent" label="规则内容" />
       <el-table-column prop="scope" label="生效范围" />

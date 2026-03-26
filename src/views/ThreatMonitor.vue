@@ -109,7 +109,11 @@
             row-class-name="event-row"
             :row-style="rowStyle"
           >
-            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column prop="id" label="ID" width="70">
+              <template #default="scope">
+                <div class="cell nowrap">{{ scope.row.id }}</div>
+              </template>
+            </el-table-column>
 
             <el-table-column label="严重程度" width="100">
               <template #default="{ row }">
@@ -240,7 +244,11 @@
             style="margin-top: 12px"
             :row-style="rowStyle"
           >
-            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column prop="id" label="ID" width="250">
+              <template #default="scope">
+                <div class="cell nowrap">{{ scope.row.id }}</div>
+              </template>
+            </el-table-column>
             <el-table-column prop="eventType" label="类型" width="130">
               <template #default="{ row }">{{ centerEventTypeLabel(row.eventType) }}</template>
             </el-table-column>
@@ -301,7 +309,11 @@
           </div>
 
           <el-table :data="rules" v-loading="rulesLoading" style="margin-top: 12px">
-            <el-table-column prop="id" label="ID" width="60" />
+            <el-table-column prop="id" label="ID" width="250">
+              <template #default="scope">
+                <div class="cell nowrap">{{ scope.row.id }}</div>
+              </template>
+            </el-table-column>
             <el-table-column prop="name" label="规则名称" min-width="180" />
             <el-table-column prop="sensitiveExtensions" label="敏感文件类型" min-width="200" />
             <el-table-column prop="sensitivePaths" label="敏感目录" min-width="200" />

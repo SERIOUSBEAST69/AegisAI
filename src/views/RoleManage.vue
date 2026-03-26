@@ -11,7 +11,11 @@
       </el-form-item>
     </el-form>
     <el-table :data="roles" style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column prop="id" label="ID" width="250">
+        <template #default="scope">
+          <div class="cell nowrap">{{ scope.row.id }}</div>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="角色名称" />
       <el-table-column prop="code" label="角色编码" />
       <el-table-column prop="description" label="描述" />

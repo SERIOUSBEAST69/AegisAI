@@ -15,7 +15,11 @@
       </el-form-item>
     </el-form>
     <el-table :data="approvals" style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column prop="id" label="ID" width="250">
+        <template #default="scope">
+          <div class="cell nowrap">{{ scope.row.id }}</div>
+        </template>
+      </el-table-column>
       <el-table-column prop="applicantId" label="申请人ID" />
       <el-table-column prop="assetId" label="资产ID" />
       <el-table-column prop="reason" label="理由" />

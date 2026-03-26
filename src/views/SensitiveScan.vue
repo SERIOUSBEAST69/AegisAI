@@ -15,7 +15,11 @@
         <el-button type="primary" :loading="saving" @click="create">创建任务</el-button>
       </el-form>
       <el-table :data="list" style="margin-top:16px" v-loading="loading">
-        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column prop="id" label="ID" width="250">
+          <template #default="scope">
+            <div class="cell nowrap">{{ scope.row.id }}</div>
+          </template>
+        </el-table-column>
         <el-table-column prop="sourceType" label="类型" width="80" />
         <el-table-column prop="sourcePath" label="来源" />
         <el-table-column prop="status" label="状态" width="80" />

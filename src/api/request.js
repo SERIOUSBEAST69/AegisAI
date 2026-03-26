@@ -3,7 +3,10 @@ import { clearSession, getAuthHeaderToken, getSession } from '../utils/auth';
 
 const service = axios.create({
   baseURL: '/api',
-  timeout: 12000
+  timeout: 12000,
+  headers: {
+    'Content-Type': 'application/json;charset=utf-8'
+  }
 });
 
 function createClientError(message, extra = {}) {

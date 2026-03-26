@@ -11,7 +11,11 @@
       </el-form-item>
     </el-form>
     <el-table :data="events" style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column prop="id" label="ID" width="250">
+        <template #default="scope">
+          <div class="cell nowrap">{{ scope.row.id }}</div>
+        </template>
+      </el-table-column>
       <el-table-column prop="type" label="类型" />
       <el-table-column prop="level" label="风险等级" />
       <el-table-column prop="status" label="状态" />

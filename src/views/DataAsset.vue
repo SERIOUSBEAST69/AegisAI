@@ -78,7 +78,11 @@
         </template>
 
         <el-table :data="assets" style="width: 100%" v-loading="loading">
-          <el-table-column prop="id" label="ID" width="70" />
+          <el-table-column prop="id" label="ID" width="250">
+            <template #default="scope">
+              <div class="cell nowrap">{{ scope.row.id }}</div>
+            </template>
+          </el-table-column>
           <el-table-column prop="name" label="名称" min-width="180" />
           <el-table-column prop="type" label="类型" width="110" />
           <el-table-column prop="sensitivityLevel" label="敏感等级" width="110" />

@@ -34,7 +34,11 @@
       </el-form-item>
     </el-form>
     <el-table :data="logs" style="width: 100%; margin-top:12px" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column prop="id" label="ID" width="250">
+        <template #default="scope">
+          <div class="cell nowrap">{{ scope.row.id }}</div>
+        </template>
+      </el-table-column>
       <el-table-column prop="userId" label="用户ID" width="80" />
       <el-table-column prop="assetId" label="资产ID" width="80" />
       <el-table-column prop="operation" label="操作类型" width="110" />

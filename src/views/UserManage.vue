@@ -19,7 +19,11 @@
       </el-form-item>
     </el-form>
     <el-table :data="users" style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column prop="id" label="ID" width="250">
+        <template #default="scope">
+          <div class="cell nowrap">{{ scope.row.id }}</div>
+        </template>
+      </el-table-column>
       <el-table-column prop="username" label="用户名" />
       <el-table-column prop="realName" label="真实姓名" />
       <el-table-column prop="companyId" label="公司ID" width="90" />

@@ -11,7 +11,11 @@
       </el-form-item>
     </el-form>
     <el-table :data="permissions" style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column prop="id" label="ID" width="250">
+        <template #default="scope">
+          <div class="cell nowrap">{{ scope.row.id }}</div>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="权限名称" />
       <el-table-column prop="code" label="权限编码" />
       <el-table-column prop="type" label="类型" />

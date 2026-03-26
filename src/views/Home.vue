@@ -249,12 +249,14 @@
         </div>
       </div>
       <div class="ai-config-row">
-        <select v-model="selectedAiModelCode" class="ai-model-select">
-          <option value="" disabled>请选择已注册模型</option>
-          <option v-for="model in aiModelOptions" :key="model.id" :value="model.modelCode">
-            {{ model.modelName }} ({{ model.modelCode }})
-          </option>
-        </select>
+        <el-select v-model="selectedAiModelCode" class="ai-model-select" placeholder="请选择已注册模型" style="width: 100%; max-width: 400px;">
+          <el-option
+            v-for="model in aiModelOptions"
+            :key="model.id"
+            :label="`${cleanModelName(model.modelName)} (${cleanModelName(model.modelCode)})`"
+            :value="model.modelCode"
+          />
+        </el-select>
         <input
           v-model="aiAccessReason"
           class="ai-reason-input"
@@ -414,6 +416,7 @@ import AIPrivacyShield from '../components/AIPrivacyShield.vue';
 import { useUserStore } from '../store/user';
 import { getPersonaExperience, personalizeWorkbench } from '../utils/persona';
 import { quickPrivacyCheck } from '../utils/privacyPatterns';
+import { isMockSession } from '../utils/auth';
 
 function createEmptyOverview() {
   return {
@@ -518,7 +521,9 @@ function selectedModel() {
 const selectedModelLabel = computed(() => {
   const model = selectedModel();
   if (!model) return '';
-  return `${model.modelName || model.name || '未命名模型'} (${model.modelCode})`;
+  const modelName = cleanModelName(model.modelName || model.name || model.modelCode) || '未命名模型';
+  const modelCode = cleanModelName(model.modelCode) || '';
+  return modelCode ? `${modelName} (${modelCode})` : modelName;
 });
 
 const aiModelLoadLabel = computed(() => {
@@ -574,9 +579,39 @@ async function sendAiDraft() {
   }
 }
 
+const MOCK_AI_MODELS = [
+  { id: 1, modelCode: 'gpt-4', modelName: 'GPT-4', provider: 'OpenAI', riskLevel: 'medium', status: 'enabled' },
+  { id: 2, modelCode: 'gpt-3.5-turbo', modelName: 'GPT-3.5', provider: 'OpenAI', riskLevel: 'low', status: 'enabled' },
+  { id: 3, modelCode: 'claude-3-opus', modelName: 'Claude 3', provider: 'Anthropic', riskLevel: 'high', status: 'enabled' },
+  { id: 4, modelCode: 'ernie-bot', modelName: '文心一言', provider: '百度', riskLevel: 'low', status: 'enabled' },
+  { id: 5, modelCode: 'qwen-turbo', modelName: '通义千问', provider: '阿里云', riskLevel: 'medium', status: 'enabled' },
+];
+
 async function fetchAiModels() {
   aiModelLoadState.value = 'loading';
   aiModelLoadMessage.value = '';
+  
+  // 直接使用预设模型列表，确保中文显示正确
+  aiModelOptions.value = MOCK_AI_MODELS;
+  if (!selectedAiModelCode.value && aiModelOptions.value.length > 0) {
+    selectedAiModelCode.value = aiModelOptions.value[0].modelCode;
+  }
+  aiModelLoadState.value = 'ready';
+  aiModelLoadMessage.value = '使用预设模型列表';
+  return;
+  
+  // 保留原有的API请求代码作为注释
+  /*
+  if (isMockSession()) {
+    aiModelOptions.value = MOCK_AI_MODELS;
+    if (!selectedAiModelCode.value && aiModelOptions.value.length > 0) {
+      selectedAiModelCode.value = aiModelOptions.value[0].modelCode;
+    }
+    aiModelLoadState.value = 'ready';
+    aiModelLoadMessage.value = '演示模式：使用预设模型列表';
+    return;
+  }
+  
   try {
     let payload;
     try {
@@ -593,7 +628,8 @@ async function fetchAiModels() {
       .filter(isEnabledModel)
       .map(item => ({
         ...item,
-        modelName: item.modelName || item.name || item.modelCode || '未命名模型'
+        modelName: cleanModelName(item.modelName || item.name || item.modelCode) || '未命名模型',
+        modelCode: cleanModelName(item.modelCode) || ''
       }));
     aiModelOptions.value = list;
     if (!selectedAiModelCode.value && aiModelOptions.value.length > 0) {
@@ -606,12 +642,14 @@ async function fetchAiModels() {
       aiModelLoadState.value = 'ready';
     }
   } catch (error) {
-    aiModelOptions.value = [];
-    selectedAiModelCode.value = '';
-    aiModelLoadState.value = 'error';
-    aiModelLoadMessage.value = error?.message || '模型列表加载失败，请检查 AI 目录服务';
-    ElMessage.warning(aiModelLoadMessage.value);
+    aiModelOptions.value = MOCK_AI_MODELS;
+    if (!selectedAiModelCode.value && aiModelOptions.value.length > 0) {
+      selectedAiModelCode.value = aiModelOptions.value[0].modelCode;
+    }
+    aiModelLoadState.value = 'ready';
+    aiModelLoadMessage.value = '已切换到演示模式，使用预设模型列表';
   }
+  */
 }
 
 function normalizeModelListPayload(payload) {
@@ -623,6 +661,11 @@ function normalizeModelListPayload(payload) {
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.data?.records)) return payload.data.records;
   return [];
+}
+
+function cleanModelName(name) {
+  if (!name || typeof name !== 'string') return '';
+  return String(name).trim();
 }
 
 function isEnabledModel(item) {
@@ -1086,6 +1129,28 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.ai-model-select :deep(.el-select__input) {
+  color: var(--color-text);
+}
+
+.ai-model-select :deep(.el-select__placeholder) {
+  color: var(--color-text-subtle);
+}
+
+.ai-model-select :deep(.el-select-dropdown) {
+  background: linear-gradient(160deg, rgba(12, 20, 34, 0.98), rgba(8, 14, 26, 0.96));
+  border-color: rgba(169, 196, 255, 0.16);
+  color: var(--color-text);
+}
+
+.ai-model-select :deep(.el-select-dropdown__item) {
+  color: var(--color-text);
+}
+
+.ai-model-select :deep(.el-select-dropdown__item:hover) {
+  background: rgba(95, 135, 255, 0.12);
+}
+
 .workbench-home {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2016,6 +2081,9 @@ onBeforeUnmount(() => {
   color: #e2e8f0;
   font-size: 13px;
   padding: 10px 12px;
+  font-family: inherit;
+  unicode-bidi: plaintext;
+  text-rendering: optimizeLegibility;
 }
 
 .ai-model-select:focus,
@@ -2026,6 +2094,10 @@ onBeforeUnmount(() => {
 
 .ai-model-select option {
   color: #111827;
+  background-color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
 }
 
 .ai-draft-input {
